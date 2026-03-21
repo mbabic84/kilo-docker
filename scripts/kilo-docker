@@ -241,5 +241,9 @@ if [ $# -gt 0 ]; then
     exec docker run "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
 else
     # Interactive mode
-    exec docker run -it "${DOCKER_ARGS[@]}" "$IMAGE"
+    if [ -t 0 ]; then
+        exec docker run -it "${DOCKER_ARGS[@]}" "$IMAGE"
+    else
+        exec docker run -i "${DOCKER_ARGS[@]}" "$IMAGE"
+    fi
 fi

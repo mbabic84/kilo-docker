@@ -17,17 +17,19 @@ No need to clone the repository. Run directly with `curl` or `wget`:
 
 ```bash
 # Interactive mode (curl)
-curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)
 
 # Interactive mode (wget)
-wget -qO- https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash
+bash <(wget -qO- https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)
 
 # Autonomous mode
-curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash -s -- run "your prompt here"
+bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker) run "your prompt here"
 
 # Show all commands
-curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash -s -- help
+bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker) help
 ```
+
+> **Note:** Use `bash <(...)` instead of `curl | bash` to preserve stdin for interactive input. Piping consumes stdin, which breaks interactive prompts and `docker run -it`.
 
 Alternatively, download the script once and run it locally:
 
@@ -98,13 +100,10 @@ If `CONTEXT7_TOKEN` or `AINSTRUCT_TOKEN` are already set in your environment, th
 
 ```bash
 # Run directly on a remote host (no clone needed)
-ssh remote-host 'curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash'
+ssh remote-host 'bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)'
 
 # With API key from environment
-ssh remote-host 'curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | CONTEXT7_TOKEN="$CONTEXT7_TOKEN" bash'
-
-# Pipe script via stdin
-ssh remote-host "bash -s" < <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)
+ssh remote-host 'CONTEXT7_TOKEN="$CONTEXT7_TOKEN" bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)'
 ```
 
 ### SSH Alias for Convenience
@@ -116,7 +115,7 @@ Host remote
     HostName remote.example.com
     User username
     RequestTTY yes
-    RemoteCommand bash -c 'curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash'
+    RemoteCommand bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)
 ```
 
 ## Image Tags
