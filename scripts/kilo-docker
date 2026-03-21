@@ -7,7 +7,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-export PATH="/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:$PATH}"
 
 readonly IMAGE="ghcr.io/mbabic84/kilo-docker:latest"
 readonly DATA_MOUNT="/home/user/.local/share/kilo"
@@ -22,8 +22,8 @@ confirm() {
     local prompt="$1"
     local response=""
     echo -n "$prompt" >&2
-    if [ -t 1 ]; then
-        read -r response </dev/tty
+    if [ -t 2 ]; then
+        read -r response </dev/tty || response="n"
     else
         response="n"
         echo "n (no TTY)" >&2
@@ -187,13 +187,13 @@ else
             echo >&2
         fi
 
-        if [ -t 1 ]; then
+        if [ -t 2 ]; then
             echo -n "Context7 API token [Enter=use existing]: " >&2
-            read -s -r TOKEN_1 </dev/tty
+            read -s -r TOKEN_1 </dev/tty || true
             echo >&2
 
             echo -n "Ainstruct API token [Enter=use existing]: " >&2
-            read -s -r TOKEN_2 </dev/tty
+            read -s -r TOKEN_2 </dev/tty || true
             echo >&2
         else
             echo "No TTY available — using environment variables (if set)." >&2
