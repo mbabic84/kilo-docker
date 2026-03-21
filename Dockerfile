@@ -7,20 +7,13 @@ RUN apk add --no-cache \
     ca-certificates \
     openssh-client
 
-RUN apk add --no-cache \
-    git \
-    curl \
-    bash \
-    ca-certificates \
-    openssh-client
-
 RUN npm install -g @kilocode/cli
 
-RUN mkdir /workspace && chown node:node /workspace
+RUN mkdir -p /workspace /home/user/.local && \
+    chmod 777 /workspace /home/user /home/user/.local
 
 WORKDIR /workspace
 
-USER node
+ENV HOME=/home/user
 
 ENTRYPOINT ["kilo"]
-CMD ["--help"]
