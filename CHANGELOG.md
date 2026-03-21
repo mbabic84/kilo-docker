@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/mbabic84/kilo-docker/compare/v1.0.2...v1.1.0) (2026-03-21)
+
+### Features
+
+* add default MCP servers (context7, ainstruct) to Docker image ([eacc61a](https://github.com/mbabic84/kilo-docker/commit/eacc61a2b58cd2f8cfc3ed4243d69e1b5e70a9e0))
+
 ## [1.0.2](https://github.com/mbabic84/kilo-docker/compare/v1.0.1...v1.0.2) (2026-03-21)
 
 ### Bug Fixes
