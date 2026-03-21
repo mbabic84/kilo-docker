@@ -8,6 +8,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **Non-root user** - Runs as `node` user for security
 - **Pre-installed tools** - `git`, `curl`, `bash` for common workflows
 - **Zero config** - Kilo config is ephemeral with `--rm` flag
+- **Persistent database** - Database and auth state survive container restarts via automatic volume
 
 ## Quick Start
 
@@ -70,6 +71,33 @@ docker run -it --rm \
   -v $(pwd):/workspace \
   -e KILO_CONFIG_CONTENT='{"model":"anthropic/claude-sonnet-4"}' \
   ghcr.io/mbabic84/kilo-docker:latest
+```
+
+## Data Persistence
+
+The image declares a `VOLUME` at `/home/user/.local/share/kilo` where Kilo stores its SQLite database, auth state, logs, and snapshots. Docker automatically creates a persistent anonymous volume on first run, so the database migration only executes once.
+
+### Using a named volume (recommended)
+
+For more control, mount a named volume explicitly:
+
+```bash
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v kilo-data:/home/user/.local/share/kilo \
+  -w /workspace \
+  ghcr.io/mbabic84/kilo-docker:latest
+```
+
+Named volumes survive `docker system prune` and can be inspected with `docker volume inspect kilo-data`.
+
+### Running as host user with volumes
+
+When using `--user $(id -u):$(id -g)`, the container user may not have write permissions to the volume. Grant access by running the container once without `--user` to initialize the volume, or use a named volume created with correct ownership:
+
+```bash
+docker volume create kilo-data
+docker run --rm -v kilo-data:/home/user/.local/share/kilo ghcr.io/mbabic84/kilo-docker:latest chown -R $(id -u):$(id -g) /home/user/.local/share/kilo
 ```
 
 ## Default MCP Servers
