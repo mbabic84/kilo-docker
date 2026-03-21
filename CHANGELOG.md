@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/mbabic84/kilo-docker/compare/v1.1.0...v1.2.0) (2026-03-21)
+
+### Features
+
+* persist database across container restarts via volume ([efc19fb](https://github.com/mbabic84/kilo-docker/commit/efc19fb758206b1a4adb44353742c593b81c108f))
+
 ## [1.1.0](https://github.com/mbabic84/kilo-docker/compare/v1.0.2...v1.1.0) (2026-03-21)
 
 ### Features
