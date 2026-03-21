@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/mbabic84/kilo-docker/compare/v1.3.0...v1.4.0) (2026-03-21)
+
+### Features
+
+* add --once flag and cleanup command ([9a751cd](https://github.com/mbabic84/kilo-docker/commit/9a751cd1cb1681b105155a6999b51ce5080e1352))
+
 ## [1.3.0](https://github.com/mbabic84/kilo-docker/compare/v1.2.0...v1.3.0) (2026-03-21)
 
 ### Features
