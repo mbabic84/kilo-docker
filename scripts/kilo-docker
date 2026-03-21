@@ -1,12 +1,35 @@
 #!/usr/bin/env bash
+# kilo-docker — Wrapper script for running Kilo in a Docker container.
+#
+# Usage: kilo-docker [--once] [command] [args...]
+# See:   kilo-docker help
+#
 set -euo pipefail
+IFS=$'\n\t'
 
-IMAGE="ghcr.io/mbabic84/kilo-docker:latest"
-DATA_MOUNT="/home/user/.local/share/kilo"
-DATA_VOLUME="kilo-data-$(whoami)"
-TOKEN_FILE="${DATA_MOUNT}/.tokens.env"
-HOST_UID="$(id -u)"
-HOST_GID="$(id -g)"
+export PATH="/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+
+readonly IMAGE="ghcr.io/mbabic84/kilo-docker:latest"
+readonly DATA_MOUNT="/home/user/.local/share/kilo"
+readonly DATA_VOLUME="kilo-data-$(whoami)"
+readonly TOKEN_FILE="${DATA_MOUNT}/.tokens.env"
+readonly HOST_UID="$(id -u)"
+readonly HOST_GID="$(id -g)"
+
+# --- Helper functions --------------------------------------------------------
+
+confirm() {
+    local prompt="$1"
+    local response=""
+    echo -n "$prompt" >&2
+    if [ -t 1 ]; then
+        read -r response </dev/tty
+    else
+        response="n"
+        echo "n (no TTY)" >&2
+    fi
+    [[ "${response,,}" == "y" ]]
+}
 
 # --- Parse --once flag ------------------------------------------------------
 
@@ -33,9 +56,7 @@ fi
 
 if [ "${1:-}" = "init" ]; then
     if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
-        echo -n "Remove volume '${DATA_VOLUME}' and reset all configuration? [y/N]: " >&2
-        read -r CONFIRM </dev/tty
-        if [[ "${CONFIRM,,}" == "y" ]]; then
+        if confirm "Remove volume '${DATA_VOLUME}' and reset all configuration? [y/N]: "; then
             docker volume rm "$DATA_VOLUME" >/dev/null
             echo "Volume removed. You will be prompted for tokens on next run." >&2
         fi
@@ -55,9 +76,7 @@ fi
 # --- Handle "cleanup" argument ----------------------------------------------
 
 if [ "${1:-}" = "cleanup" ]; then
-    echo -n "Remove volume, containers, and image for kilo-docker? [y/N]: " >&2
-    read -r CONFIRM </dev/tty
-    if [[ "${CONFIRM,,}" != "y" ]]; then
+    if ! confirm "Remove volume, containers, and image for kilo-docker? [y/N]: "; then
         echo "Aborted." >&2
         exit 0
     fi
@@ -158,24 +177,28 @@ else
     if [ "$FIRST_RUN" -eq 1 ]; then
         echo "First-time setup: Enter API tokens for remote MCP servers." >&2
         echo "Leave empty to skip a server." >&2
-        echo "" >&2
+        echo >&2
 
         if [ -n "$ENV_TOKEN_1" ] || [ -n "$ENV_TOKEN_2" ]; then
             echo "Existing environment variables detected:" >&2
             [ -n "$ENV_TOKEN_1" ] && echo "  - CONTEXT7_TOKEN is set" >&2
             [ -n "$ENV_TOKEN_2" ] && echo "  - AINSTRUCT_TOKEN is set" >&2
             echo "Press Enter to use existing values, or type a new token to override." >&2
-            echo "" >&2
+            echo >&2
         fi
 
-        echo -n "Context7 API token [Enter=use existing]: " >&2
-        read -s -r TOKEN_1 </dev/tty
-        echo >&2
-        TOKEN_1="${TOKEN_1:-$ENV_TOKEN_1}"
+        if [ -t 1 ]; then
+            echo -n "Context7 API token [Enter=use existing]: " >&2
+            read -s -r TOKEN_1 </dev/tty
+            echo >&2
 
-        echo -n "Ainstruct API token [Enter=use existing]: " >&2
-        read -s -r TOKEN_2 </dev/tty
-        echo >&2
+            echo -n "Ainstruct API token [Enter=use existing]: " >&2
+            read -s -r TOKEN_2 </dev/tty
+            echo >&2
+        else
+            echo "No TTY available — using environment variables (if set)." >&2
+        fi
+        TOKEN_1="${TOKEN_1:-$ENV_TOKEN_1}"
         TOKEN_2="${TOKEN_2:-$ENV_TOKEN_2}"
     fi
 
