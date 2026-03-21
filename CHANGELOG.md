@@ -1,3 +1,9 @@
+## [1.4.2](https://github.com/mbabic84/kilo-docker/compare/v1.4.1...v1.4.2) (2026-03-21)
+
+### Bug Fixes
+
+* build Docker image only when semantic-release publishes a release ([6c61a66](https://github.com/mbabic84/kilo-docker/commit/6c61a663dc5315b9141358e8c3ce3ebc71814a7e))
+
 ## [1.4.1](https://github.com/mbabic84/kilo-docker/compare/v1.4.0...v1.4.1) (2026-03-21)
 
 ### Bug Fixes
