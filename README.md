@@ -8,6 +8,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **Non-root user** - Runs as `node` user (UID 1000) for security
 - **Persistent database** - SQLite database and auth state survive container restarts via named volume
 - **Token persistence** - MCP server tokens are saved in the volume on first run
+- **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Host user mapping** - Runs with your UID/GID so files are owned by you
 
 ## Quick Start
@@ -45,8 +46,28 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | *(none)* | Start Kilo in interactive mode |
 | `run "prompt"` | Run Kilo in autonomous mode |
 | `init` | Reset configuration (remove volume, re-enter tokens) |
+| `cleanup` | Remove volume, containers, and image |
 | `update` | Pull the latest Docker image |
 | `help` | Show help message |
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--once` | Run a one-time session without persistence (no volume) |
+
+## One-Time Sessions
+
+Use `--once` to run without creating or mounting a named volume. No data persists after the container exits. Tokens must be provided via environment variables:
+
+```bash
+CONTEXT7_TOKEN=xxx AINSTRUCT_TOKEN=xxx kilo-docker --once
+
+# Autonomous one-shot
+CONTEXT7_TOKEN=xxx kilo-docker --once run "fix build errors"
+```
+
+This is useful for CI pipelines, ephemeral environments, or when you don't want to leave any state on the host.
 
 ## Data Persistence
 
@@ -56,7 +77,7 @@ The script uses a named Docker volume (`kilo-data-<username>`) mounted at `/home
 - MCP server tokens
 - Auth state, logs, and snapshots
 
-The volume persists across container restarts. Use `kilo-docker init` to reset.
+The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, and image).
 
 ## MCP Servers
 
