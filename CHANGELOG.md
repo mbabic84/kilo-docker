@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/mbabic84/kilo-docker/compare/v1.2.0...v1.3.0) (2026-03-21)
+
+### Features
+
+* add kilo-docker script with token persistence ([276475d](https://github.com/mbabic84/kilo-docker/commit/276475d39f94875bafa72bff0049bf63b1beba23))
+
 ## [1.2.0](https://github.com/mbabic84/kilo-docker/compare/v1.1.0...v1.2.0) (2026-03-21)
 
 ### Features
