@@ -17,4 +17,6 @@ WORKDIR /workspace
 
 ENV HOME=/home/user
 
+VOLUME /home/user/.local/share/kilo
+
 ENTRYPOINT ["kilo"]
