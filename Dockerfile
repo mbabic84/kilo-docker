@@ -7,10 +7,11 @@ RUN apk add --no-cache curl \
 FROM alpine:3.21
 
 RUN apk add --no-cache git ca-certificates openssh-client libstdc++ \
-    && mkdir -p /workspace /home/user/.local \
+    && mkdir -p /workspace /home/user/.local /home/user/.config/kilo \
     && chmod 777 /workspace /home/user /home/user/.local
 
 COPY --from=builder /kilo /usr/local/bin/kilo
+COPY opencode.json /home/user/.config/kilo/opencode.json
 
 WORKDIR /workspace
 

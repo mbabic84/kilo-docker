@@ -72,6 +72,40 @@ docker run -it --rm \
   ghcr.io/mbabic84/kilo-docker:latest
 ```
 
+## Default MCP Servers
+
+The image ships with two MCP servers pre-configured:
+
+| Server | Type | Description |
+|--------|------|-------------|
+| `context7` | Remote | Library documentation lookup via `https://mcp.context7.com/mcp` |
+| `ainstruct` | Remote | Document storage and semantic search via `https://ainstruct-dev.kralicinora.cz/mcp` |
+
+Both servers require Bearer token authentication via environment variables:
+
+| Environment Variable | Description |
+|---------------------|-------------|
+| `CONTEXT7_TOKEN` | API token for Context7 MCP server |
+| `AINSTRUCT_TOKEN` | API token for ainstruct MCP server |
+
+### Passing tokens at runtime
+
+```bash
+# Interactive
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -e CONTEXT7_TOKEN="your-token" \
+  -e AINSTRUCT_TOKEN="your-token" \
+  ghcr.io/mbabic84/kilo-docker:latest
+
+# Via docker-compose (.env file)
+echo 'CONTEXT7_TOKEN=your-token' > .env
+echo 'AINSTRUCT_TOKEN=your-token' >> .env
+docker-compose run kilo
+```
+
+Servers are only activated when their respective environment variables are set. Without the token, the server is configured but authentication will fail.
+
 ## Running as Host User
 
 By default, the container runs as a non-root user (`node`, UID 1000). This may cause permission issues when creating files. To run with the same UID/GID as your host user:
