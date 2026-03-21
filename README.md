@@ -12,15 +12,28 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 
 ## Quick Start
 
+No need to clone the repository. Run directly with `curl` or `wget`:
+
 ```bash
-# Interactive mode
-./scripts/kilo-docker
+# Interactive mode (curl)
+curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash
+
+# Interactive mode (wget)
+wget -qO- https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash
 
 # Autonomous mode
-./scripts/kilo-docker run "your prompt here"
+curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash -s -- run "your prompt here"
 
 # Show all commands
-./scripts/kilo-docker help
+curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash -s -- help
+```
+
+Alternatively, download the script once and run it locally:
+
+```bash
+curl -fsSL -o kilo-docker https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker
+chmod +x kilo-docker
+./kilo-docker
 ```
 
 On first run, the script prompts for MCP server tokens and saves them to a named Docker volume. Subsequent runs reuse the saved tokens.
@@ -63,14 +76,14 @@ If `CONTEXT7_TOKEN` or `AINSTRUCT_TOKEN` are already set in your environment, th
 ## Usage on Remote Hosts
 
 ```bash
-# SSH and run
-ssh remote-host './scripts/kilo-docker'
+# Run directly on a remote host (no clone needed)
+ssh remote-host 'curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash'
 
 # With API key from environment
-ssh remote-host 'CONTEXT7_TOKEN="$CONTEXT7_TOKEN" ./scripts/kilo-docker'
+ssh remote-host 'curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | CONTEXT7_TOKEN="$CONTEXT7_TOKEN" bash'
 
-# One-liner (copy script to remote host first)
-ssh remote-host "bash -s" < scripts/kilo-docker
+# Pipe script via stdin
+ssh remote-host "bash -s" < <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)
 ```
 
 ### SSH Alias for Convenience
@@ -82,7 +95,7 @@ Host remote
     HostName remote.example.com
     User username
     RequestTTY yes
-    RemoteCommand ./scripts/kilo-docker
+    RemoteCommand bash -c 'curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker | bash'
 ```
 
 ## Image Tags
@@ -103,8 +116,8 @@ docker build -t kilo-docker .
 docker run -it --rm -v $(pwd):/workspace -w /workspace kilo-docker --version
 ```
 
-To use the local image, update `IMAGE` in `scripts/kilo-docker`:
+To use the local image, set the `IMAGE` environment variable:
 
 ```bash
-IMAGE="kilo-docker"
+IMAGE="kilo-docker" ./kilo-docker
 ```
