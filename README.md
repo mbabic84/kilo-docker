@@ -72,6 +72,36 @@ docker run -it --rm \
   ghcr.io/mbabic84/kilo-docker:latest
 ```
 
+## Running as Host User
+
+By default, the container runs as a non-root user (`node`, UID 1000). This may cause permission issues when creating files. To run with the same UID/GID as your host user:
+
+```bash
+# Interactive mode
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -w /workspace \
+  --user $(id -u):$(id -g) \
+  ghcr.io/mbabic84/kilo-docker:latest
+
+# SSH one-liner
+ssh remote-host "docker run -it --rm -v \$(pwd):/workspace -w /workspace --user \$(id -u):\$(id -g) ghcr.io/mbabic84/kilo-docker:latest"
+```
+
+### SSH Alias for Convenience
+
+Add to your `~/.ssh/config`:
+
+```
+Host remote
+    HostName remote.example.com
+    User username
+    RequestTTY yes
+    RemoteCommand docker run -it --rm -v $(pwd):/workspace -w /workspace --user $(id -u):$(id -g) ghcr.io/mbabic84/kilo-docker:latest
+```
+
+When running as your host user, your Git credentials and SSH keys work automatically.
+
 ## Building Locally
 
 ```bash
