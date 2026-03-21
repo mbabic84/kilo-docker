@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/mbabic84/kilo-docker/compare/v1.0.0...v1.0.1) (2026-03-21)
+
+### Bug Fixes
+
+* support arbitrary UID and remove default --help command [#patch](https://github.com/mbabic84/kilo-docker/issues/patch) ([67b4030](https://github.com/mbabic84/kilo-docker/commit/67b4030f58749506485cb81f49d2baa0e2a44df6))
+
 ## 1.0.0 (2026-03-21)
 
 ### Features
