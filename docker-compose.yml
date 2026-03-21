@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  kilo:
+    image: ghcr.io/mbabic84/kilo-docker:latest
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
