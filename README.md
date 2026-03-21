@@ -4,150 +4,73 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 
 ## Features
 
-- **Node.js LTS** - Latest stable Node.js via Alpine Linux
-- **Non-root user** - Runs as `node` user for security
-- **Pre-installed tools** - `git`, `curl`, `bash` for common workflows
-- **Zero config** - Kilo config is ephemeral with `--rm` flag
-- **Persistent database** - Database and auth state survive container restarts via automatic volume
+- **Alpine Linux** - Lightweight image with `git`, `ca-certificates`, and `openssh-client`
+- **Non-root user** - Runs as `node` user (UID 1000) for security
+- **Persistent database** - SQLite database and auth state survive container restarts via named volume
+- **Token persistence** - MCP server tokens are saved in the volume on first run
+- **Host user mapping** - Runs with your UID/GID so files are owned by you
 
 ## Quick Start
 
 ```bash
-# Interactive mode (current directory)
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  ghcr.io/mbabic84/kilo-docker:latest
+# Interactive mode
+./scripts/kilo-docker
 
 # Autonomous mode
-docker run --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  ghcr.io/mbabic84/kilo-docker:latest run "your prompt here"
+./scripts/kilo-docker run "your prompt here"
+
+# Show all commands
+./scripts/kilo-docker help
 ```
+
+On first run, the script prompts for MCP server tokens and saves them to a named Docker volume. Subsequent runs reuse the saved tokens.
+
+## Script Commands
+
+| Command | Description |
+|---------|-------------|
+| *(none)* | Start Kilo in interactive mode |
+| `run "prompt"` | Run Kilo in autonomous mode |
+| `init` | Reset configuration (remove volume, re-enter tokens) |
+| `update` | Pull the latest Docker image |
+| `help` | Show help message |
+
+## Data Persistence
+
+The script uses a named Docker volume (`kilo-data-<username>`) mounted at `/home/user/.local/share/kilo`. This stores:
+
+- SQLite database
+- MCP server tokens
+- Auth state, logs, and snapshots
+
+The volume persists across container restarts. Use `kilo-docker init` to reset.
+
+## MCP Servers
+
+The image ships with two remote MCP servers pre-configured:
+
+| Server | Description |
+|--------|-------------|
+| `context7` | Library documentation lookup |
+| `ainstruct` | Document storage and semantic search |
+
+Both require Bearer token authentication. Tokens are prompted on first run and stored in the named volume for subsequent runs.
+
+### Passing tokens via environment
+
+If `CONTEXT7_TOKEN` or `AINSTRUCT_TOKEN` are already set in your environment, the script detects them and offers to use them during first-time setup.
 
 ## Usage on Remote Hosts
 
 ```bash
-# SSH and run interactively
-ssh remote-host 'docker run -it --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  ghcr.io/mbabic84/kilo-docker:latest'
+# SSH and run
+ssh remote-host './scripts/kilo-docker'
 
 # With API key from environment
-ssh remote-host 'docker run -it --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  -e OPENAI_API_KEY="$OPENAI_API_KEY" \
-  ghcr.io/mbabic84/kilo-docker:latest'
-```
+ssh remote-host 'CONTEXT7_TOKEN="$CONTEXT7_TOKEN" ./scripts/kilo-docker'
 
-## Image Tags
-
-| Tag | Description |
-|-----|-------------|
-| `latest` | Most recent stable release |
-| `v{version}` | Exact semantic version (e.g., `v1.2.3`) |
-| `v{major}.{minor}` | Minor track (e.g., `v1.2`) |
-
-## Configuration
-
-Kilo CLI writes config to `~/.config/kilo`. By default this is inside the container and ephemeral. To persist config:
-
-```bash
-# Mount a config directory
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v $HOME/.config/kilo:/home/node/.config/kilo \
-  -w /workspace \
-  ghcr.io/mbabic84/kilo-docker:latest
-```
-
-Or use environment variable override:
-
-```bash
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -e KILO_CONFIG_CONTENT='{"model":"anthropic/claude-sonnet-4"}' \
-  ghcr.io/mbabic84/kilo-docker:latest
-```
-
-## Data Persistence
-
-The image declares a `VOLUME` at `/home/user/.local/share/kilo` where Kilo stores its SQLite database, auth state, logs, and snapshots. Docker automatically creates a persistent anonymous volume on first run, so the database migration only executes once.
-
-### Using a named volume (recommended)
-
-For more control, mount a named volume explicitly:
-
-```bash
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v kilo-data:/home/user/.local/share/kilo \
-  -w /workspace \
-  ghcr.io/mbabic84/kilo-docker:latest
-```
-
-Named volumes survive `docker system prune` and can be inspected with `docker volume inspect kilo-data`.
-
-### Running as host user with volumes
-
-When using `--user $(id -u):$(id -g)`, the container user may not have write permissions to the volume. Grant access by running the container once without `--user` to initialize the volume, or use a named volume created with correct ownership:
-
-```bash
-docker volume create kilo-data
-docker run --rm -v kilo-data:/home/user/.local/share/kilo ghcr.io/mbabic84/kilo-docker:latest chown -R $(id -u):$(id -g) /home/user/.local/share/kilo
-```
-
-## Default MCP Servers
-
-The image ships with two MCP servers pre-configured:
-
-| Server | Type | Description |
-|--------|------|-------------|
-| `context7` | Remote | Library documentation lookup via `https://mcp.context7.com/mcp` |
-| `ainstruct` | Remote | Document storage and semantic search via `https://ainstruct-dev.kralicinora.cz/mcp` |
-
-Both servers require Bearer token authentication via environment variables:
-
-| Environment Variable | Description |
-|---------------------|-------------|
-| `CONTEXT7_TOKEN` | API token for Context7 MCP server |
-| `AINSTRUCT_TOKEN` | API token for ainstruct MCP server |
-
-### Passing tokens at runtime
-
-```bash
-# Interactive
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -e CONTEXT7_TOKEN="your-token" \
-  -e AINSTRUCT_TOKEN="your-token" \
-  ghcr.io/mbabic84/kilo-docker:latest
-
-# Via docker-compose (.env file)
-echo 'CONTEXT7_TOKEN=your-token' > .env
-echo 'AINSTRUCT_TOKEN=your-token' >> .env
-docker-compose run kilo
-```
-
-Servers are only activated when their respective environment variables are set. Without the token, the server is configured but authentication will fail.
-
-## Running as Host User
-
-By default, the container runs as a non-root user (`node`, UID 1000). This may cause permission issues when creating files. To run with the same UID/GID as your host user:
-
-```bash
-# Interactive mode
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -w /workspace \
-  --user $(id -u):$(id -g) \
-  ghcr.io/mbabic84/kilo-docker:latest
-
-# SSH one-liner
-ssh remote-host "docker run -it --rm -v \$(pwd):/workspace -w /workspace --user \$(id -u):\$(id -g) ghcr.io/mbabic84/kilo-docker:latest"
+# One-liner (copy script to remote host first)
+ssh remote-host "bash -s" < scripts/kilo-docker
 ```
 
 ### SSH Alias for Convenience
@@ -159,10 +82,16 @@ Host remote
     HostName remote.example.com
     User username
     RequestTTY yes
-    RemoteCommand docker run -it --rm -v $(pwd):/workspace -w /workspace --user $(id -u):$(id -g) ghcr.io/mbabic84/kilo-docker:latest
+    RemoteCommand ./scripts/kilo-docker
 ```
 
-When running as your host user, your Git credentials and SSH keys work automatically.
+## Image Tags
+
+| Tag | Description |
+|-----|-------------|
+| `latest` | Most recent stable release |
+| `v{version}` | Exact semantic version (e.g., `v1.2.3`) |
+| `v{major}.{minor}` | Minor track (e.g., `v1.2`) |
 
 ## Building Locally
 
@@ -174,11 +103,8 @@ docker build -t kilo-docker .
 docker run -it --rm -v $(pwd):/workspace -w /workspace kilo-docker --version
 ```
 
-## Versioning
+To use the local image, update `IMAGE` in `scripts/kilo-docker`:
 
-This project uses [semantic-release](https://semantic-release.git/) with [Conventional Commits](https://www.conventionalcommits.org/). Version bumps:
-
-- `feat:` → Minor
-- `fix:` → Patch
-- `feat!:` / `BREAKING CHANGE:` → Major
-- `docs:`, `chore:`, `ci:` → No version change
+```bash
+IMAGE="kilo-docker"
+```
