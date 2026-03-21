@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/mbabic84/kilo-docker/compare/v1.4.0...v1.4.1) (2026-03-21)
+
+### Bug Fixes
+
+* address Copilot review feedback ([8b5e8f8](https://github.com/mbabic84/kilo-docker/commit/8b5e8f87c003fadbf751c49110b1f1fb1db814cf))
+
 ## [1.4.0](https://github.com/mbabic84/kilo-docker/compare/v1.3.0...v1.4.0) (2026-03-21)
 
 ### Features
