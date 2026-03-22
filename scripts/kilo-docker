@@ -234,6 +234,15 @@ if [ -n "$TOKEN_2" ]; then
     DOCKER_ARGS+=(-e "AINSTRUCT_TOKEN=${TOKEN_2}")
 fi
 
+# Pass terminal capability variables to preserve TUI formatting
+if [ -n "${TERM:-}" ]; then
+    DOCKER_ARGS+=(-e "TERM=${TERM}")
+fi
+
+if [ -n "${COLORTERM:-}" ]; then
+    DOCKER_ARGS+=(-e "COLORTERM=${COLORTERM}")
+fi
+
 # --- Run --------------------------------------------------------------------
 
 if [ $# -gt 0 ]; then
