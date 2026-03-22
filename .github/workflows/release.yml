@@ -27,6 +27,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
       - name: Install dependencies
         run: npm ci
 
@@ -58,7 +64,6 @@ jobs:
             type=semver,pattern={{version}},value=v${{ steps.release.outputs.new_release_version }},enable=${{ steps.release.outputs.new_release_version != '' }}
             type=semver,pattern={{major}}.{{minor}},value=v${{ steps.release.outputs.new_release_version }},enable=${{ steps.release.outputs.new_release_version != '' }}
             type=semver,pattern={{major}},value=v${{ steps.release.outputs.new_release_version }},enable=${{ steps.release.outputs.new_release_version != '' }}
-            type=raw,value=latest
 
       - name: Build and push
         if: ${{ steps.release.outputs.new_release_published == 'true' }}
