@@ -1,3 +1,9 @@
+## [1.4.8](https://github.com/mbabic84/kilo-docker/compare/v1.4.7...v1.4.8) (2026-03-22)
+
+### Bug Fixes
+
+* add gcompat for musl terminal handling ([c880661](https://github.com/mbabic84/kilo-docker/commit/c8806611b89fed30582155acea3da6305396a38a))
+
 ## [1.4.7](https://github.com/mbabic84/kilo-docker/compare/v1.4.6...v1.4.7) (2026-03-22)
 
 ### Bug Fixes
