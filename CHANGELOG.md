@@ -1,3 +1,9 @@
+## [1.4.6](https://github.com/mbabic84/kilo-docker/compare/v1.4.5...v1.4.6) (2026-03-22)
+
+### Bug Fixes
+
+* pass TERM/COLORTERM to container for proper TUI formatting ([5e9bed1](https://github.com/mbabic84/kilo-docker/commit/5e9bed132dbba722ed6c891ca6d538f620099b5a))
+
 ## [1.4.5](https://github.com/mbabic84/kilo-docker/compare/v1.4.4...v1.4.5) (2026-03-22)
 
 ### Bug Fixes
