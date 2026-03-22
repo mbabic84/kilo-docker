@@ -1,26 +1,26 @@
+# syntax=docker/dockerfile:1
+# ── Builder: download Kilo binary ──
+FROM alpine:3.21 AS builder
+
+ARG KILO_VERSION=7.1.0
+
+RUN apk add --no-cache curl tar \
+    && curl -fsSL "https://github.com/Kilo-Org/kilocode/releases/download/v${KILO_VERSION}/kilo-linux-x64-musl.tar.gz" \
+       | tar xz -C /tmp \
+    && chmod +x /tmp/kilo
+
+# ── Runtime: Alpine with tools ──
 FROM alpine:3.21
 
-RUN apk add --no-cache \
-    git \
-    ca-certificates \
-    openssh-client \
-    libstdc++ \
-    ripgrep \
-    curl \
-    coreutils \
-    bash \
-    && mkdir -p /workspace /home/user/.local/share/kilo /home/user/.config/kilo \
-    && chmod 777 /workspace /home/user /home/user/.local /home/user/.local/share/kilo \
-    && curl -fsSL https://kilo.ai/cli/install | bash -s -- --no-modify-path \
-    && mv /root/.kilo/bin/kilo /usr/local/bin/kilo
+RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec \
+    && adduser -D -u 1000 kilo
 
-COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY opencode.json /home/user/.config/kilo/opencode.json
+COPY --from=builder /tmp/kilo /usr/local/bin/kilo
+COPY opencode.json /home/kilo/.config/kilo/opencode.json
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+ENV HOME=/home/kilo
 WORKDIR /workspace
 
-ENV HOME=/home/user
-
-VOLUME /home/user/.local/share/kilo
-
-ENTRYPOINT ["entrypoint.sh"]
+ENTRYPOINT ["docker-entrypoint.sh"]

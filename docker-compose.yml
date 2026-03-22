@@ -1,12 +1,13 @@
-version: '3.8'
-
 services:
   kilo:
-    image: ghcr.io/mbabic84/kilo-docker:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     volumes:
       - .:/workspace
     working_dir: /workspace
     stdin_open: true
     tty: true
-    env_file:
-      - .env
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
