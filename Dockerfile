@@ -15,6 +15,7 @@ RUN apk add --no-cache \
     curl \
     coreutils \
     bash \
+    gcompat \
     ncurses-terminfo \
     && mkdir -p /workspace /home/user/.local/share/kilo /home/user/.config/kilo \
     && chmod 777 /workspace /home/user /home/user/.local /home/user/.local/share/kilo
