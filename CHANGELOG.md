@@ -1,3 +1,9 @@
+## [1.4.10](https://github.com/mbabic84/kilo-docker/compare/v1.4.9...v1.4.10) (2026-03-22)
+
+### Bug Fixes
+
+* move kilo binary to /usr/local/bin to resolve permission denied ([2d2b603](https://github.com/mbabic84/kilo-docker/commit/2d2b60315ca2a9fee0cc5d58d59a382092240b4f))
+
 ## [1.4.9](https://github.com/mbabic84/kilo-docker/compare/v1.4.8...v1.4.9) (2026-03-22)
 
 ### Bug Fixes
