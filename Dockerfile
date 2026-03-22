@@ -6,7 +6,15 @@ RUN apk add --no-cache curl \
 
 FROM alpine:3.21
 
-RUN apk add --no-cache git ca-certificates openssh-client libstdc++ \
+RUN apk add --no-cache \
+    git \
+    ca-certificates \
+    openssh-client \
+    libstdc++ \
+    ripgrep \
+    curl \
+    coreutils \
+    bash \
     && mkdir -p /workspace /home/user/.local/share/kilo /home/user/.config/kilo \
     && chmod 777 /workspace /home/user /home/user/.local /home/user/.local/share/kilo
 
