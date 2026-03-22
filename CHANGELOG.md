@@ -1,3 +1,9 @@
+## [1.4.9](https://github.com/mbabic84/kilo-docker/compare/v1.4.8...v1.4.9) (2026-03-22)
+
+### Bug Fixes
+
+* use official installer instead of direct binary download ([97f42c2](https://github.com/mbabic84/kilo-docker/commit/97f42c26d6e988419596e7c7f305e02e7d9d8e94))
+
 ## [1.4.8](https://github.com/mbabic84/kilo-docker/compare/v1.4.7...v1.4.8) (2026-03-22)
 
 ### Bug Fixes
