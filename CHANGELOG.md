@@ -1,3 +1,9 @@
+## [1.4.7](https://github.com/mbabic84/kilo-docker/compare/v1.4.6...v1.4.7) (2026-03-22)
+
+### Bug Fixes
+
+* set LANG env and revert forced TERM/COLORTERM defaults ([1fb0c0d](https://github.com/mbabic84/kilo-docker/commit/1fb0c0d49e3c050f09a02d9b1480079cb6ff104e)), closes [#19](https://github.com/mbabic84/kilo-docker/issues/19)
+
 ## [1.4.6](https://github.com/mbabic84/kilo-docker/compare/v1.4.5...v1.4.6) (2026-03-22)
 
 ### Bug Fixes
