@@ -27,6 +27,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Release
         id: release
         uses: cycjimmy/semantic-release-action@v6
