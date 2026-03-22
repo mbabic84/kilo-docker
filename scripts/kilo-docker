@@ -5,16 +5,12 @@
 # See:   kilo-docker help
 #
 set -euo pipefail
-IFS=$'\n\t'
 
 export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:$PATH}"
 
 readonly IMAGE="ghcr.io/mbabic84/kilo-docker:latest"
-readonly DATA_MOUNT="/home/user/.local/share/kilo"
 readonly DATA_VOLUME="kilo-data-$(whoami)"
-readonly TOKEN_FILE="${DATA_MOUNT}/.tokens.env"
-readonly HOST_UID="$(id -u)"
-readonly HOST_GID="$(id -g)"
+readonly TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env"
 
 # --- Helper functions --------------------------------------------------------
 
@@ -81,20 +77,17 @@ if [ "${1:-}" = "cleanup" ]; then
         exit 0
     fi
 
-    # Remove all containers referencing the image (including running)
     CONTAINERS=$(docker ps -a --filter "ancestor=${IMAGE}" -q 2>/dev/null || true)
     if [ -n "$CONTAINERS" ]; then
         echo "Removing containers..." >&2
         echo "$CONTAINERS" | xargs docker rm -f >/dev/null 2>&1 || true
     fi
 
-    # Remove the named volume
     if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
         echo "Removing volume '${DATA_VOLUME}'..." >&2
         docker volume rm "$DATA_VOLUME" >/dev/null
     fi
 
-    # Remove the image
     if docker image inspect "$IMAGE" >/dev/null 2>&1; then
         echo "Removing image '${IMAGE}'..." >&2
         docker rmi "$IMAGE" >/dev/null
@@ -113,7 +106,7 @@ Usage: kilo-docker [--once] [command] [args...]
 Commands:
   (no command)      Start Kilo in interactive mode
   run "prompt"      Run Kilo in autonomous mode with a prompt
-  init              Reset configuration (remove volume, re-enter tokens)
+  init              Reset configuration (remove volume)
   cleanup           Remove volume, containers, and image
   update            Pull the latest Docker image
   help              Show this help message
@@ -121,95 +114,61 @@ Commands:
 Options:
   --once            Run a one-time session without persisting data (no volume)
 
-Environment variables:
-  CONTEXT7_TOKEN    API token for Context7 MCP server
-  AINSTRUCT_TOKEN   API token for Ainstruct MCP server
-
-On first run, tokens are prompted interactively and saved to a
-named Docker volume for subsequent runs. Use --once to skip
-persistence entirely (tokens must be provided via environment).
-
 Examples:
   kilo-docker                         # interactive mode
   kilo-docker run "fix build errors"  # autonomous mode
   kilo-docker --once                  # one-time interactive session
   kilo-docker --once run "prompt"     # one-time autonomous session
-  kilo-docker init                    # reset and re-enter tokens
+  kilo-docker init                    # reset configuration
   kilo-docker cleanup                 # remove volume, containers, image
   kilo-docker update                  # pull latest image
 EOF
     exit 0
 fi
 
-# --- Read existing tokens from volume --------------------------------------
+# --- Read/load tokens -------------------------------------------------------
 
 TOKEN_1=""
 TOKEN_2=""
 
-if [ "$ONCE" -eq 1 ]; then
-    # One-time mode: use environment variables only, no volume
-    TOKEN_1="${CONTEXT7_TOKEN:-}"
-    TOKEN_2="${AINSTRUCT_TOKEN:-}"
-else
-    FIRST_RUN=0
-
+if [ "$ONCE" -eq 0 ]; then
     EXISTING=""
     if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
         EXISTING=$(docker run --rm --entrypoint "" \
-            -v "${DATA_VOLUME}:${DATA_MOUNT}" \
+            -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
             "$IMAGE" \
             cat "$TOKEN_FILE" 2>/dev/null || true)
     fi
 
-    if [ -z "$EXISTING" ]; then
-        FIRST_RUN=1
-    else
+    if [ -n "$EXISTING" ]; then
         TOKEN_1=$(echo "$EXISTING" | grep '^KMCP_TOKEN_1=' | cut -d= -f2- || true)
         TOKEN_2=$(echo "$EXISTING" | grep '^KMCP_TOKEN_2=' | cut -d= -f2- || true)
     fi
+fi
 
-    # --- Prompt for missing tokens -------------------------------------------
+if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ] && [ "$ONCE" -eq 0 ]; then
+    echo "First-time setup: Enter API tokens for remote MCP servers." >&2
+    echo "Leave empty to skip a server." >&2
+    echo >&2
 
-    # Detect existing env vars as fallback defaults
-    ENV_TOKEN_1="${CONTEXT7_TOKEN:-}"
-    ENV_TOKEN_2="${AINSTRUCT_TOKEN:-}"
-
-    if [ "$FIRST_RUN" -eq 1 ]; then
-        echo "First-time setup: Enter API tokens for remote MCP servers." >&2
-        echo "Leave empty to skip a server." >&2
+    if [ -t 2 ]; then
+        echo -n "Context7 API token: " >&2
+        read -s -r TOKEN_1 </dev/tty || true
         echo >&2
 
-        if [ -n "$ENV_TOKEN_1" ] || [ -n "$ENV_TOKEN_2" ]; then
-            echo "Existing environment variables detected:" >&2
-            [ -n "$ENV_TOKEN_1" ] && echo "  - CONTEXT7_TOKEN is set" >&2
-            [ -n "$ENV_TOKEN_2" ] && echo "  - AINSTRUCT_TOKEN is set" >&2
-            echo "Press Enter to use existing values, or type a new token to override." >&2
-            echo >&2
-        fi
-
-        if [ -t 2 ]; then
-            echo -n "Context7 API token [Enter=use existing]: " >&2
-            read -s -r TOKEN_1 </dev/tty || true
-            echo >&2
-
-            echo -n "Ainstruct API token [Enter=use existing]: " >&2
-            read -s -r TOKEN_2 </dev/tty || true
-            echo >&2
-        else
-            echo "No TTY available — using environment variables (if set)." >&2
-        fi
-        TOKEN_1="${TOKEN_1:-$ENV_TOKEN_1}"
-        TOKEN_2="${TOKEN_2:-$ENV_TOKEN_2}"
+        echo -n "Ainstruct API token: " >&2
+        read -s -r TOKEN_2 </dev/tty || true
+        echo >&2
+    else
+        echo "No TTY available. Tokens must be set manually in the volume." >&2
     fi
 
-    # --- Save tokens to volume -----------------------------------------------
-
-    if [ "$FIRST_RUN" -eq 1 ]; then
+    if [ -n "$TOKEN_1" ] || [ -n "$TOKEN_2" ]; then
         printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$TOKEN_1" "$TOKEN_2" | \
             docker run --rm -i --entrypoint "" \
-                -v "${DATA_VOLUME}:${DATA_MOUNT}" \
+                -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
                 "$IMAGE" \
-                sh -c "cat > '${TOKEN_FILE}'"
+                sh -c "mkdir -p \"\$(dirname '${TOKEN_FILE}')\" && cat > '${TOKEN_FILE}'"
     fi
 fi
 
@@ -217,13 +176,14 @@ fi
 
 DOCKER_ARGS=(
     --rm
-    --user "${HOST_UID}:${HOST_GID}"
+    -e "PUID=$(id -u)"
+    -e "PGID=$(id -g)"
     -v "$(pwd):/workspace"
     -w /workspace
 )
 
 if [ "$ONCE" -eq 0 ]; then
-    DOCKER_ARGS+=(-v "${DATA_VOLUME}:${DATA_MOUNT}")
+    DOCKER_ARGS+=(-v "${DATA_VOLUME}:/home/kilo/.local/share/kilo")
 fi
 
 if [ -n "$TOKEN_1" ]; then
@@ -234,22 +194,22 @@ if [ -n "$TOKEN_2" ]; then
     DOCKER_ARGS+=(-e "AINSTRUCT_TOKEN=${TOKEN_2}")
 fi
 
-# Pass terminal capability variables to preserve TUI formatting
-if [ -n "${TERM:-}" ]; then
-    DOCKER_ARGS+=(-e "TERM=${TERM}")
-fi
-
-if [ -n "${COLORTERM:-}" ]; then
-    DOCKER_ARGS+=(-e "COLORTERM=${COLORTERM}")
-fi
+# Pass terminal capability variables
+for var in TERM COLORTERM LANG LC_ALL; do
+    if [ -n "${!var:-}" ]; then
+        DOCKER_ARGS+=(-e "${var}=${!var}")
+    fi
+done
 
 # --- Run --------------------------------------------------------------------
 
 if [ $# -gt 0 ]; then
-    # Autonomous mode: kilo run "prompt"
-    exec docker run "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
+    if [ -t 0 ]; then
+        exec docker run -t "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
+    else
+        exec docker run "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
+    fi
 else
-    # Interactive mode
     if [ -t 0 ]; then
         exec docker run -it "${DOCKER_ARGS[@]}" "$IMAGE"
     else
