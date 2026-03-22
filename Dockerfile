@@ -26,6 +26,7 @@ COPY opencode.json /home/user/.config/kilo/opencode.json
 WORKDIR /workspace
 
 ENV HOME=/home/user
+ENV LANG=C.UTF-8
 
 VOLUME /home/user/.local/share/kilo
 
