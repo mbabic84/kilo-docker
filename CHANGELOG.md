@@ -1,3 +1,9 @@
+## [1.5.0](https://github.com/mbabic84/kilo-docker/compare/v1.4.10...v1.5.0) (2026-03-22)
+
+### Features
+
+* replace Node.js image with minimal Alpine binary distribution ([0137bf5](https://github.com/mbabic84/kilo-docker/commit/0137bf58f7602952f31bd7f4a6b85c26cc0ec255))
+
 ## [1.4.10](https://github.com/mbabic84/kilo-docker/compare/v1.4.9...v1.4.10) (2026-03-22)
 
 ### Bug Fixes
