@@ -4,12 +4,11 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 
 ## Features
 
-- **Alpine Linux** - Lightweight image with `git`, `ca-certificates`, and `openssh-client`
-- **Non-root user** - Runs as `node` user (UID 1000) for security
+- **Alpine Linux** - Lightweight image with `git`, `openssh-client`, `ripgrep`, and `libstdc++`
+- **Non-root user** - Runs as `kilo` user with dynamic `PUID`/`PGID` mapping to match host user
 - **Persistent database** - SQLite database and auth state survive container restarts via named volume
-- **Token persistence** - MCP server tokens are saved in the volume on first run
+- **Token persistence** - MCP server tokens are prompted once and saved in the volume
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
-- **Host user mapping** - Runs with your UID/GID so files are owned by you
 
 ## Quick Start
 
@@ -60,20 +59,20 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 
 ## One-Time Sessions
 
-Use `--once` to run without creating or mounting a named volume. No data persists after the container exits. Tokens must be provided via environment variables:
+Use `--once` to run without creating or mounting a named volume. No data persists after the container exits:
 
 ```bash
-CONTEXT7_TOKEN=xxx AINSTRUCT_TOKEN=xxx kilo-docker --once
+kilo-docker --once
 
 # Autonomous one-shot
-CONTEXT7_TOKEN=xxx kilo-docker --once run "fix build errors"
+kilo-docker --once run "fix build errors"
 ```
 
 This is useful for CI pipelines, ephemeral environments, or when you don't want to leave any state on the host.
 
 ## Data Persistence
 
-The script uses a named Docker volume (`kilo-data-<username>`) mounted at `/home/user/.local/share/kilo`. This stores:
+The script uses a named Docker volume (`kilo-data-<username>`) mounted at `/home/kilo/.local/share/kilo`. This stores:
 
 - SQLite database
 - MCP server tokens
@@ -92,19 +91,14 @@ The image ships with two remote MCP servers pre-configured:
 
 Both require Bearer token authentication. Tokens are prompted on first run and stored in the named volume for subsequent runs.
 
-### Passing tokens via environment
-
-If `CONTEXT7_TOKEN` or `AINSTRUCT_TOKEN` are already set in your environment, the script detects them and offers to use them during first-time setup.
-
 ## Usage on Remote Hosts
 
 ```bash
 # Run directly on a remote host (no clone needed)
 ssh remote-host 'bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)'
-
-# With API key from environment
-ssh remote-host 'CONTEXT7_TOKEN="$CONTEXT7_TOKEN" bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)'
 ```
+
+> Tokens are prompted interactively on first run via the TTY.
 
 ### SSH Alias for Convenience
 
@@ -133,11 +127,8 @@ Host remote
 docker build -t kilo-docker .
 
 # Test
-docker run -it --rm -v $(pwd):/workspace -w /workspace kilo-docker --version
-```
+docker run --rm kilo-docker --version
 
-To use the local image, set the `IMAGE` environment variable:
-
-```bash
-IMAGE="kilo-docker" ./kilo-docker
+# Interactive
+docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-docker
 ```
