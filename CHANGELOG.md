@@ -1,3 +1,9 @@
+## [1.4.5](https://github.com/mbabic84/kilo-docker/compare/v1.4.4...v1.4.5) (2026-03-22)
+
+### Bug Fixes
+
+* add missing CLI tool dependencies for Kilo agent ([ab2ad5b](https://github.com/mbabic84/kilo-docker/commit/ab2ad5be7a71ca9fd53b8fb5cc554c505c19585c))
+
 ## [1.4.4](https://github.com/mbabic84/kilo-docker/compare/v1.4.3...v1.4.4) (2026-03-22)
 
 ### Bug Fixes
