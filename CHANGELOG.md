@@ -1,3 +1,10 @@
+## [1.4.3](https://github.com/mbabic84/kilo-docker/compare/v1.4.2...v1.4.3) (2026-03-22)
+
+### Bug Fixes
+
+* install project dependencies before semantic-release action ([8c0ccc0](https://github.com/mbabic84/kilo-docker/commit/8c0ccc0f60229e7196662004761daa8790f3f583))
+* use semantic-release action with proper step outputs for Docker build gating ([d5c16c7](https://github.com/mbabic84/kilo-docker/commit/d5c16c7bce2d24d1a8d74ecac31856286d33a574))
+
 ## [1.4.2](https://github.com/mbabic84/kilo-docker/compare/v1.4.1...v1.4.2) (2026-03-21)
 
 ### Bug Fixes
