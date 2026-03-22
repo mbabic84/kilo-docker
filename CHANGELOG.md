@@ -1,3 +1,9 @@
+## [1.4.4](https://github.com/mbabic84/kilo-docker/compare/v1.4.3...v1.4.4) (2026-03-22)
+
+### Bug Fixes
+
+* add Node.js setup and remove duplicate latest tag in release workflow ([c7295cc](https://github.com/mbabic84/kilo-docker/commit/c7295cc2f6d0fe6ae413503b321db0fe7ef9aaac))
+
 ## [1.4.3](https://github.com/mbabic84/kilo-docker/compare/v1.4.2...v1.4.3) (2026-03-22)
 
 ### Bug Fixes
