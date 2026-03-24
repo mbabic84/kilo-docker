@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kilo-docker — Wrapper script for running Kilo in a Docker container.
 #
-# Usage: kilo-docker [--once] [command] [args...]
+# Usage: kilo-docker [--once] [--network <name>] [command] [args...]
 # See:   kilo-docker help
 #
 set -euo pipefail
@@ -27,16 +27,33 @@ confirm() {
     [[ "${response,,}" == "y" ]]
 }
 
-# --- Parse --once flag ------------------------------------------------------
+# --- Parse flags -------------------------------------------------------------
 
 ONCE=0
+NETWORK=""
+NETWORK_FLAG=0
 FILTERED_ARGS=()
-for arg in "$@"; do
-    if [ "$arg" = "--once" ]; then
-        ONCE=1
-    else
-        FILTERED_ARGS+=("$arg")
-    fi
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --once)
+            ONCE=1
+            ;;
+        --network)
+            NETWORK_FLAG=1
+            if [ $# -ge 2 ] && [[ "$2" != --* ]]; then
+                NETWORK="$2"
+                shift
+            fi
+            ;;
+        --network=*)
+            NETWORK_FLAG=1
+            NETWORK="${1#--network=}"
+            ;;
+        *)
+            FILTERED_ARGS+=("$1")
+            ;;
+    esac
+    shift
 done
 # Replace positional parameters with filtered args
 set -- "${FILTERED_ARGS[@]}"
@@ -97,15 +114,23 @@ if [ "${1:-}" = "cleanup" ]; then
     exit 0
 fi
 
+# --- Handle "networks" argument ----------------------------------------------
+
+if [ "${1:-}" = "networks" ]; then
+    docker network ls --format "{{.Name}}"
+    exit 0
+fi
+
 # --- Handle "help" argument ------------------------------------------------
 
 if [ "${1:-}" = "help" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [command] [args...]
+Usage: kilo-docker [--once] [--network <name>] [command] [args...]
 
 Commands:
   (no command)      Start Kilo in interactive mode
   run "prompt"      Run Kilo in autonomous mode with a prompt
+  networks          List available Docker networks
   init              Reset configuration (remove volume)
   cleanup           Remove volume, containers, and image
   update            Pull the latest Docker image
@@ -113,17 +138,42 @@ Commands:
 
 Options:
   --once            Run a one-time session without persisting data (no volume)
+  --network <name>  Connect the container to a Docker network
 
 Examples:
   kilo-docker                         # interactive mode
   kilo-docker run "fix build errors"  # autonomous mode
   kilo-docker --once                  # one-time interactive session
   kilo-docker --once run "prompt"     # one-time autonomous session
+  kilo-docker --network host          # connect to host network
+  kilo-docker networks                # list available Docker networks
   kilo-docker init                    # reset configuration
   kilo-docker cleanup                 # remove volume, containers, image
   kilo-docker update                  # pull latest image
 EOF
     exit 0
+fi
+
+# --- Interactive network selection -------------------------------------------
+
+if [ "$NETWORK_FLAG" -eq 1 ] && [ -z "$NETWORK" ] && [ -t 0 ] && [ -t 2 ]; then
+    if mapfile -t AVAILABLE_NETWORKS < <(docker network ls --format "{{.Name}}" 2>/dev/null) && [ ${#AVAILABLE_NETWORKS[@]} -gt 0 ]; then
+        echo "Available Docker networks:" >&2
+        for i in "${!AVAILABLE_NETWORKS[@]}"; do
+            echo "  $((i + 1)). ${AVAILABLE_NETWORKS[$i]}" >&2
+        done
+        echo -n "Select a network (number) or press Enter to use default: " >&2
+        local_selection=""
+        read -r local_selection </dev/tty || local_selection=""
+        if [ -n "$local_selection" ]; then
+            if [[ "$local_selection" =~ ^[0-9]+$ ]] && [ "$local_selection" -ge 1 ] && [ "$local_selection" -le ${#AVAILABLE_NETWORKS[@]} ]; then
+                NETWORK="${AVAILABLE_NETWORKS[$((local_selection - 1))]}"
+                echo "Using network: ${NETWORK}" >&2
+            else
+                echo "Invalid selection. Using default network." >&2
+            fi
+        fi
+    fi
 fi
 
 # --- Read/load tokens -------------------------------------------------------
@@ -192,6 +242,10 @@ fi
 
 if [ -n "$TOKEN_2" ]; then
     DOCKER_ARGS+=(-e "AINSTRUCT_TOKEN=${TOKEN_2}")
+fi
+
+if [ -n "$NETWORK" ]; then
+    DOCKER_ARGS+=(--network "$NETWORK")
 fi
 
 # Pass terminal capability variables
