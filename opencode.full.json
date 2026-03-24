@@ -19,9 +19,8 @@
       }
     },
     "playwright": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest", "--no-sandbox"],
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@latest", "--no-sandbox"],
       "enabled": true
     }
   },
