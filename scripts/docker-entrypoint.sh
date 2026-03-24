@@ -15,4 +15,23 @@ if [ "$(id -u)" = "0" ]; then
     exec su-exec kilo "$0" "$@"
 fi
 
+CONFIG="/home/kilo/.config/kilo/opencode.json"
+
+# Disable MCP servers whose required token env vars are not set.
+# Mapping: MCP server key → required env var name.
+# Uses jq's env object — undefined vars evaluate to null.
+# To add a new MCP server, add its key and env var to the $mapping object.
+if [ -f "$CONFIG" ]; then
+    jq '
+      {"ainstruct":"AINSTRUCT_TOKEN","context7":"CONTEXT7_TOKEN"} as $mapping |
+      .mcp |= with_entries(
+        if $mapping[.key] and (env[$mapping[.key]] // null) == null then
+          .value.enabled = false
+        else
+          .
+        end
+      )
+    ' "$CONFIG" > "${CONFIG}.tmp" && mv "${CONFIG}.tmp" "$CONFIG"
+fi
+
 exec kilo "$@"
