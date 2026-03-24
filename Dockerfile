@@ -2,7 +2,7 @@
 # ── Builder: download Kilo binary ──
 FROM alpine:3.21 AS builder
 
-ARG KILO_VERSION=7.1.0
+ARG KILO_VERSION=7.1.2
 
 RUN apk add --no-cache curl tar \
     && curl -fsSL "https://github.com/Kilo-Org/kilocode/releases/download/v${KILO_VERSION}/kilo-linux-x64-musl.tar.gz" \
