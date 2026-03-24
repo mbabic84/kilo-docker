@@ -1,3 +1,14 @@
+## [1.7.0](https://github.com/mbabic84/kilo-docker/compare/v1.6.0...v1.7.0) (2026-03-24)
+
+### Features
+
+* add automated Kilo CLI version bump workflow ([e112792](https://github.com/mbabic84/kilo-docker/commit/e1127929ab2a684224df61beb70514614b418b15))
+* bump Kilo CLI to v7.1.2 ([e22b980](https://github.com/mbabic84/kilo-docker/commit/e22b980d3d20c8fc7eb6d8532330b20e3b6b9e74))
+
+### Bug Fixes
+
+* use PAT token and update create-pull-request to v8 in version check workflow ([d2c7a04](https://github.com/mbabic84/kilo-docker/commit/d2c7a049bba08a828150d4c02d2a256daf0e9c2b))
+
 ## [1.6.0](https://github.com/mbabic84/kilo-docker/compare/v1.5.0...v1.6.0) (2026-03-24)
 
 ### Features
