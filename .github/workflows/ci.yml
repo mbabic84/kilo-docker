@@ -20,21 +20,13 @@ jobs:
         with:
           context: .
           load: true
-          tags: kilo-docker:pr-test
+          tags: ghcr.io/mbabic84/kilo-docker:latest
 
       - name: Verify kilo is installed
-        run: docker run --rm kilo-docker:pr-test kilo --version
-
-      - name: Tag base image for full variant
-        run: docker tag kilo-docker:pr-test kilo-docker:base
+        run: docker run --rm ghcr.io/mbabic84/kilo-docker:latest kilo --version
 
       - name: Build full variant
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./Dockerfile.full
-          load: true
-          tags: kilo-docker:pr-test-full
+        run: docker build -f Dockerfile.full -t kilo-docker:latest-full .
 
       - name: Verify full variant
-        run: docker run --rm kilo-docker:pr-test-full kilo --version
+        run: docker run --rm kilo-docker:latest-full kilo --version
