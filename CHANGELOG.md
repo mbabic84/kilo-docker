@@ -1,3 +1,13 @@
+## [1.11.0](https://github.com/mbabic84/kilo-docker/compare/v1.10.0...v1.11.0) (2026-03-24)
+
+### Features
+
+* add full image variant with Chromium and Playwright ([bdf3956](https://github.com/mbabic84/kilo-docker/commit/bdf39566efce1f0adbd0240ca18217eb18d14417))
+
+### Bug Fixes
+
+* use GHCR image tag in Dockerfile.full to avoid re-tagging ([906c951](https://github.com/mbabic84/kilo-docker/commit/906c95109185ef28fddaf928be7ae1833961bd56))
+
 ## [1.10.0](https://github.com/mbabic84/kilo-docker/compare/v1.9.0...v1.10.0) (2026-03-24)
 
 ### Features
