@@ -46,9 +46,9 @@ jobs:
 
       - name: Create Pull Request
         if: steps.compare.outputs.needs_update == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN }}
           commit-message: "feat: bump Kilo CLI to v${{ steps.latest.outputs.version }}"
           branch: chore/kilo-${{ steps.latest.outputs.version }}
           title: "feat: bump Kilo CLI to v${{ steps.latest.outputs.version }}"
