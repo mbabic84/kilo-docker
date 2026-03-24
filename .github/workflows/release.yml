@@ -91,9 +91,12 @@ jobs:
 
       - name: Build and push (full)
         if: ${{ steps.release.outputs.new_release_published == 'true' }}
-        run: |
-          docker build -f Dockerfile.full -t full-temp .
-          for tag in ${{ steps.meta-full.outputs.tags }}; do
-            docker tag full-temp "$tag"
-            docker push "$tag"
-          done
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.full
+          push: true
+          tags: ${{ steps.meta-full.outputs.tags }}
+          labels: ${{ steps.meta-full.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
