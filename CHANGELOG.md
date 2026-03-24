@@ -1,3 +1,13 @@
+## [1.6.0](https://github.com/mbabic84/kilo-docker/compare/v1.5.0...v1.6.0) (2026-03-24)
+
+### Features
+
+* add --network flag with interactive picker and networks subcommand ([561f72f](https://github.com/mbabic84/kilo-docker/commit/561f72f6bfd9484a1ebffde769b7b6a7559bda4a))
+
+### Bug Fixes
+
+* split readonly declaration to avoid masking return values ([fe20a28](https://github.com/mbabic84/kilo-docker/commit/fe20a28a9fd82a69abeb2d3304220d4660ff84c7))
+
 ## [1.5.0](https://github.com/mbabic84/kilo-docker/compare/v1.4.10...v1.5.0) (2026-03-22)
 
 ### Features
