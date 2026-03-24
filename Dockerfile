@@ -12,8 +12,9 @@ RUN apk add --no-cache curl tar \
 # ── Runtime: Alpine with tools ──
 FROM alpine:3.21
 
-RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec \
-    && adduser -D -u 1000 kilo
+RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec sudo \
+    && adduser -D -u 1000 kilo \
+    && echo "kilo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo
 COPY opencode.json /home/kilo/.config/kilo/opencode.json
