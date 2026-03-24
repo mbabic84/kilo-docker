@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -26,7 +29,14 @@ jobs:
         run: docker run --rm ghcr.io/mbabic84/kilo-docker:latest kilo --version
 
       - name: Build full variant
-        run: docker build -f Dockerfile.full -t kilo-docker:latest-full .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.full
+          load: true
+          tags: kilo-docker:latest-full
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Verify full variant
         run: docker run --rm kilo-docker:latest-full kilo --version
