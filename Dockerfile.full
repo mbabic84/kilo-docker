@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1
+# ── Full variant: extends base with Chromium and @playwright/mcp ──
+FROM kilo-docker:base
+
+# Install Chromium (Alpine package) and Node.js. Firefox/WebKit require glibc
+# and are not available on Alpine.
+RUN apk add --no-cache chromium nodejs npm
+
+# Pre-install @playwright/mcp so npx doesn't download it at runtime.
+RUN npm install -g @playwright/mcp
+
+# Tell Playwright where to find the Chromium binary.
+ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+COPY opencode.full.json /home/kilo/.config/kilo/opencode.json
+
+ENV HOME=/home/kilo
+WORKDIR /workspace
+
+ENTRYPOINT ["docker-entrypoint.sh"]

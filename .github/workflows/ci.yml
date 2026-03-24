@@ -24,3 +24,17 @@ jobs:
 
       - name: Verify kilo is installed
         run: docker run --rm kilo-docker:pr-test kilo --version
+
+      - name: Tag base image for full variant
+        run: docker tag kilo-docker:pr-test kilo-docker:base
+
+      - name: Build full variant
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.full
+          load: true
+          tags: kilo-docker:pr-test-full
+
+      - name: Verify full variant
+        run: docker run --rm kilo-docker:pr-test-full kilo --version
