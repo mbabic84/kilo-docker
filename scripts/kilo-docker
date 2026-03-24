@@ -9,7 +9,8 @@ set -euo pipefail
 export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:$PATH}"
 
 readonly IMAGE="ghcr.io/mbabic84/kilo-docker:latest"
-readonly DATA_VOLUME="kilo-data-$(whoami)"
+DATA_VOLUME="kilo-data-$(whoami)"
+readonly DATA_VOLUME
 readonly TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env"
 
 # --- Helper functions --------------------------------------------------------
