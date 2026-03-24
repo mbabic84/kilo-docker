@@ -1,3 +1,9 @@
+## [1.11.1](https://github.com/mbabic84/kilo-docker/compare/v1.11.0...v1.11.1) (2026-03-24)
+
+### Bug Fixes
+
+* use build-push-action for full image to fix shell syntax error ([3f156f6](https://github.com/mbabic84/kilo-docker/commit/3f156f6128a3f10491c0f70793921479cfa23e68))
+
 ## [1.11.0](https://github.com/mbabic84/kilo-docker/compare/v1.10.0...v1.11.0) (2026-03-24)
 
 ### Features
