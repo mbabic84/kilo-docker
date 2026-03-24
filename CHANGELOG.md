@@ -1,3 +1,9 @@
+## [1.8.0](https://github.com/mbabic84/kilo-docker/compare/v1.7.0...v1.8.0) (2026-03-24)
+
+### Features
+
+* allow kilo user to install packages via sudo ([283eadc](https://github.com/mbabic84/kilo-docker/commit/283eadcc81a92f04046efa5eb918e397e50e0dc1))
+
 ## [1.7.0](https://github.com/mbabic84/kilo-docker/compare/v1.6.0...v1.7.0) (2026-03-24)
 
 ### Features
