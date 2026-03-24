@@ -75,3 +75,25 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Docker meta (full)
+        if: ${{ steps.release.outputs.new_release_published == 'true' }}
+        id: meta-full
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: |
+            suffix=-full,onlatest=true
+          tags: |
+            type=semver,pattern={{version}},value=v${{ steps.release.outputs.new_release_version }},enable=${{ steps.release.outputs.new_release_version != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.release.outputs.new_release_version }},enable=${{ steps.release.outputs.new_release_version != '' }}
+            type=semver,pattern={{major}},value=v${{ steps.release.outputs.new_release_version }},enable=${{ steps.release.outputs.new_release_version != '' }}
+
+      - name: Build and push (full)
+        if: ${{ steps.release.outputs.new_release_published == 'true' }}
+        run: |
+          docker build -f Dockerfile.full -t full-temp .
+          for tag in ${{ steps.meta-full.outputs.tags }}; do
+            docker tag full-temp "$tag"
+            docker push "$tag"
+          done

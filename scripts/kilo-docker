@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # kilo-docker — Wrapper script for running Kilo in a Docker container.
 #
-# Usage: kilo-docker [--once] [--network <name>] [command] [args...]
+# Usage: kilo-docker [--once] [--full] [--network <name>] [command] [args...]
 # See:   kilo-docker help
 #
 set -euo pipefail
 
 export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:$PATH}"
 
-readonly IMAGE="ghcr.io/mbabic84/kilo-docker:latest"
+readonly REPO="ghcr.io/mbabic84/kilo-docker"
 DATA_VOLUME="kilo-data-$(whoami)"
 readonly DATA_VOLUME
 readonly TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env"
@@ -31,6 +31,7 @@ confirm() {
 # --- Parse flags -------------------------------------------------------------
 
 ONCE=0
+FULL=0
 NETWORK=""
 NETWORK_FLAG=0
 FILTERED_ARGS=()
@@ -38,6 +39,9 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --once)
             ONCE=1
+            ;;
+        --full)
+            FULL=1
             ;;
         --network)
             NETWORK_FLAG=1
@@ -56,6 +60,14 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+
+# Resolve image tag
+if [ "$FULL" -eq 1 ]; then
+    IMAGE="${REPO}:latest-full"
+else
+    IMAGE="${REPO}:latest"
+fi
+
 # Replace positional parameters with filtered args
 set -- "${FILTERED_ARGS[@]}"
 
@@ -90,12 +102,12 @@ fi
 # --- Handle "cleanup" argument ----------------------------------------------
 
 if [ "${1:-}" = "cleanup" ]; then
-    if ! confirm "Remove volume, containers, and image for kilo-docker? [y/N]: "; then
+    if ! confirm "Remove volume, containers, and images for kilo-docker? [y/N]: "; then
         echo "Aborted." >&2
         exit 0
     fi
 
-    CONTAINERS=$(docker ps -a --filter "ancestor=${IMAGE}" -q 2>/dev/null || true)
+    CONTAINERS=$(docker ps -a --filter "ancestor=${REPO}" -q 2>/dev/null || true)
     if [ -n "$CONTAINERS" ]; then
         echo "Removing containers..." >&2
         echo "$CONTAINERS" | xargs docker rm -f >/dev/null 2>&1 || true
@@ -106,10 +118,13 @@ if [ "${1:-}" = "cleanup" ]; then
         docker volume rm "$DATA_VOLUME" >/dev/null
     fi
 
-    if docker image inspect "$IMAGE" >/dev/null 2>&1; then
-        echo "Removing image '${IMAGE}'..." >&2
-        docker rmi "$IMAGE" >/dev/null
-    fi
+    for tag in latest latest-full; do
+        local_img="${REPO}:${tag}"
+        if docker image inspect "$local_img" >/dev/null 2>&1; then
+            echo "Removing image '${local_img}'..." >&2
+            docker rmi "$local_img" >/dev/null
+        fi
+    done
 
     echo "Cleanup complete." >&2
     exit 0
@@ -126,31 +141,35 @@ fi
 
 if [ "${1:-}" = "help" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [--network <name>] [command] [args...]
+Usage: kilo-docker [--once] [--full] [--network <name>] [command] [args...]
 
 Commands:
   (no command)      Start Kilo in interactive mode
   run "prompt"      Run Kilo in autonomous mode with a prompt
   networks          List available Docker networks
   init              Reset configuration (remove volume)
-  cleanup           Remove volume, containers, and image
+  cleanup           Remove volume, containers, and images
   update            Pull the latest Docker image
   help              Show this help message
 
 Options:
   --once            Run a one-time session without persisting data (no volume)
+  --full            Use the full image variant (includes Chromium + Playwright)
   --network <name>  Connect the container to a Docker network
 
 Examples:
-  kilo-docker                         # interactive mode
-  kilo-docker run "fix build errors"  # autonomous mode
-  kilo-docker --once                  # one-time interactive session
-  kilo-docker --once run "prompt"     # one-time autonomous session
-  kilo-docker --network host          # connect to host network
-  kilo-docker networks                # list available Docker networks
-  kilo-docker init                    # reset configuration
-  kilo-docker cleanup                 # remove volume, containers, image
-  kilo-docker update                  # pull latest image
+  kilo-docker                                    # interactive mode
+  kilo-docker run "fix build errors"             # autonomous mode
+  kilo-docker --full                             # interactive with browser automation
+  kilo-docker --full --once                      # one-time full session
+  kilo-docker --once                             # one-time interactive session
+  kilo-docker --once run "prompt"                # one-time autonomous session
+  kilo-docker --network host                     # connect to host network
+  kilo-docker networks                           # list available Docker networks
+  kilo-docker init                               # reset configuration
+  kilo-docker cleanup                            # remove volume, containers, images
+  kilo-docker update                             # pull latest image
+  kilo-docker --full update                      # pull latest full image
 EOF
     exit 0
 fi
