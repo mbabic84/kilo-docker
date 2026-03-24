@@ -1,3 +1,9 @@
+## [1.11.2](https://github.com/mbabic84/kilo-docker/compare/v1.11.1...v1.11.2) (2026-03-24)
+
+### Bug Fixes
+
+* correct playwright MCP config and remove unused docker-compose.yml ([609b88a](https://github.com/mbabic84/kilo-docker/commit/609b88a92f2b5db5e396649cd31174d61c804758))
+
 ## [1.11.1](https://github.com/mbabic84/kilo-docker/compare/v1.11.0...v1.11.1) (2026-03-24)
 
 ### Bug Fixes
