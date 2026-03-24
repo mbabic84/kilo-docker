@@ -1,3 +1,9 @@
+## [1.9.0](https://github.com/mbabic84/kilo-docker/compare/v1.8.0...v1.9.0) (2026-03-24)
+
+### Features
+
+* dynamically disable MCP servers when tokens are missing ([92d5fac](https://github.com/mbabic84/kilo-docker/commit/92d5fac1a5dc7956df1cbc92e0a09f4c081799b4))
+
 ## [1.8.0](https://github.com/mbabic84/kilo-docker/compare/v1.7.0...v1.8.0) (2026-03-24)
 
 ### Features
