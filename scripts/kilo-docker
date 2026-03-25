@@ -9,8 +9,11 @@ set -euo pipefail
 export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:$PATH}"
 
 readonly REPO="ghcr.io/mbabic84/kilo-docker"
+readonly GITHUB_RAW="https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker"
 readonly TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env"
 readonly ENCRYPTED_TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env.enc"
+readonly INSTALL_DIR="$HOME/.local/bin"
+readonly INSTALL_TARGET="${INSTALL_DIR}/kilo-docker"
 
 # --- Helper functions --------------------------------------------------------
 
@@ -180,8 +183,9 @@ Commands:
   run "prompt"      Run Kilo in autonomous mode with a prompt
   networks          List available Docker networks
   init              Reset configuration (remove volume)
-  cleanup           Remove volume, containers, and images
-  update            Pull the latest Docker image
+  cleanup           Remove volume, containers, images, and installed script
+  install           Install kilo-docker as a global command (~/.local/bin)
+  update            Pull the latest Docker image and update the installed script
   help              Show this help message (wrapper)
 
 Options:
@@ -213,8 +217,9 @@ Examples:
   kilo-docker --network host                     # connect to host network
   kilo-docker networks                           # list available Docker networks
   kilo-docker init                               # reset configuration
-  kilo-docker cleanup                            # remove volume, containers, images
-  kilo-docker update                             # pull latest image
+  kilo-docker cleanup                            # remove volume, containers, images, script
+  kilo-docker install                            # install as global command
+  kilo-docker update                             # update script and pull latest image
 EOF
     exit 0
 fi
@@ -229,7 +234,27 @@ fi
 # --- Handle "update" argument ----------------------------------------------
 
 if [ "${1:-}" = "update" ]; then
-    docker pull "$IMAGE"
+    if [ -f "$INSTALL_TARGET" ]; then
+        echo "Updating kilo-docker script..." >&2
+        TEMP_FILE="$(mktemp)"
+        if curl -fsSL "$GITHUB_RAW" -o "$TEMP_FILE" 2>/dev/null; then
+            chmod +x "$TEMP_FILE"
+            mv "$TEMP_FILE" "$INSTALL_TARGET"
+            echo "Script updated: ${INSTALL_TARGET}" >&2
+        else
+            rm -f "$TEMP_FILE" 2>/dev/null || true
+            echo "Warning: Failed to download script update. Continuing with image pull." >&2
+        fi
+    else
+        echo "kilo-docker script is not installed locally (no file at ${INSTALL_TARGET})." >&2
+        echo "Run 'kilo-docker install' to install it first." >&2
+    fi
+
+    echo "" >&2
+    echo "Pulling Docker image..." >&2
+    docker pull "$IMAGE" >&2
+    echo "" >&2
+    echo "Update complete." >&2
     exit 0
 fi
 
@@ -301,7 +326,75 @@ if [ "${1:-}" = "cleanup" ]; then
         docker rmi "$local_img" >/dev/null
     fi
 
+    if [ -L "$INSTALL_TARGET" ] || [ -f "$INSTALL_TARGET" ]; then
+        echo "Removing installed script '${INSTALL_TARGET}'..." >&2
+        rm -f "$INSTALL_TARGET"
+    fi
+    if [ -d "$INSTALL_DIR" ]; then
+        rmdir "$INSTALL_DIR" 2>/dev/null || true
+    fi
+
     echo "Cleanup complete." >&2
+    exit 0
+fi
+
+# --- Handle "install" argument -----------------------------------------------
+
+if [ "${1:-}" = "install" ]; then
+    SOURCE_SCRIPT=""
+
+    if [ -f "$0" ]; then
+        SOURCE_SCRIPT="$(realpath "$0")"
+    fi
+
+    if [ -z "$SOURCE_SCRIPT" ] || [ ! -f "$SOURCE_SCRIPT" ]; then
+        echo "Error: Cannot determine script path (running from stdin?). Download the script first:" >&2
+        echo "  curl -fsSL -o kilo-docker ${GITHUB_RAW}" >&2
+        echo "  chmod +x kilo-docker" >&2
+        exit 1
+    fi
+
+    mkdir -p "$INSTALL_DIR"
+
+    if [ -L "$INSTALL_TARGET" ]; then
+        echo "kilo-docker is already installed at ${INSTALL_TARGET}" >&2
+        echo "Updating symlink..." >&2
+        ln -sf "$SOURCE_SCRIPT" "$INSTALL_TARGET"
+    elif [ -f "$INSTALL_TARGET" ]; then
+        echo "kilo-docker already exists at ${INSTALL_TARGET} (not a symlink)." >&2
+        if confirm "Replace it? [y/N]: "; then
+            ln -sf "$SOURCE_SCRIPT" "$INSTALL_TARGET"
+        else
+            echo "Aborted." >&2
+            exit 0
+        fi
+    else
+        ln -s "$SOURCE_SCRIPT" "$INSTALL_TARGET" 2>/dev/null || {
+            echo "Symlink failed (cross-device?). Copying instead..." >&2
+            cp "$SOURCE_SCRIPT" "$INSTALL_TARGET"
+        }
+    fi
+
+    chmod +x "$INSTALL_TARGET"
+
+    case ":${PATH}:" in
+        *":${INSTALL_DIR}:"*)
+            ;;
+        *)
+            echo "" >&2
+            echo "Warning: ${INSTALL_DIR} is not on your PATH." >&2
+            echo "Add the following line to your ~/.bashrc (or ~/.zshrc):" >&2
+            echo '  export PATH="$HOME/.local/bin:$PATH"' >&2
+            echo "Then restart your shell or run: source ~/.bashrc" >&2
+            ;;
+    esac
+
+    echo "" >&2
+    echo "Pulling Docker image..." >&2
+    docker pull "$IMAGE" >&2
+    echo "" >&2
+    echo "Installed successfully: ${INSTALL_TARGET} -> ${SOURCE_SCRIPT}" >&2
+    echo "Run 'kilo-docker' from any directory." >&2
     exit 0
 fi
 
