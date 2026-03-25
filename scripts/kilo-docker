@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kilo-docker — Wrapper script for running Kilo in a Docker container.
 #
-# Usage: kilo-docker [--once] [--full] [--network <name>] [command] [args...]
+# Usage: kilo-docker [--once] [--network <name>] [command] [args...]
 # See:   kilo-docker help
 #
 set -euo pipefail
@@ -31,7 +31,6 @@ confirm() {
 # --- Parse flags -------------------------------------------------------------
 
 ONCE=0
-FULL=0
 NETWORK=""
 NETWORK_FLAG=0
 FILTERED_ARGS=()
@@ -39,9 +38,6 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --once)
             ONCE=1
-            ;;
-        --full)
-            FULL=1
             ;;
         --network)
             NETWORK_FLAG=1
@@ -62,11 +58,7 @@ while [ $# -gt 0 ]; do
 done
 
 # Resolve image tag
-if [ "$FULL" -eq 1 ]; then
-    IMAGE="${REPO}:latest-full"
-else
-    IMAGE="${REPO}:latest"
-fi
+IMAGE="${REPO}:latest"
 
 # Replace positional parameters with filtered args
 set -- "${FILTERED_ARGS[@]}"
@@ -118,7 +110,7 @@ if [ "${1:-}" = "cleanup" ]; then
         docker volume rm "$DATA_VOLUME" >/dev/null
     fi
 
-    for tag in latest latest-full; do
+    for tag in latest; do
         local_img="${REPO}:${tag}"
         if docker image inspect "$local_img" >/dev/null 2>&1; then
             echo "Removing image '${local_img}'..." >&2
@@ -141,7 +133,7 @@ fi
 
 if [ "${1:-}" = "help" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [--full] [--network <name>] [command] [args...]
+Usage: kilo-docker [--once] [--network <name>] [command] [args...]
 
 Commands:
   (no command)      Start Kilo in interactive mode
@@ -154,14 +146,11 @@ Commands:
 
 Options:
   --once            Run a one-time session without persisting data (no volume)
-  --full            Use the full image variant (includes Chromium + Playwright)
   --network <name>  Connect the container to a Docker network
 
 Examples:
   kilo-docker                                    # interactive mode
   kilo-docker run "fix build errors"             # autonomous mode
-  kilo-docker --full                             # interactive with browser automation
-  kilo-docker --full --once                      # one-time full session
   kilo-docker --once                             # one-time interactive session
   kilo-docker --once run "prompt"                # one-time autonomous session
   kilo-docker --network host                     # connect to host network
@@ -169,7 +158,6 @@ Examples:
   kilo-docker init                               # reset configuration
   kilo-docker cleanup                            # remove volume, containers, images
   kilo-docker update                             # pull latest image
-  kilo-docker --full update                      # pull latest full image
 EOF
     exit 0
 fi
@@ -246,6 +234,8 @@ fi
 
 DOCKER_ARGS=(
     --rm
+    --init
+    --ipc=host
     -e "PUID=$(id -u)"
     -e "PGID=$(id -g)"
     -v "$(pwd):/workspace"

@@ -1,0 +1,11 @@
+.git
+.github
+.kilo
+node_modules
+.releaserc.json
+CHANGELOG.md
+README.md
+package.json
+package-lock.json
+Dockerfile
+.dockerignore
