@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kilo-docker — Wrapper script for running Kilo in a Docker container.
 #
-# Usage: kilo-docker [--once] [--network <name>] [command] [args...]
+# Usage: kilo-docker [--once] [--playwright] [--network <name>] [command] [args...]
 # See:   kilo-docker help
 #
 set -euo pipefail
@@ -31,6 +31,7 @@ confirm() {
 # --- Parse flags -------------------------------------------------------------
 
 ONCE=0
+PLAYWRIGHT=0
 NETWORK=""
 NETWORK_FLAG=0
 FILTERED_ARGS=()
@@ -38,6 +39,9 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --once)
             ONCE=1
+            ;;
+        --playwright)
+            PLAYWRIGHT=1
             ;;
         --network)
             NETWORK_FLAG=1
@@ -110,13 +114,11 @@ if [ "${1:-}" = "cleanup" ]; then
         docker volume rm "$DATA_VOLUME" >/dev/null
     fi
 
-    for tag in latest; do
-        local_img="${REPO}:${tag}"
-        if docker image inspect "$local_img" >/dev/null 2>&1; then
-            echo "Removing image '${local_img}'..." >&2
-            docker rmi "$local_img" >/dev/null
-        fi
-    done
+    local_img="${REPO}:latest"
+    if docker image inspect "$local_img" >/dev/null 2>&1; then
+        echo "Removing image '${local_img}'..." >&2
+        docker rmi "$local_img" >/dev/null
+    fi
 
     echo "Cleanup complete." >&2
     exit 0
@@ -133,7 +135,7 @@ fi
 
 if [ "${1:-}" = "help" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
     cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [--network <name>] [command] [args...]
+Usage: kilo-docker [--once] [--playwright] [--network <name>] [command] [args...]
 
 Commands:
   (no command)      Start Kilo in interactive mode
@@ -146,6 +148,7 @@ Commands:
 
 Options:
   --once            Run a one-time session without persisting data (no volume)
+  --playwright      Start a Playwright MCP sidecar container for browser automation
   --network <name>  Connect the container to a Docker network
 
 Examples:
@@ -153,6 +156,7 @@ Examples:
   kilo-docker run "fix build errors"             # autonomous mode
   kilo-docker --once                             # one-time interactive session
   kilo-docker --once run "prompt"                # one-time autonomous session
+  kilo-docker --playwright                       # with Playwright browser automation
   kilo-docker --network host                     # connect to host network
   kilo-docker networks                           # list available Docker networks
   kilo-docker init                               # reset configuration
@@ -230,6 +234,93 @@ if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ] && [ "$ONCE" -eq 0 ]; then
     fi
 fi
 
+# --- Playwright sidecar ----------------------------------------------------
+
+PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright/mcp"
+PLAYWRIGHT_NETWORK=""
+PLAYWRIGHT_CONTAINER="playwright-mcp"
+
+if [ "$PLAYWRIGHT" -eq 1 ]; then
+    if [ -n "$NETWORK" ]; then
+        echo "Error: --playwright and --network are mutually exclusive." >&2
+        echo "       Playwright creates its own network." >&2
+        exit 1
+    fi
+
+    PLAYWRIGHT_NETWORK="kilo-playwright-$(whoami)"
+
+    # Create network (idempotent)
+    if ! docker network inspect "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1; then
+        docker network create "$PLAYWRIGHT_NETWORK" >/dev/null
+    fi
+
+    # Pull Playwright MCP image
+    echo "Pulling Playwright MCP image..." >&2
+    docker pull "$PLAYWRIGHT_IMAGE" >/dev/null 2>&1
+
+    # Ensure output directory exists
+    mkdir -p "$(pwd)/.playwright-mcp"
+
+    # Remove any stale container
+    docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
+
+    # Start Playwright MCP in HTTP mode.
+    # Uses --entrypoint node (overrides default entrypoint) with cli.js
+    # relative to image WORKDIR /app.
+    docker run -d --rm --init \
+        --name "$PLAYWRIGHT_CONTAINER" \
+        --network "$PLAYWRIGHT_NETWORK" \
+        --entrypoint node \
+        -v "$(pwd):/workspace" \
+        "$PLAYWRIGHT_IMAGE" \
+        cli.js --headless --browser chromium --no-sandbox --port 8931 --host 0.0.0.0 --output-dir /workspace/.playwright-mcp --allowed-hosts '*' \
+        >/dev/null
+
+    # Wait for Playwright MCP to be ready
+    echo -n "Waiting for Playwright MCP..." >&2
+    for i in $(seq 1 30); do
+        # Check container is still running
+        if [ "$(docker inspect -f '{{.State.Status}}' "$PLAYWRIGHT_CONTAINER" 2>/dev/null)" != "running" ]; then
+            echo " container stopped." >&2
+            echo "Error: Playwright MCP container exited unexpectedly." >&2
+            docker logs "$PLAYWRIGHT_CONTAINER" 2>&1 | tail -5 >&2
+            docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
+            docker network rm "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1 || true
+            exit 1
+        fi
+        # Check if port 8931 is listening (MCP endpoint rejects plain GET, so use TCP check)
+        if docker exec "$PLAYWRIGHT_CONTAINER" node -e "
+            const net = require('net');
+            const s = net.connect(8931, '127.0.0.1', () => { s.destroy(); process.exit(0); });
+            s.on('error', () => process.exit(1));
+            s.setTimeout(2000, () => { s.destroy(); process.exit(1); });
+        " 2>/dev/null; then
+            echo " ready." >&2
+            break
+        fi
+        if [ "$i" -eq 30 ]; then
+            echo " timeout." >&2
+            echo "Error: Playwright MCP did not become ready in 30s." >&2
+            docker logs "$PLAYWRIGHT_CONTAINER" 2>&1 | tail -5 >&2
+            docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
+            docker network rm "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1 || true
+            exit 1
+        fi
+        sleep 1
+        echo -n "." >&2
+    done
+
+    # Cleanup function called on EXIT (fires after exec'd docker run exits)
+    cleanup_playwright() {
+        docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
+        docker network rm "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1 || true
+    }
+    trap cleanup_playwright EXIT
+
+    # Use the Playwright network for the Kilo container
+    NETWORK="$PLAYWRIGHT_NETWORK"
+fi
+
 # --- Build docker run args -------------------------------------------------
 
 DOCKER_ARGS=(
@@ -252,6 +343,10 @@ fi
 
 if [ -n "$TOKEN_2" ]; then
     DOCKER_ARGS+=(-e "AINSTRUCT_TOKEN=${TOKEN_2}")
+fi
+
+if [ "$PLAYWRIGHT" -eq 1 ]; then
+    DOCKER_ARGS+=(-e "PLAYWRIGHT_ENABLED=1")
 fi
 
 if [ -n "$NETWORK" ]; then
