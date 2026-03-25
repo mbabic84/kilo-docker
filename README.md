@@ -2,9 +2,14 @@
 
 Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) - enabling portable, zero-install execution on remote hosts.
 
+## Image Variants
+
+| Image | Base | Size | Description |
+|-------|------|------|-------------|
+| `ghcr.io/mbabic84/kilo-docker:latest` | Alpine | ~192 MB | Lightweight base with `git`, `openssh-client`, `ripgrep`, and `libstdc++` |
+
 ## Features
 
-- **Alpine Linux** - Lightweight image with `git`, `openssh-client`, `ripgrep`, and `libstdc++`
 - **Non-root user** - Runs as `kilo` user with dynamic `PUID`/`PGID` mapping to match host user
 - **Persistent database** - SQLite database and auth state survive container restarts via named volume
 - **Token persistence** - MCP server tokens are prompted once and saved in the volume
@@ -15,11 +20,8 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 No need to clone the repository. Run directly with `curl` or `wget`:
 
 ```bash
-# Interactive mode (curl)
+# Interactive mode (base image)
 bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)
-
-# Interactive mode (wget)
-bash <(wget -qO- https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)
 
 # Autonomous mode
 bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker) run "your prompt here"
@@ -56,6 +58,7 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | Option | Description |
 |--------|-------------|
 | `--once` | Run a one-time session without persistence (no volume) |
+| `--network <name>` | Attach to a specific Docker network |
 
 ## One-Time Sessions
 
@@ -82,7 +85,7 @@ The volume persists across container restarts. Use `kilo-docker init` to reset t
 
 ## MCP Servers
 
-The image ships with two remote MCP servers pre-configured:
+### Base Image
 
 | Server | Description |
 |--------|-------------|
@@ -116,14 +119,14 @@ Host remote
 
 | Tag | Description |
 |-----|-------------|
-| `latest` | Most recent stable release |
+| `latest` | Most recent stable release (base) |
 | `v{version}` | Exact semantic version (e.g., `v1.2.3`) |
 | `v{major}.{minor}` | Minor track (e.g., `v1.2`) |
 
 ## Building Locally
 
 ```bash
-# Build
+# Build image
 docker build -t kilo-docker .
 
 # Test
@@ -132,3 +135,19 @@ docker run --rm kilo-docker --version
 # Interactive
 docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-docker
 ```
+
+## Project Structure
+
+```
+├── Dockerfile                  # Base image (Alpine, musl kilo binary)
+├── configs/
+│   └── opencode.json           # Kilo config for base image
+└── scripts/
+    ├── kilo-docker             # CLI wrapper script
+    ├── entrypoint.sh           # Entrypoint for Alpine (base image)
+    └── setup-kilo-config.sh    # Shared config logic (sourced by entrypoint)
+```
+
+## License
+
+See [LICENSE](LICENSE) for details.

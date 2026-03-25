@@ -17,9 +17,10 @@ RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec sudo jq \
     && echo "kilo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo
-COPY opencode.json /home/kilo/.config/kilo/opencode.json
-COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY configs/opencode.json /home/kilo/.config/kilo/opencode.json
+COPY scripts/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY scripts/setup-kilo-config.sh /usr/local/bin/setup-kilo-config.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/setup-kilo-config.sh
 
 ENV HOME=/home/kilo
 WORKDIR /workspace

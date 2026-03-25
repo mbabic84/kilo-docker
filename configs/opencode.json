@@ -5,7 +5,7 @@
     "ainstruct": {
       "type": "remote",
       "url": "https://ainstruct-dev.kralicinora.cz/mcp",
-      "enabled": true,
+      "enabled": false,
       "headers": {
         "Authorization": "Bearer {env:AINSTRUCT_TOKEN}"
       }
@@ -13,15 +13,10 @@
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp",
-      "enabled": true,
+      "enabled": false,
       "headers": {
         "Authorization": "Bearer {env:CONTEXT7_TOKEN}"
       }
-    },
-    "playwright": {
-      "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp@latest", "--no-sandbox"],
-      "enabled": true
     }
   },
   "instructions": [
@@ -29,7 +24,6 @@
   ],
   "permission": {
     "ainstruct_*": "allow",
-    "context7_*": "allow",
-    "playwright_*": "allow"
+    "context7_*": "allow"
   }
 }

@@ -18,25 +18,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build (test layer caching)
+      - name: Build base image
         uses: docker/build-push-action@v7
         with:
           context: .
           load: true
           tags: ghcr.io/mbabic84/kilo-docker:latest
+          cache-from: type=gha,scope=base
+          cache-to: type=gha,scope=base,mode=max
 
       - name: Verify kilo is installed
         run: docker run --rm ghcr.io/mbabic84/kilo-docker:latest kilo --version
-
-      - name: Build full variant
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: Dockerfile.full
-          load: true
-          tags: kilo-docker:latest-full
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Verify full variant
-        run: docker run --rm kilo-docker:latest-full kilo --version
