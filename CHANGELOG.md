@@ -1,3 +1,9 @@
+## [1.12.1](https://github.com/mbabic84/kilo-docker/compare/v1.12.0...v1.12.1) (2026-03-25)
+
+### Bug Fixes
+
+* pass --help/-h to Kilo CLI and fix TTY for args with TUI ([284c076](https://github.com/mbabic84/kilo-docker/commit/284c076432317c6933dbf43c81e433252b91381a))
+
 ## [1.12.0](https://github.com/mbabic84/kilo-docker/compare/v1.11.2...v1.12.0) (2026-03-25)
 
 ### Features
