@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kilo-docker — Wrapper script for running Kilo in a Docker container.
 #
-# Usage: kilo-docker [--once] [--playwright] [--network <name>] [command] [args...]
+# Usage: kilo-docker [--once] [--password] [--playwright] [--network <name>] [command] [args...]
 # See:   kilo-docker help
 #
 set -euo pipefail
@@ -9,9 +9,8 @@ set -euo pipefail
 export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:$PATH}"
 
 readonly REPO="ghcr.io/mbabic84/kilo-docker"
-DATA_VOLUME="kilo-data-$(whoami)"
-readonly DATA_VOLUME
 readonly TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env"
+readonly ENCRYPTED_TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env.enc"
 
 # --- Helper functions --------------------------------------------------------
 
@@ -28,9 +27,102 @@ confirm() {
     [[ "${response,,}" == "y" ]]
 }
 
+prompt_password() {
+    local password=""
+    while true; do
+        echo -n "Volume password: " >&2
+        read -s -r password </dev/tty || { echo >&2; echo "Error: Failed to read password." >&2; exit 1; }
+        echo >&2
+
+        if [ -z "$password" ]; then
+            echo "Password cannot be empty." >&2
+            continue
+        fi
+
+        if [ ${#password} -lt 4 ]; then
+            echo "Password must be at least 4 characters." >&2
+            continue
+        fi
+
+        echo -n "Confirm password: " >&2
+        local confirm_pw=""
+        read -s -r confirm_pw </dev/tty || { echo >&2; echo "Error: Failed to read password." >&2; exit 1; }
+        echo >&2
+
+        if [ "$password" = "$confirm_pw" ]; then
+            VOLUME_PASSWORD="$password"
+            return
+        fi
+        echo "Passwords do not match. Try again." >&2
+        echo >&2
+    done
+}
+
+derive_volume_name() {
+    local hash
+    hash=$(printf '%s' "$VOLUME_PASSWORD" | sha256sum | cut -c1-12)
+    DATA_VOLUME="kilo-${hash}"
+}
+
+encrypt_tokens() {
+    local token1="$1" token2="$2"
+    printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
+        openssl enc -aes-256-cbc -salt -pbkdf2 -pass "pass:${VOLUME_PASSWORD}" -out /dev/stdout 2>/dev/null | \
+        docker run --rm -i --entrypoint "" \
+            -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+            "$IMAGE" \
+            sh -c "mkdir -p \"\$(dirname '${ENCRYPTED_TOKEN_FILE}')\" && cat > '${ENCRYPTED_TOKEN_FILE}' && chmod 600 '${ENCRYPTED_TOKEN_FILE}'"
+}
+
+decrypt_tokens() {
+    local decrypted
+    decrypted=$(docker run --rm --entrypoint "" \
+        -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+        "$IMAGE" \
+        cat "${ENCRYPTED_TOKEN_FILE}" 2>/dev/null | \
+        openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${VOLUME_PASSWORD}" 2>/dev/null) || return 1
+    echo "$decrypted"
+}
+
+prompt_new_tokens() {
+    local token1="" token2=""
+
+    echo "First-time setup: Enter API tokens for remote MCP servers." >&2
+    echo "Leave empty to skip a server." >&2
+    echo >&2
+
+    if [ -t 2 ]; then
+        echo -n "Context7 API token: " >&2
+        read -s -r token1 </dev/tty || true
+        echo >&2
+
+        echo -n "Ainstruct API token: " >&2
+        read -s -r token2 </dev/tty || true
+        echo >&2
+    else
+        echo "No TTY available. Tokens must be set manually in the volume." >&2
+    fi
+
+    if [ -n "$token1" ] || [ -n "$token2" ]; then
+        if [ "$ENCRYPTED" -eq 1 ]; then
+            echo "Encrypting tokens..." >&2
+            encrypt_tokens "$token1" "$token2"
+        else
+            printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
+                docker run --rm -i --entrypoint "" \
+                    -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+                    "$IMAGE" \
+                    sh -c "mkdir -p \"\$(dirname '${TOKEN_FILE}')\" && cat > '${TOKEN_FILE}'"
+        fi
+        TOKEN_1="$token1"
+        TOKEN_2="$token2"
+    fi
+}
+
 # --- Parse flags -------------------------------------------------------------
 
 ONCE=0
+ENCRYPTED=0
 PLAYWRIGHT=0
 NETWORK=""
 NETWORK_FLAG=0
@@ -39,6 +131,9 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --once)
             ONCE=1
+            ;;
+        --password|-p)
+            ENCRYPTED=1
             ;;
         --playwright)
             PLAYWRIGHT=1
@@ -74,17 +169,60 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
 fi
 
-# --- Handle "init" argument ------------------------------------------------
+# --- Handle "help" argument ------------------------------------------------
 
-if [ "${1:-}" = "init" ]; then
-    if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
-        if confirm "Remove volume '${DATA_VOLUME}' and reset all configuration? [y/N]: "; then
-            docker volume rm "$DATA_VOLUME" >/dev/null
-            echo "Volume removed. You will be prompted for tokens on next run." >&2
-        fi
-    else
-        echo "No existing volume found." >&2
-    fi
+if [ "${1:-}" = "help" ]; then
+    cat >&2 <<'EOF'
+Usage: kilo-docker [--once] [--password] [--playwright] [--network <name>] [command] [args...]
+
+Commands:
+  (no command)      Start Kilo in interactive mode
+  run "prompt"      Run Kilo in autonomous mode with a prompt
+  networks          List available Docker networks
+  init              Reset configuration (remove volume)
+  cleanup           Remove volume, containers, and images
+  update            Pull the latest Docker image
+  help              Show this help message (wrapper)
+
+Options:
+  --once            Run a one-time session without persisting data (no volume)
+  --password, -p    Protect volume with a password (encrypts tokens, derives volume name from password)
+  --playwright      Start a Playwright MCP sidecar container for browser automation
+  --network <name>  Connect the container to a Docker network
+
+Security (--password):
+  When --password is used, the volume name is derived from the password hash,
+  making it non-discoverable by other users. API tokens are encrypted with
+  AES-256-CBC before being stored in the volume.
+
+  Without --password, the volume name is kilo-data-<username> and tokens are
+  stored in plaintext (original behavior).
+
+Note:
+  Use "kilo-docker help" for this wrapper help.
+  Use "kilo-docker --help" for Kilo CLI help.
+
+Examples:
+  kilo-docker                                    # interactive mode
+  kilo-docker run "fix build errors"             # autonomous mode
+  kilo-docker --password                         # interactive mode with encryption
+  kilo-docker --password init                    # reset encrypted volume
+  kilo-docker --once                             # one-time interactive session
+  kilo-docker --once run "prompt"                # one-time autonomous session
+  kilo-docker --playwright                       # with Playwright browser automation
+  kilo-docker --network host                     # connect to host network
+  kilo-docker networks                           # list available Docker networks
+  kilo-docker init                               # reset configuration
+  kilo-docker cleanup                            # remove volume, containers, images
+  kilo-docker update                             # pull latest image
+EOF
+    exit 0
+fi
+
+# --- Handle "networks" argument ----------------------------------------------
+
+if [ "${1:-}" = "networks" ]; then
+    docker network ls --format "{{.Name}}"
     exit 0
 fi
 
@@ -92,6 +230,49 @@ fi
 
 if [ "${1:-}" = "update" ]; then
     docker pull "$IMAGE"
+    exit 0
+fi
+
+# --- Volume name and password -----------------------------------------------
+
+VOLUME_PASSWORD=""
+
+if [ "$ONCE" -eq 1 ]; then
+    # --once: no volume, no password
+    DATA_VOLUME=""
+elif [ "$ENCRYPTED" -eq 1 ]; then
+    # --password: derive volume name from password
+    if [ -t 2 ] && [ -t 0 ]; then
+        prompt_password
+    else
+        echo "Error: --password requires a TTY. Use --once for ephemeral runs." >&2
+        exit 1
+    fi
+    derive_volume_name
+else
+    # Default: plaintext volume with username
+    DATA_VOLUME="kilo-data-$(whoami)"
+fi
+
+# --- Handle "init" argument ------------------------------------------------
+
+if [ "${1:-}" = "init" ]; then
+    if [ -z "$DATA_VOLUME" ]; then
+        echo "Nothing to reset in --once mode." >&2
+        exit 0
+    fi
+    if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+        if confirm "Remove volume '${DATA_VOLUME}' and reset all configuration? [y/N]: "; then
+            docker volume rm "$DATA_VOLUME" >/dev/null
+            echo "Volume removed. You will be prompted for tokens on next run." >&2
+        fi
+    else
+        if [ "$ENCRYPTED" -eq 1 ]; then
+            echo "No existing volume found for this password." >&2
+        else
+            echo "No existing volume found." >&2
+        fi
+    fi
     exit 0
 fi
 
@@ -109,7 +290,7 @@ if [ "${1:-}" = "cleanup" ]; then
         echo "$CONTAINERS" | xargs docker rm -f >/dev/null 2>&1 || true
     fi
 
-    if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+    if [ -n "$DATA_VOLUME" ] && docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
         echo "Removing volume '${DATA_VOLUME}'..." >&2
         docker volume rm "$DATA_VOLUME" >/dev/null
     fi
@@ -121,52 +302,6 @@ if [ "${1:-}" = "cleanup" ]; then
     fi
 
     echo "Cleanup complete." >&2
-    exit 0
-fi
-
-# --- Handle "networks" argument ----------------------------------------------
-
-if [ "${1:-}" = "networks" ]; then
-    docker network ls --format "{{.Name}}"
-    exit 0
-fi
-
-# --- Handle "help" argument ------------------------------------------------
-
-if [ "${1:-}" = "help" ]; then
-    cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [--playwright] [--network <name>] [command] [args...]
-
-Commands:
-  (no command)      Start Kilo in interactive mode
-  run "prompt"      Run Kilo in autonomous mode with a prompt
-  networks          List available Docker networks
-  init              Reset configuration (remove volume)
-  cleanup           Remove volume, containers, and images
-  update            Pull the latest Docker image
-  help              Show this help message (wrapper)
-
-Options:
-  --once            Run a one-time session without persisting data (no volume)
-  --playwright      Start a Playwright MCP sidecar container for browser automation
-  --network <name>  Connect the container to a Docker network
-
-Note:
-  Use "kilo-docker help" for this wrapper help.
-  Use "kilo-docker --help" for Kilo CLI help.
-
-Examples:
-  kilo-docker                                    # interactive mode
-  kilo-docker run "fix build errors"             # autonomous mode
-  kilo-docker --once                             # one-time interactive session
-  kilo-docker --once run "prompt"                # one-time autonomous session
-  kilo-docker --playwright                       # with Playwright browser automation
-  kilo-docker --network host                     # connect to host network
-  kilo-docker networks                           # list available Docker networks
-  kilo-docker init                               # reset configuration
-  kilo-docker cleanup                            # remove volume, containers, images
-  kilo-docker update                             # pull latest image
-EOF
     exit 0
 fi
 
@@ -198,43 +333,56 @@ TOKEN_1=""
 TOKEN_2=""
 
 if [ "$ONCE" -eq 0 ]; then
-    EXISTING=""
     if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
-        EXISTING=$(docker run --rm --entrypoint "" \
-            -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
-            "$IMAGE" \
-            cat "$TOKEN_FILE" 2>/dev/null || true)
-    fi
+        if [ "$ENCRYPTED" -eq 1 ]; then
+            # Encrypted mode: decrypt existing tokens
+            DECRYPTED=$(decrypt_tokens) || true
 
-    if [ -n "$EXISTING" ]; then
-        TOKEN_1=$(echo "$EXISTING" | grep '^KMCP_TOKEN_1=' | cut -d= -f2- || true)
-        TOKEN_2=$(echo "$EXISTING" | grep '^KMCP_TOKEN_2=' | cut -d= -f2- || true)
-    fi
-fi
+            if [ -n "$DECRYPTED" ]; then
+                TOKEN_1=$(echo "$DECRYPTED" | grep '^KMCP_TOKEN_1=' | cut -d= -f2- || true)
+                TOKEN_2=$(echo "$DECRYPTED" | grep '^KMCP_TOKEN_2=' | cut -d= -f2- || true)
+            fi
 
-if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ] && [ "$ONCE" -eq 0 ]; then
-    echo "First-time setup: Enter API tokens for remote MCP servers." >&2
-    echo "Leave empty to skip a server." >&2
-    echo >&2
+            if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ]; then
+                # Check if old plaintext token file exists (migration)
+                PLAINTEXT=$(docker run --rm --entrypoint "" \
+                    -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+                    "$IMAGE" \
+                    cat "$TOKEN_FILE" 2>/dev/null || true)
 
-    if [ -t 2 ]; then
-        echo -n "Context7 API token: " >&2
-        read -s -r TOKEN_1 </dev/tty || true
-        echo >&2
+                if [ -n "$PLAINTEXT" ]; then
+                    echo "Migrating plaintext tokens to encrypted storage..." >&2
+                    TOKEN_1=$(echo "$PLAINTEXT" | grep '^KMCP_TOKEN_1=' | cut -d= -f2- || true)
+                    TOKEN_2=$(echo "$PLAINTEXT" | grep '^KMCP_TOKEN_2=' | cut -d= -f2- || true)
 
-        echo -n "Ainstruct API token: " >&2
-        read -s -r TOKEN_2 </dev/tty || true
-        echo >&2
-    else
-        echo "No TTY available. Tokens must be set manually in the volume." >&2
-    fi
-
-    if [ -n "$TOKEN_1" ] || [ -n "$TOKEN_2" ]; then
-        printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$TOKEN_1" "$TOKEN_2" | \
-            docker run --rm -i --entrypoint "" \
+                    if [ -n "$TOKEN_1" ] || [ -n "$TOKEN_2" ]; then
+                        encrypt_tokens "$TOKEN_1" "$TOKEN_2"
+                        # Remove old plaintext file
+                        docker run --rm --entrypoint "" \
+                            -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+                            "$IMAGE" \
+                            rm -f "$TOKEN_FILE" 2>/dev/null || true
+                        echo "Migration complete. Old plaintext token file removed." >&2
+                    fi
+                fi
+            fi
+        else
+            # Plaintext mode: read tokens directly
+            EXISTING=$(docker run --rm --entrypoint "" \
                 -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
                 "$IMAGE" \
-                sh -c "mkdir -p \"\$(dirname '${TOKEN_FILE}')\" && cat > '${TOKEN_FILE}'"
+                cat "$TOKEN_FILE" 2>/dev/null || true)
+
+            if [ -n "$EXISTING" ]; then
+                TOKEN_1=$(echo "$EXISTING" | grep '^KMCP_TOKEN_1=' | cut -d= -f2- || true)
+                TOKEN_2=$(echo "$EXISTING" | grep '^KMCP_TOKEN_2=' | cut -d= -f2- || true)
+            fi
+        fi
+    fi
+
+    # If still no tokens, prompt for new ones
+    if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ]; then
+        prompt_new_tokens
     fi
 fi
 
@@ -337,7 +485,7 @@ DOCKER_ARGS=(
     -w /workspace
 )
 
-if [ "$ONCE" -eq 0 ]; then
+if [ "$ONCE" -eq 0 ] && [ -n "$DATA_VOLUME" ]; then
     DOCKER_ARGS+=(-v "${DATA_VOLUME}:/home/kilo/.local/share/kilo")
 fi
 
@@ -363,6 +511,10 @@ for var in TERM COLORTERM LANG LC_ALL; do
         DOCKER_ARGS+=(-e "${var}=${!var}")
     fi
 done
+
+# --- Clear sensitive data from shell ----------------------------------------
+
+unset VOLUME_PASSWORD 2>/dev/null || true
 
 # --- Run --------------------------------------------------------------------
 
