@@ -1,3 +1,9 @@
+## [1.14.0](https://github.com/mbabic84/kilo-docker/compare/v1.13.1...v1.14.0) (2026-03-25)
+
+### Features
+
+* add install and update commands for global script management ([676ca4b](https://github.com/mbabic84/kilo-docker/commit/676ca4bda13ecc46b9a72ca2df9dcc9b1926cffc))
+
 ## [1.13.1](https://github.com/mbabic84/kilo-docker/compare/v1.13.0...v1.13.1) (2026-03-25)
 
 ### Bug Fixes
