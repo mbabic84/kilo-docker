@@ -1,3 +1,9 @@
+## [1.13.1](https://github.com/mbabic84/kilo-docker/compare/v1.13.0...v1.13.1) (2026-03-25)
+
+### Bug Fixes
+
+* enable MCP servers when tokens are present ([1285e49](https://github.com/mbabic84/kilo-docker/commit/1285e49ec30ea5461c5f2bc396ee06238cb84c54))
+
 ## [1.13.0](https://github.com/mbabic84/kilo-docker/compare/v1.12.1...v1.13.0) (2026-03-25)
 
 ### Features
