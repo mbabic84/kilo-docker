@@ -1,3 +1,10 @@
+## [1.12.0](https://github.com/mbabic84/kilo-docker/compare/v1.11.2...v1.12.0) (2026-03-25)
+
+### Features
+
+* add --playwright flag for Playwright MCP sidecar ([72a9070](https://github.com/mbabic84/kilo-docker/commit/72a9070b628d0b076b6e9a67f5fff1fcae244459))
+* bump Kilo CLI to v7.1.4 ([23e6283](https://github.com/mbabic84/kilo-docker/commit/23e6283b8e0b5efeb2c1772ddc85a469d0d3ecae))
+
 ## [1.11.2](https://github.com/mbabic84/kilo-docker/compare/v1.11.1...v1.11.2) (2026-03-24)
 
 ### Bug Fixes
