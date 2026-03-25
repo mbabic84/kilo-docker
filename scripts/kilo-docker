@@ -133,7 +133,7 @@ fi
 
 # --- Handle "help" argument ------------------------------------------------
 
-if [ "${1:-}" = "help" ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+if [ "${1:-}" = "help" ]; then
     cat >&2 <<'EOF'
 Usage: kilo-docker [--once] [--playwright] [--network <name>] [command] [args...]
 
@@ -144,12 +144,16 @@ Commands:
   init              Reset configuration (remove volume)
   cleanup           Remove volume, containers, and images
   update            Pull the latest Docker image
-  help              Show this help message
+  help              Show this help message (wrapper)
 
 Options:
   --once            Run a one-time session without persisting data (no volume)
   --playwright      Start a Playwright MCP sidecar container for browser automation
   --network <name>  Connect the container to a Docker network
+
+Note:
+  Use "kilo-docker help" for this wrapper help.
+  Use "kilo-docker --help" for Kilo CLI help.
 
 Examples:
   kilo-docker                                    # interactive mode
@@ -364,7 +368,7 @@ done
 
 if [ $# -gt 0 ]; then
     if [ -t 0 ]; then
-        exec docker run -t "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
+        exec docker run -it "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
     else
         exec docker run "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
     fi
