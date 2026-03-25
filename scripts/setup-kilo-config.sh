@@ -1,7 +1,8 @@
 #!/bin/sh
 # Shared kilo config setup — sourced by entrypoint scripts.
-# Disables MCP servers whose required token env vars are not set.
-# Enables/disables Playwright based on PLAYWRIGHT_ENABLED env var.
+# Enables MCP servers whose required token env vars are set;
+# disables those whose tokens are missing. Playwright is toggled
+# via the PLAYWRIGHT_ENABLED env var.
 #
 # Kilo reads config with CWD taking priority over user config, so both
 # the user config and any workspace config must be patched.
@@ -17,6 +18,8 @@ JQ_FILTER='
       end
     elif $mapping[.key] and ((env[$mapping[.key]] // "") == "") then
       .value.enabled = false
+    elif $mapping[.key] then
+      .value.enabled = true
     else
       .
     end
