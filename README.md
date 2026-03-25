@@ -13,6 +13,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **Non-root user** - Runs as `kilo` user with dynamic `PUID`/`PGID` mapping to match host user
 - **Persistent database** - SQLite database and auth state survive container restarts via named volume
 - **Token persistence** - MCP server tokens are prompted once and saved in the volume
+- **Volume encryption** - `--password` flag encrypts tokens and derives a non-discoverable volume name
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
 
@@ -59,6 +60,7 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | Option | Description |
 |--------|-------------|
 | `--once` | Run a one-time session without persistence (no volume) |
+| `--password`, `-p` | Protect volume with a password (encrypts tokens, derives volume name from password) |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--network <name>` | Attach to a specific Docker network |
 
@@ -74,6 +76,28 @@ kilo-docker --once run "fix build errors"
 ```
 
 This is useful for CI pipelines, ephemeral environments, or when you don't want to leave any state on the host.
+
+## Volume Encryption
+
+Use `--password` (or `-p`) to protect your volume on shared hosts. This applies two layers of protection:
+
+1. **Non-discoverable volume name** — The volume name is derived from the SHA-256 hash of your password (e.g., `kilo-a3f2b1c9d4e5`). Other users on the host cannot find or target your volume via `docker volume ls`.
+
+2. **Encrypted tokens** — API tokens are encrypted with AES-256-CBC (PBKDF2 key derivation) before being stored in the volume. Plaintext tokens never touch the disk.
+
+```bash
+# Start with encryption
+kilo-docker --password
+
+# Reset encrypted volume
+kilo-docker --password init
+```
+
+On first run, you are prompted for a volume password and then for API tokens. Subsequent runs only ask for the volume password.
+
+Without `--password`, the volume name is `kilo-data-<username>` and tokens are stored in plaintext (original behavior).
+
+> **Note:** `--once` and `--password` are mutually exclusive. `--once` creates no volume, so there is nothing to encrypt.
 
 ## Browser Automation
 
@@ -93,11 +117,15 @@ Screenshots and other output files are saved to `.playwright-mcp/` in the worksp
 
 ## Data Persistence
 
-The script uses a named Docker volume (`kilo-data-<username>`) mounted at `/home/kilo/.local/share/kilo`. This stores:
+The script uses a named Docker volume mounted at `/home/kilo/.local/share/kilo`. This stores:
 
 - SQLite database
 - MCP server tokens
 - Auth state, logs, and snapshots
+
+**Default mode** — Volume name: `kilo-data-<username>`. Tokens stored in plaintext.
+
+**Encrypted mode** (`--password`) — Volume name: `kilo-<hash>` (derived from password). Tokens stored as AES-256-CBC ciphertext.
 
 The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, and image).
 
@@ -123,6 +151,16 @@ ssh remote-host 'bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/ki
 ```
 
 > Tokens are prompted interactively on first run via the TTY.
+
+### Shared Hosts
+
+On shared hosts where other users have Docker access, use `--password` to protect your volume and tokens:
+
+```bash
+ssh remote-host 'bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)' -- --password
+```
+
+This ensures other users cannot discover your volume or read your API tokens.
 
 ### SSH Alias for Convenience
 
