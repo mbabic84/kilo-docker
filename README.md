@@ -14,6 +14,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **Persistent database** - SQLite database and auth state survive container restarts via named volume
 - **Token persistence** - MCP server tokens are prompted once and saved in the volume
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
+- **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
 
 ## Quick Start
 
@@ -58,6 +59,7 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | Option | Description |
 |--------|-------------|
 | `--once` | Run a one-time session without persistence (no volume) |
+| `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--network <name>` | Attach to a specific Docker network |
 
 ## One-Time Sessions
@@ -73,6 +75,22 @@ kilo-docker --once run "fix build errors"
 
 This is useful for CI pipelines, ephemeral environments, or when you don't want to leave any state on the host.
 
+## Browser Automation
+
+The `--playwright` flag starts a [Playwright MCP](https://github.com/microsoft/playwright-mcp) sidecar container alongside Kilo, enabling browser automation (screenshots, navigation, form filling, etc.):
+
+```bash
+# Interactive with browser
+kilo-docker --playwright
+
+# Autonomous with browser
+kilo-docker --once --playwright run "take a screenshot of example.com"
+```
+
+The sidecar runs headless Chromium in HTTP mode on port 8931 inside a dedicated Docker network (`kilo-playwright-<username>`). Both the sidecar container and network are automatically cleaned up when Kilo exits.
+
+Screenshots and other output files are saved to `.playwright-mcp/` in the workspace directory.
+
 ## Data Persistence
 
 The script uses a named Docker volume (`kilo-data-<username>`) mounted at `/home/kilo/.local/share/kilo`. This stores:
@@ -87,12 +105,15 @@ The volume persists across container restarts. Use `kilo-docker init` to reset t
 
 ### Base Image
 
-| Server | Description |
-|--------|-------------|
-| `context7` | Library documentation lookup |
-| `ainstruct` | Document storage and semantic search |
+| Server | Description | Auth |
+|--------|-------------|------|
+| `context7` | Library documentation lookup | Bearer token |
+| `ainstruct` | Document storage and semantic search | Bearer token |
+| `playwright` | Browser automation (screenshots, navigation) | None (local sidecar) |
 
-Both require Bearer token authentication. Tokens are prompted on first run and stored in the named volume for subsequent runs.
+`context7` and `ainstruct` require Bearer token authentication. Tokens are prompted on first run and stored in the named volume for subsequent runs.
+
+`playwright` is only available when using the `--playwright` flag. It runs as a separate container on a shared Docker network with no authentication required.
 
 ## Usage on Remote Hosts
 

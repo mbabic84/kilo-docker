@@ -17,6 +17,11 @@
       "headers": {
         "Authorization": "Bearer {env:CONTEXT7_TOKEN}"
       }
+    },
+    "playwright": {
+      "type": "remote",
+      "url": "http://playwright-mcp:8931/mcp",
+      "enabled": false
     }
   },
   "instructions": [
@@ -24,6 +29,7 @@
   ],
   "permission": {
     "ainstruct_*": "allow",
-    "context7_*": "allow"
+    "context7_*": "allow",
+    "playwright_*": "allow"
   }
 }
