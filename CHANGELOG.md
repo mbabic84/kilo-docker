@@ -1,3 +1,9 @@
+## [1.13.0](https://github.com/mbabic84/kilo-docker/compare/v1.12.1...v1.13.0) (2026-03-25)
+
+### Features
+
+* add --password flag for volume encryption and non-discoverable volume names ([58c32d5](https://github.com/mbabic84/kilo-docker/commit/58c32d5b607e0e4ffc8f3796d4473d2b399a4785))
+
 ## [1.12.1](https://github.com/mbabic84/kilo-docker/compare/v1.12.0...v1.12.1) (2026-03-25)
 
 ### Bug Fixes
