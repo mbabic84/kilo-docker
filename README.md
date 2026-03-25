@@ -42,6 +42,14 @@ chmod +x kilo-docker
 ./kilo-docker
 ```
 
+Or install it as a global command (symlinked to `~/.local/bin/kilo-docker`):
+
+```bash
+bash kilo-docker install
+```
+
+After installing, `kilo-docker` is available from any directory. The install command also pulls the Docker image so it is ready to use immediately.
+
 On first run, the script prompts for MCP server tokens and saves them to a named Docker volume. Subsequent runs reuse the saved tokens.
 
 ## Script Commands
@@ -51,8 +59,9 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | *(none)* | Start Kilo in interactive mode |
 | `run "prompt"` | Run Kilo in autonomous mode |
 | `init` | Reset configuration (remove volume, re-enter tokens) |
-| `cleanup` | Remove volume, containers, and image |
-| `update` | Pull the latest Docker image |
+| `cleanup` | Remove volume, containers, image, and installed script |
+| `install` | Install as a global command (`~/.local/bin/kilo-docker`) |
+| `update` | Update the installed script and pull the latest Docker image |
 | `help` | Show help message |
 
 ### Options
@@ -127,7 +136,7 @@ The script uses a named Docker volume mounted at `/home/kilo/.local/share/kilo`.
 
 **Encrypted mode** (`--password`) — Volume name: `kilo-<hash>` (derived from password). Tokens stored as AES-256-CBC ciphertext.
 
-The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, and image).
+The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, image, and installed script).
 
 ## MCP Servers
 
