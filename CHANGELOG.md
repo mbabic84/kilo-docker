@@ -1,3 +1,9 @@
+## [1.14.2](https://github.com/mbabic84/kilo-docker/compare/v1.14.1...v1.14.2) (2026-03-26)
+
+### Bug Fixes
+
+* skip password confirmation for existing volumes ([dba49df](https://github.com/mbabic84/kilo-docker/commit/dba49dfa3a696fad1dd2c11032d979388887593a))
+
 ## [1.14.1](https://github.com/mbabic84/kilo-docker/compare/v1.14.0...v1.14.1) (2026-03-26)
 
 ### Bug Fixes
