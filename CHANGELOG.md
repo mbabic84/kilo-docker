@@ -1,3 +1,9 @@
+## [1.15.0](https://github.com/mbabic84/kilo-docker/compare/v1.14.3...v1.15.0) (2026-03-26)
+
+### Features
+
+* reduce first-time password setup from 3 prompts to 2 ([30f8bec](https://github.com/mbabic84/kilo-docker/commit/30f8bec7db8045c4c09b2dddac0a2e038dfaa73a))
+
 ## [1.14.3](https://github.com/mbabic84/kilo-docker/compare/v1.14.2...v1.14.3) (2026-03-26)
 
 ### Bug Fixes
