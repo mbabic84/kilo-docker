@@ -67,6 +67,22 @@ prompt_password() {
     done
 }
 
+confirm_password() {
+    local confirm_pw=""
+    echo -n "Confirm: " >&2
+    read -s -r confirm_pw </dev/tty || { echo >&2; echo "Error: Failed to read password." >&2; exit 1; }
+    echo >&2
+
+    if [ "$confirm_pw" = "$VOLUME_PASSWORD" ]; then
+        return
+    fi
+
+    echo "Passwords do not match. Re-enter password." >&2
+    echo >&2
+    prompt_password
+    derive_volume_name
+}
+
 derive_volume_name() {
     local hash
     hash=$(printf '%s' "$VOLUME_PASSWORD" | sha256sum | cut -c1-12)
@@ -278,10 +294,9 @@ elif [ "$ENCRYPTED" -eq 1 ]; then
     if [ -t 2 ] && [ -t 0 ]; then
         prompt_password skip_confirm
         derive_volume_name
-        # If volume doesn't exist yet, re-prompt with confirmation to avoid typos
+        # If volume doesn't exist yet, confirm the password to avoid typos
         if ! docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
-            prompt_password
-            derive_volume_name
+            confirm_password
         fi
     else
         echo "Error: --password requires a TTY. Use --once for ephemeral runs." >&2
