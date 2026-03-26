@@ -347,16 +347,26 @@ if [ "${1:-}" = "install" ]; then
         SOURCE_SCRIPT="$(realpath "$0")"
     fi
 
+    DOWNLOADED_SCRIPT=""
+
     if [ -z "$SOURCE_SCRIPT" ] || [ ! -f "$SOURCE_SCRIPT" ]; then
-        echo "Error: Cannot determine script path (running from stdin?). Download the script first:" >&2
-        echo "  curl -fsSL -o kilo-docker ${GITHUB_RAW}" >&2
-        echo "  chmod +x kilo-docker" >&2
-        exit 1
+        echo "Source script path not available (e.g., running via pipe). Downloading..." >&2
+        DOWNLOADED_SCRIPT="$(mktemp)"
+        if curl -fsSL "$GITHUB_RAW" -o "$DOWNLOADED_SCRIPT" 2>/dev/null; then
+            chmod +x "$DOWNLOADED_SCRIPT"
+            SOURCE_SCRIPT="$DOWNLOADED_SCRIPT"
+        else
+            echo "Error: Failed to download script from ${GITHUB_RAW}." >&2
+            exit 1
+        fi
     fi
 
     mkdir -p "$INSTALL_DIR"
 
-    if [ -L "$INSTALL_TARGET" ]; then
+    if [ -n "$DOWNLOADED_SCRIPT" ]; then
+        cp "$SOURCE_SCRIPT" "$INSTALL_TARGET"
+        rm -f "$DOWNLOADED_SCRIPT"
+    elif [ -L "$INSTALL_TARGET" ]; then
         echo "kilo-docker is already installed at ${INSTALL_TARGET}" >&2
         echo "Updating symlink..." >&2
         ln -sf "$SOURCE_SCRIPT" "$INSTALL_TARGET"
@@ -383,9 +393,16 @@ if [ "${1:-}" = "install" ]; then
         *)
             echo "" >&2
             echo "Warning: ${INSTALL_DIR} is not on your PATH." >&2
-            echo "Add the following line to your ~/.bashrc (or ~/.zshrc):" >&2
-            echo '  export PATH="$HOME/.local/bin:$PATH"' >&2
-            echo "Then restart your shell or run: source ~/.bashrc" >&2
+            if [ -f "$HOME/.profile" ] && grep -q '.local/bin' "$HOME/.profile"; then
+                echo "Your ~/.profile already configures ~/.local/bin for PATH, but it was not active at login." >&2
+                echo "Run one of the following to activate it:" >&2
+                echo '  source ~/.profile' >&2
+                echo "Or log out and log back in." >&2
+            else
+                echo "Add the following line to your ~/.bashrc (or ~/.zshrc):" >&2
+                echo "  export PATH=\"\$HOME/.local/bin:\$PATH\"" >&2
+                echo "Then restart your shell or run: source ~/.bashrc" >&2
+            fi
             ;;
     esac
 
