@@ -17,8 +17,25 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
 - **Docker access** - `--docker` flag mounts the host Docker socket for container management from within Kilo
+- **Zellij sessions** - `--zellij` flag starts a Zellij terminal multiplexer session
 
 ## Quick Start
+
+Install `kilo-docker` as a global command:
+
+```bash
+# curl
+bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker) install
+
+# wget
+bash <(wget -qO- https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker) install
+```
+
+Then run from any directory:
+
+```bash
+kilo-docker
+```
 
 No need to clone the repository. Run directly with `curl` or `wget`:
 
@@ -73,6 +90,7 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | `--password`, `-p` | Protect volume with a password (encrypts tokens, derives volume name from password) |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--docker` | Mount Docker socket for container management from within Kilo |
+| `--zellij` | Start a Zellij terminal multiplexer session |
 | `--network <name>` | Attach to a specific Docker network |
 
 ## One-Time Sessions
@@ -141,6 +159,26 @@ kilo-docker --once --docker run "list running containers and check their logs"
 The Docker CLI and Compose plugin are installed at runtime inside the container. The socket's group ownership is dynamically matched so `docker` commands work without `sudo`.
 
 > **Security:** Mounting the Docker socket grants full Docker API access inside the container, which is equivalent to root access on the host. Only use `--docker` in trusted environments.
+
+## Zellij Sessions
+
+The `--zellij` flag starts a [Zellij](https://zellij.dev/) terminal multiplexer session:
+
+```bash
+# Interactive with Zellij
+kilo-docker --zellij
+```
+
+Run `kilo` inside the session to start Kilo. Zellij is installed at runtime from the latest GitHub release. Pane frames, startup tips, and release notes are hidden by default.
+
+### Key Bindings
+
+| Action | Keys |
+|--------|------|
+| Enter session mode | `Ctrl+P` (pane), `Ctrl+T` (tab), `Ctrl+N` (resize) |
+| Quit | `Ctrl+Q` |
+
+Zellij configuration is stored in `configs/zellij.kdl` and copied to the container at runtime.
 
 ## Data Persistence
 
@@ -238,7 +276,8 @@ docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-
 ```
 ├── Dockerfile                  # Base image (Alpine, musl kilo binary)
 ├── configs/
-│   └── opencode.json           # Kilo config for base image
+│   ├── opencode.json           # Kilo config for base image
+│   └── zellij.kdl              # Zellij config (keybinds, pane settings)
 └── scripts/
     ├── kilo-docker             # CLI wrapper script
     ├── entrypoint.sh           # Entrypoint for Alpine (base image)
