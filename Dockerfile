@@ -18,6 +18,7 @@ RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec sudo jq \
 
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo
 COPY configs/opencode.json /home/kilo/.config/kilo/opencode.json
+COPY configs/zellij.kdl /etc/zellij/config.kdl
 COPY scripts/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY scripts/setup-kilo-config.sh /usr/local/bin/setup-kilo-config.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/setup-kilo-config.sh

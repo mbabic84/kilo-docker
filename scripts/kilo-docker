@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kilo-docker — Wrapper script for running Kilo in a Docker container.
 #
-# Usage: kilo-docker [--once] [--password] [--playwright] [--docker] [--network <name>] [command] [args...]
+# Usage: kilo-docker [--once] [--password] [--playwright] [--docker] [--zellij] [--network <name>] [command] [args...]
 # See:   kilo-docker help
 #
 set -euo pipefail
@@ -150,6 +150,7 @@ ONCE=0
 ENCRYPTED=0
 PLAYWRIGHT=0
 DOCKER=0
+ZELLIJ=0
 NETWORK=""
 NETWORK_FLAG=0
 FILTERED_ARGS=()
@@ -166,6 +167,9 @@ while [ $# -gt 0 ]; do
             ;;
         --docker)
             DOCKER=1
+            ;;
+        --zellij)
+            ZELLIJ=1
             ;;
         --network)
             NETWORK_FLAG=1
@@ -218,7 +222,7 @@ fi
 
 if [ "${1:-}" = "help" ]; then
     cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [--password] [--playwright] [--docker] [--network <name>] [command] [args...]
+Usage: kilo-docker [--once] [--password] [--playwright] [--docker] [--zellij] [--network <name>] [command] [args...]
 
 Commands:
   (no command)      Start Kilo in interactive mode
@@ -236,6 +240,7 @@ Options:
   --password, -p    Protect volume with a password (encrypts tokens, derives volume name from password)
   --playwright      Start a Playwright MCP sidecar container for browser automation
   --docker          Mount Docker socket for container management from within Kilo
+  --zellij          Run Kilo inside a Zellij session (detach with Ctrl+O D, re-attach with: docker exec -it <c> zellij attach kilo)
   --network <name>  Connect the container to a Docker network
 
 Security (--password):
@@ -264,6 +269,7 @@ Examples:
   kilo-docker --once run "prompt"                # one-time autonomous session
   kilo-docker --playwright                       # with Playwright browser automation
   kilo-docker --docker                           # with Docker socket access
+  kilo-docker --zellij                           # run Kilo in a Zellij session
   kilo-docker --network host                     # connect to host network
   kilo-docker networks                           # list available Docker networks
   kilo-docker init                               # reset configuration
@@ -705,6 +711,10 @@ if [ "$DOCKER" -eq 1 ]; then
     DOCKER_ARGS+=(-v /var/run/docker.sock:/var/run/docker.sock)
     DOCKER_ARGS+=(-e "DOCKER_ENABLED=1")
     DOCKER_ARGS+=(-e "DOCKER_GID=${DOCKER_GID}")
+fi
+
+if [ "$ZELLIJ" -eq 1 ]; then
+    DOCKER_ARGS+=(-e "ZELLIJ=1")
 fi
 
 if [ -n "$NETWORK" ]; then
