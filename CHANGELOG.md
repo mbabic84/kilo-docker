@@ -1,3 +1,9 @@
+## [1.16.0](https://github.com/mbabic84/kilo-docker/compare/v1.15.0...v1.16.0) (2026-03-26)
+
+### Features
+
+* add --docker flag for Docker socket access ([c3d51c5](https://github.com/mbabic84/kilo-docker/commit/c3d51c54f832454b2d102e5a65bced4c84e63e96))
+
 ## [1.15.0](https://github.com/mbabic84/kilo-docker/compare/v1.14.3...v1.15.0) (2026-03-26)
 
 ### Features
