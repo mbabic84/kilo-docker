@@ -31,9 +31,10 @@ confirm() {
 }
 
 prompt_password() {
+    local skip_confirm="${1:-}"
     local password=""
     while true; do
-        echo -n "Volume password: " >&2
+        echo -n "Password: " >&2
         read -s -r password </dev/tty || { echo >&2; echo "Error: Failed to read password." >&2; exit 1; }
         echo >&2
 
@@ -47,7 +48,12 @@ prompt_password() {
             continue
         fi
 
-        echo -n "Confirm password: " >&2
+        if [ "$skip_confirm" = "skip_confirm" ]; then
+            VOLUME_PASSWORD="$password"
+            return
+        fi
+
+        echo -n "Confirm: " >&2
         local confirm_pw=""
         read -s -r confirm_pw </dev/tty || { echo >&2; echo "Error: Failed to read password." >&2; exit 1; }
         echo >&2
@@ -268,12 +274,17 @@ if [ "$ONCE" -eq 1 ]; then
 elif [ "$ENCRYPTED" -eq 1 ]; then
     # --password: derive volume name from password
     if [ -t 2 ] && [ -t 0 ]; then
-        prompt_password
+        prompt_password skip_confirm
+        derive_volume_name
+        # If volume doesn't exist yet, re-prompt with confirmation to avoid typos
+        if ! docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+            prompt_password
+            derive_volume_name
+        fi
     else
         echo "Error: --password requires a TTY. Use --once for ephemeral runs." >&2
         exit 1
     fi
-    derive_volume_name
 else
     # Default: plaintext volume with username
     DATA_VOLUME="kilo-data-$(whoami)"
