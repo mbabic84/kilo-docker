@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kilo-docker — Wrapper script for running Kilo in a Docker container.
 #
-# Usage: kilo-docker [--once] [--password] [--playwright] [--network <name>] [command] [args...]
+# Usage: kilo-docker [--once] [--password] [--playwright] [--docker] [--network <name>] [command] [args...]
 # See:   kilo-docker help
 #
 set -euo pipefail
@@ -149,6 +149,7 @@ prompt_new_tokens() {
 ONCE=0
 ENCRYPTED=0
 PLAYWRIGHT=0
+DOCKER=0
 NETWORK=""
 NETWORK_FLAG=0
 FILTERED_ARGS=()
@@ -162,6 +163,9 @@ while [ $# -gt 0 ]; do
             ;;
         --playwright)
             PLAYWRIGHT=1
+            ;;
+        --docker)
+            DOCKER=1
             ;;
         --network)
             NETWORK_FLAG=1
@@ -187,6 +191,22 @@ IMAGE="${REPO}:latest"
 # Replace positional parameters with filtered args
 set -- "${FILTERED_ARGS[@]}"
 
+# --- Docker socket access ----------------------------------------------------
+
+DOCKER_GID=""
+if [ "$DOCKER" -eq 1 ]; then
+    echo "WARNING: --docker grants full Docker API access inside the container." >&2
+    echo "         This is equivalent to root access on the host." >&2
+    echo "" >&2
+
+    if [ ! -S /var/run/docker.sock ]; then
+        echo "Error: /var/run/docker.sock not found. Is Docker running?" >&2
+        exit 1
+    fi
+
+    DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+fi
+
 # --- Docker daemon check ---------------------------------------------------
 
 if ! docker info >/dev/null 2>&1; then
@@ -198,7 +218,7 @@ fi
 
 if [ "${1:-}" = "help" ]; then
     cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [--password] [--playwright] [--network <name>] [command] [args...]
+Usage: kilo-docker [--once] [--password] [--playwright] [--docker] [--network <name>] [command] [args...]
 
 Commands:
   (no command)      Start Kilo in interactive mode
@@ -215,6 +235,7 @@ Options:
   --once            Run a one-time session without persisting data (no volume)
   --password, -p    Protect volume with a password (encrypts tokens, derives volume name from password)
   --playwright      Start a Playwright MCP sidecar container for browser automation
+  --docker          Mount Docker socket for container management from within Kilo
   --network <name>  Connect the container to a Docker network
 
 Security (--password):
@@ -224,6 +245,11 @@ Security (--password):
 
   Without --password, the volume name is kilo-data-<username> and tokens are
   stored in plaintext (original behavior).
+
+Security (--docker):
+  Mounting the Docker socket grants full Docker API access inside the container.
+  This is equivalent to root access on the host. Only use this in trusted
+  environments.
 
 Note:
   Use "kilo-docker help" for this wrapper help.
@@ -237,6 +263,7 @@ Examples:
   kilo-docker --once                             # one-time interactive session
   kilo-docker --once run "prompt"                # one-time autonomous session
   kilo-docker --playwright                       # with Playwright browser automation
+  kilo-docker --docker                           # with Docker socket access
   kilo-docker --network host                     # connect to host network
   kilo-docker networks                           # list available Docker networks
   kilo-docker init                               # reset configuration
@@ -672,6 +699,12 @@ fi
 
 if [ "$PLAYWRIGHT" -eq 1 ]; then
     DOCKER_ARGS+=(-e "PLAYWRIGHT_ENABLED=1")
+fi
+
+if [ "$DOCKER" -eq 1 ]; then
+    DOCKER_ARGS+=(-v /var/run/docker.sock:/var/run/docker.sock)
+    DOCKER_ARGS+=(-e "DOCKER_ENABLED=1")
+    DOCKER_ARGS+=(-e "DOCKER_GID=${DOCKER_GID}")
 fi
 
 if [ -n "$NETWORK" ]; then
