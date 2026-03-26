@@ -1,3 +1,9 @@
+## [1.18.0](https://github.com/mbabic84/kilo-docker/compare/v1.17.0...v1.18.0) (2026-03-26)
+
+### Features
+
+* add --zellij flag for terminal multiplexer sessions ([a278056](https://github.com/mbabic84/kilo-docker/commit/a278056ee7cf05fd0fd8d89423abcea764bb6400))
+
 ## [1.17.0](https://github.com/mbabic84/kilo-docker/compare/v1.16.0...v1.17.0) (2026-03-26)
 
 ### Features
