@@ -126,17 +126,28 @@ Screenshots and other output files are saved to `.playwright-mcp/` in the worksp
 
 ## Data Persistence
 
-The script uses a named Docker volume mounted at `/home/kilo/.local/share/kilo`. This stores:
+The script uses a named Docker volume mounted at `/home/kilo`. This stores:
 
-- SQLite database
-- MCP server tokens
-- Auth state, logs, and snapshots
+- SQLite database, auth state, logs
+- Configuration (`opencode.json` — model selection, provider connections, MCP settings)
+- Session state and snapshots
+- Cache
 
 **Default mode** — Volume name: `kilo-data-<username>`. Tokens stored in plaintext.
 
 **Encrypted mode** (`--password`) — Volume name: `kilo-<hash>` (derived from password). Tokens stored as AES-256-CBC ciphertext.
 
 The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, image, and installed script).
+
+### Updating config from template
+
+When a new Kilo Docker image adds MCP servers or config changes, run:
+
+```bash
+kilo-docker update-config
+```
+
+This downloads the latest `opencode.json` template from the repository and merges it with your existing config. New servers are added, existing customizations are preserved. Run `kilo-docker --password update-config` for encrypted volumes.
 
 ## MCP Servers
 

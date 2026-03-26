@@ -78,7 +78,7 @@ encrypt_tokens() {
     printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
         openssl enc -aes-256-cbc -salt -pbkdf2 -pass "pass:${VOLUME_PASSWORD}" -out /dev/stdout 2>/dev/null | \
         docker run --rm -i --entrypoint "" \
-            -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+            -v "${DATA_VOLUME}:/home/kilo" \
             "$IMAGE" \
             sh -c "mkdir -p \"\$(dirname '${ENCRYPTED_TOKEN_FILE}')\" && cat > '${ENCRYPTED_TOKEN_FILE}' && chmod 600 '${ENCRYPTED_TOKEN_FILE}'"
 }
@@ -86,7 +86,7 @@ encrypt_tokens() {
 decrypt_tokens() {
     local decrypted
     decrypted=$(docker run --rm --entrypoint "" \
-        -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+        -v "${DATA_VOLUME}:/home/kilo" \
         "$IMAGE" \
         cat "${ENCRYPTED_TOKEN_FILE}" 2>/dev/null | \
         openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${VOLUME_PASSWORD}" 2>/dev/null) || return 1
@@ -119,7 +119,7 @@ prompt_new_tokens() {
         else
             printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
                 docker run --rm -i --entrypoint "" \
-                    -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+                    -v "${DATA_VOLUME}:/home/kilo" \
                     "$IMAGE" \
                     sh -c "mkdir -p \"\$(dirname '${TOKEN_FILE}')\" && cat > '${TOKEN_FILE}'"
         fi
@@ -192,6 +192,7 @@ Commands:
   cleanup           Remove volume, containers, images, and installed script
   install           Install kilo-docker as a global command (~/.local/bin)
   update            Pull the latest Docker image and update the installed script
+  update-config     Download latest opencode.json template and merge with existing config
   help              Show this help message (wrapper)
 
 Options:
@@ -226,6 +227,7 @@ Examples:
   kilo-docker cleanup                            # remove volume, containers, images, script
   kilo-docker install                            # install as global command
   kilo-docker update                             # update script and pull latest image
+  kilo-docker update-config                      # update config template, preserve customizations
 EOF
     exit 0
 fi
@@ -288,6 +290,41 @@ elif [ "$ENCRYPTED" -eq 1 ]; then
 else
     # Default: plaintext volume with username
     DATA_VOLUME="kilo-data-$(whoami)"
+fi
+
+# --- Handle "update-config" argument ----------------------------------------
+
+if [ "${1:-}" = "update-config" ]; then
+    if [ -z "$DATA_VOLUME" ]; then
+        echo "Nothing to update in --once mode." >&2
+        exit 0
+    fi
+    if ! docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+        echo "No existing volume found. Run kilo-docker first to create one." >&2
+        exit 1
+    fi
+    echo "Updating opencode.json from repository template..." >&2
+    docker run --rm --entrypoint "" \
+        -v "${DATA_VOLUME}:/home/kilo" \
+        "$IMAGE" \
+        sh -c '
+            set -e
+            TEMPLATE=$(mktemp)
+            CONFIG="/home/kilo/.config/kilo/opencode.json"
+            if curl -fsSL "https://raw.githubusercontent.com/mbabic84/kilo-docker/main/configs/opencode.json" -o "$TEMPLATE"; then
+                if [ -f "$CONFIG" ]; then
+                    jq -s ".[0] * .[1]" "$TEMPLATE" "$CONFIG" > "${CONFIG}.tmp" && mv "${CONFIG}.tmp" "$CONFIG"
+                    echo "Config merged. Existing customizations preserved, new servers added."
+                else
+                    cp "$TEMPLATE" "$CONFIG"
+                    echo "Config created from template."
+                fi
+            else
+                echo "Error: Failed to download config template."
+                exit 1
+            fi
+        '
+    exit 0
 fi
 
 # --- Handle "init" argument ------------------------------------------------
@@ -467,7 +504,7 @@ if [ "$ONCE" -eq 0 ]; then
             if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ]; then
                 # Check if old plaintext token file exists (migration)
                 PLAINTEXT=$(docker run --rm --entrypoint "" \
-                    -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+                    -v "${DATA_VOLUME}:/home/kilo" \
                     "$IMAGE" \
                     cat "$TOKEN_FILE" 2>/dev/null || true)
 
@@ -480,7 +517,7 @@ if [ "$ONCE" -eq 0 ]; then
                         encrypt_tokens "$TOKEN_1" "$TOKEN_2"
                         # Remove old plaintext file
                         docker run --rm --entrypoint "" \
-                            -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+                            -v "${DATA_VOLUME}:/home/kilo" \
                             "$IMAGE" \
                             rm -f "$TOKEN_FILE" 2>/dev/null || true
                         echo "Migration complete. Old plaintext token file removed." >&2
@@ -490,7 +527,7 @@ if [ "$ONCE" -eq 0 ]; then
         else
             # Plaintext mode: read tokens directly
             EXISTING=$(docker run --rm --entrypoint "" \
-                -v "${DATA_VOLUME}:/home/kilo/.local/share/kilo" \
+                -v "${DATA_VOLUME}:/home/kilo" \
                 "$IMAGE" \
                 cat "$TOKEN_FILE" 2>/dev/null || true)
 
@@ -607,7 +644,7 @@ DOCKER_ARGS=(
 )
 
 if [ "$ONCE" -eq 0 ] && [ -n "$DATA_VOLUME" ]; then
-    DOCKER_ARGS+=(-v "${DATA_VOLUME}:/home/kilo/.local/share/kilo")
+    DOCKER_ARGS+=(-v "${DATA_VOLUME}:/home/kilo")
 fi
 
 if [ -n "$TOKEN_1" ]; then
