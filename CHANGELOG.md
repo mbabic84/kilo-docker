@@ -1,3 +1,9 @@
+## [1.14.3](https://github.com/mbabic84/kilo-docker/compare/v1.14.2...v1.14.3) (2026-03-26)
+
+### Bug Fixes
+
+* persist config and state across container recreation ([b887bb1](https://github.com/mbabic84/kilo-docker/commit/b887bb1d1fdda00fcb7bffc0b686092ea4071d5b))
+
 ## [1.14.2](https://github.com/mbabic84/kilo-docker/compare/v1.14.1...v1.14.2) (2026-03-26)
 
 ### Bug Fixes
