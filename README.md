@@ -16,6 +16,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **Volume encryption** - `--password` flag encrypts tokens and derives a non-discoverable volume name
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
+- **Docker access** - `--docker` flag mounts the host Docker socket for container management from within Kilo
 
 ## Quick Start
 
@@ -71,6 +72,7 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | `--once` | Run a one-time session without persistence (no volume) |
 | `--password`, `-p` | Protect volume with a password (encrypts tokens, derives volume name from password) |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
+| `--docker` | Mount Docker socket for container management from within Kilo |
 | `--network <name>` | Attach to a specific Docker network |
 
 ## One-Time Sessions
@@ -123,6 +125,22 @@ kilo-docker --once --playwright run "take a screenshot of example.com"
 The sidecar runs headless Chromium in HTTP mode on port 8931 inside a dedicated Docker network (`kilo-playwright-<username>`). Both the sidecar container and network are automatically cleaned up when Kilo exits.
 
 Screenshots and other output files are saved to `.playwright-mcp/` in the workspace directory.
+
+## Docker Socket Access
+
+The `--docker` flag mounts the host Docker socket into the container, allowing Kilo to manage containers, images, and networks from within the session:
+
+```bash
+# Interactive with Docker access
+kilo-docker --docker
+
+# Autonomous with Docker access
+kilo-docker --once --docker run "list running containers and check their logs"
+```
+
+The Docker CLI and Compose plugin are installed at runtime inside the container. The socket's group ownership is dynamically matched so `docker` commands work without `sudo`.
+
+> **Security:** Mounting the Docker socket grants full Docker API access inside the container, which is equivalent to root access on the host. Only use `--docker` in trusted environments.
 
 ## Data Persistence
 
