@@ -1,3 +1,9 @@
+## [1.14.1](https://github.com/mbabic84/kilo-docker/compare/v1.14.0...v1.14.1) (2026-03-26)
+
+### Bug Fixes
+
+* support install command when running via pipe ([73826c4](https://github.com/mbabic84/kilo-docker/commit/73826c4fac482b91ca732da7cf888038f9dd077f))
+
 ## [1.14.0](https://github.com/mbabic84/kilo-docker/compare/v1.13.1...v1.14.0) (2026-03-25)
 
 ### Features
