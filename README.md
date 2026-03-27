@@ -182,7 +182,7 @@ Zellij configuration is stored in `configs/zellij.kdl` and copied to the contain
 
 ## Data Persistence
 
-The script uses a named Docker volume mounted at `/home/kilo`. This stores:
+The script uses a named Docker volume mounted at `/home/kilo-t8x3m7kp`. This stores:
 
 - SQLite database, auth state, logs
 - Configuration (`opencode.json` — model selection, provider connections, MCP settings)

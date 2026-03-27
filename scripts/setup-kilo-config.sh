@@ -32,5 +32,5 @@ disable_mcp() {
     fi
 }
 
-disable_mcp "/home/kilo/.config/kilo/opencode.json"
+disable_mcp "${HOME}/.config/kilo/opencode.json"
 disable_mcp "${PWD}/configs/opencode.json"

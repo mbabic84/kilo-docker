@@ -10,8 +10,9 @@ export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:$PATH}"
 
 readonly REPO="ghcr.io/mbabic84/kilo-docker"
 readonly GITHUB_RAW="https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker"
-readonly TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env"
-readonly ENCRYPTED_TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env.enc"
+readonly KILO_HOME="/home/kilo-t8x3m7kp"
+readonly TOKEN_FILE="${KILO_HOME}/.local/share/kilo/.tokens.env"
+readonly ENCRYPTED_TOKEN_FILE="${KILO_HOME}/.local/share/kilo/.tokens.env.enc"
 readonly INSTALL_DIR="$HOME/.local/bin"
 readonly INSTALL_TARGET="${INSTALL_DIR}/kilo-docker"
 
@@ -94,7 +95,7 @@ encrypt_tokens() {
     printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
         openssl enc -aes-256-cbc -salt -pbkdf2 -pass "pass:${VOLUME_PASSWORD}" -out /dev/stdout 2>/dev/null | \
         docker run --rm -i --entrypoint "" \
-            -v "${DATA_VOLUME}:/home/kilo" \
+            -v "${DATA_VOLUME}:${KILO_HOME}" \
             "$IMAGE" \
             sh -c "mkdir -p \"\$(dirname '${ENCRYPTED_TOKEN_FILE}')\" && cat > '${ENCRYPTED_TOKEN_FILE}' && chmod 600 '${ENCRYPTED_TOKEN_FILE}'"
 }
@@ -102,7 +103,7 @@ encrypt_tokens() {
 decrypt_tokens() {
     local decrypted
     decrypted=$(docker run --rm --entrypoint "" \
-        -v "${DATA_VOLUME}:/home/kilo" \
+        -v "${DATA_VOLUME}:${KILO_HOME}" \
         "$IMAGE" \
         cat "${ENCRYPTED_TOKEN_FILE}" 2>/dev/null | \
         openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${VOLUME_PASSWORD}" 2>/dev/null) || return 1
@@ -135,7 +136,7 @@ prompt_new_tokens() {
         else
             printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
                 docker run --rm -i --entrypoint "" \
-                    -v "${DATA_VOLUME}:/home/kilo" \
+                    -v "${DATA_VOLUME}:${KILO_HOME}" \
                     "$IMAGE" \
                     sh -c "mkdir -p \"\$(dirname '${TOKEN_FILE}')\" && cat > '${TOKEN_FILE}'"
         fi
@@ -252,6 +253,11 @@ Security (--docker):
   This is equivalent to root access on the host. Only use this in trusted
   environments.
 
+Breaking Change:
+  After v1.x updates, existing volumes are incompatible and must be recreated:
+    kilo-docker init
+  This removes the old volume and prompts for new tokens on next run.
+
 Note:
   Use "kilo-docker help" for this wrapper help.
   Use "kilo-docker --help" for Kilo CLI help.
@@ -349,12 +355,12 @@ if [ "${1:-}" = "update-config" ]; then
     fi
     echo "Updating opencode.json from repository template..." >&2
     docker run --rm --entrypoint "" \
-        -v "${DATA_VOLUME}:/home/kilo" \
+        -v "${DATA_VOLUME}:${KILO_HOME}" \
         "$IMAGE" \
         sh -c '
             set -e
             TEMPLATE=$(mktemp)
-            CONFIG="/home/kilo/.config/kilo/opencode.json"
+            CONFIG="${HOME}/.config/kilo/opencode.json"
             if curl -fsSL "https://raw.githubusercontent.com/mbabic84/kilo-docker/main/configs/opencode.json" -o "$TEMPLATE"; then
                 if [ -f "$CONFIG" ]; then
                     jq -s ".[0] * .[1]" "$TEMPLATE" "$CONFIG" > "${CONFIG}.tmp" && mv "${CONFIG}.tmp" "$CONFIG"
@@ -548,7 +554,7 @@ if [ "$ONCE" -eq 0 ]; then
             if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ]; then
                 # Check if old plaintext token file exists (migration)
                 PLAINTEXT=$(docker run --rm --entrypoint "" \
-                    -v "${DATA_VOLUME}:/home/kilo" \
+                    -v "${DATA_VOLUME}:${KILO_HOME}" \
                     "$IMAGE" \
                     cat "$TOKEN_FILE" 2>/dev/null || true)
 
@@ -561,7 +567,7 @@ if [ "$ONCE" -eq 0 ]; then
                         encrypt_tokens "$TOKEN_1" "$TOKEN_2"
                         # Remove old plaintext file
                         docker run --rm --entrypoint "" \
-                            -v "${DATA_VOLUME}:/home/kilo" \
+                            -v "${DATA_VOLUME}:${KILO_HOME}" \
                             "$IMAGE" \
                             rm -f "$TOKEN_FILE" 2>/dev/null || true
                         echo "Migration complete. Old plaintext token file removed." >&2
@@ -571,7 +577,7 @@ if [ "$ONCE" -eq 0 ]; then
         else
             # Plaintext mode: read tokens directly
             EXISTING=$(docker run --rm --entrypoint "" \
-                -v "${DATA_VOLUME}:/home/kilo" \
+                -v "${DATA_VOLUME}:${KILO_HOME}" \
                 "$IMAGE" \
                 cat "$TOKEN_FILE" 2>/dev/null || true)
 
@@ -675,6 +681,18 @@ if [ "$PLAYWRIGHT" -eq 1 ]; then
     NETWORK="$PLAYWRIGHT_NETWORK"
 fi
 
+# --- Workspace path conflict check ----------------------------------------
+
+CURRENT_PWD="$(pwd)"
+if [ -z "$ONCE" ] || [ "$ONCE" -eq 0 ]; then
+    case "$CURRENT_PWD" in
+        "/home/kilo-t8x3m7kp"|"/home/kilo-t8x3m7kp"/*)
+            echo "Warning: Current directory (${CURRENT_PWD}) overlaps with the container's home path." >&2
+            echo "This may cause permission issues or unexpected behavior." >&2
+            ;;
+    esac
+fi
+
 # --- Build docker run args -------------------------------------------------
 
 DOCKER_ARGS=(
@@ -683,12 +701,12 @@ DOCKER_ARGS=(
     --ipc=host
     -e "PUID=$(id -u)"
     -e "PGID=$(id -g)"
-    -v "$(pwd):/mnt/$(basename "$(pwd)")"
-    -w "/mnt/$(basename "$(pwd)")"
+    -v "${CURRENT_PWD}:${CURRENT_PWD}"
+    -w "${CURRENT_PWD}"
 )
 
 if [ "$ONCE" -eq 0 ] && [ -n "$DATA_VOLUME" ]; then
-    DOCKER_ARGS+=(-v "${DATA_VOLUME}:/home/kilo")
+    DOCKER_ARGS+=(-v "${DATA_VOLUME}:${KILO_HOME}")
 fi
 
 if [ -n "$TOKEN_1" ]; then
