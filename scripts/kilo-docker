@@ -226,7 +226,7 @@ Commands:
   run "prompt"      Run Kilo in autonomous mode with a prompt
   networks          List available Docker networks
   backup [-f]       Create backup of volume to tar.gz (auto-names with timestamp)
-  restore <file>    Restore volume from backup (with path translation)
+  restore <file>    Restore volume from backup
   init              Reset configuration (remove volume)
   cleanup           Remove volume, containers, images, and installed script
   install           Install kilo-docker as a global command (~/.local/bin)
@@ -254,11 +254,6 @@ Security (--docker):
   Mounting the Docker socket grants full Docker API access inside the container.
   This is equivalent to root access on the host. Only use this in trusted
   environments.
-
-Breaking Change:
-  After v1.x updates, existing volumes are incompatible and must be recreated:
-    kilo-docker init
-  This removes the old volume and prompts for new tokens on next run.
 
 Note:
   Use "kilo-docker help" for this wrapper help.
