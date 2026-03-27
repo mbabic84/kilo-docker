@@ -629,9 +629,9 @@ if [ "$PLAYWRIGHT" -eq 1 ]; then
         --name "$PLAYWRIGHT_CONTAINER" \
         --network "$PLAYWRIGHT_NETWORK" \
         --entrypoint node \
-        -v "$(pwd):/workspace" \
+        -v "$(pwd):/mnt/$(basename "$(pwd)")" \
         "$PLAYWRIGHT_IMAGE" \
-        cli.js --headless --browser chromium --no-sandbox --port 8931 --host 0.0.0.0 --output-dir /workspace/.playwright-mcp --allowed-hosts '*' \
+        cli.js --headless --browser chromium --no-sandbox --port 8931 --host 0.0.0.0 --output-dir /mnt/$(basename "$(pwd)")/.playwright-mcp --allowed-hosts '*' \
         >/dev/null
 
     # Wait for Playwright MCP to be ready
@@ -687,8 +687,8 @@ DOCKER_ARGS=(
     --ipc=host
     -e "PUID=$(id -u)"
     -e "PGID=$(id -g)"
-    -v "$(pwd):/workspace"
-    -w /workspace
+    -v "$(pwd):/mnt/$(basename "$(pwd)")"
+    -w /mnt/$(basename "$(pwd)")"
 )
 
 if [ "$ONCE" -eq 0 ] && [ -n "$DATA_VOLUME" ]; then
