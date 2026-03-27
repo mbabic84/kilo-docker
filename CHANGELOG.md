@@ -1,3 +1,9 @@
+## [1.21.0](https://github.com/mbabic84/kilo-docker/compare/v1.20.0...v1.21.0) (2026-03-27)
+
+### Features
+
+* **zellij:** limit bottom menu to only Ctrl+G and Ctrl+T ([8e01f08](https://github.com/mbabic84/kilo-docker/commit/8e01f08d93b16dd98ebe21026d68b112ed22d700))
+
 ## [1.20.0](https://github.com/mbabic84/kilo-docker/compare/v1.19.1...v1.20.0) (2026-03-27)
 
 ### Features
