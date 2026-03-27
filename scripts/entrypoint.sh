@@ -12,10 +12,26 @@ if [ "$(id -u)" = "0" ]; then
         addgroup -g "$PGID" kilo 2>/dev/null || true
         adduser -u "$PUID" -G kilo -D -s /bin/sh kilo
     fi
-    if [ "${DOCKER_ENABLED:-}" = "1" ] && ! command -v docker >/dev/null 2>&1; then
-        apk add --no-cache docker-cli docker-cli-compose
+    if [ "${DOCKER_ENABLED:-}" = "1" ]; then
+        if ! command -v docker >/dev/null 2>&1; then
+            echo "[kilo-docker] Downloading latest Docker client..." >&2
+            DOCKER_VERSION=$(curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/" | grep -oE 'docker-[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 | sed 's/docker-//')
+            curl -fsSL "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz" | tar xzf - -C /tmp docker/docker
+            mv /tmp/docker/docker /usr/local/bin/docker
+            chmod +x /usr/local/bin/docker
+            rm -rf /tmp/docker
+        fi
+        if ! command -v docker-compose >/dev/null 2>&1; then
+            echo "[kilo-docker] Downloading latest Docker Compose..." >&2
+            curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+                -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
+            mkdir -p /usr/libexec/docker/cli-plugins
+            ln -sf /usr/local/bin/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
+        fi
     fi
     if [ "${ZELLIJ:-}" = "1" ] && ! command -v zellij >/dev/null 2>&1; then
+        echo "[kilo-docker] Downloading latest Zellij..." >&2
         wget -qO /tmp/zellij.tar.gz "https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz"
         tar xzf /tmp/zellij.tar.gz -C /usr/local/bin
         rm -f /tmp/zellij.tar.gz
