@@ -1,3 +1,10 @@
+## [1.20.0](https://github.com/mbabic84/kilo-docker/compare/v1.19.1...v1.20.0) (2026-03-27)
+
+### Features
+
+* download latest Docker client and Compose from official sources ([4f0b756](https://github.com/mbabic84/kilo-docker/commit/4f0b756eb82838264a5e41df9fdc045ce8f6c9bc))
+* use alpine:latest for base image ([fece42f](https://github.com/mbabic84/kilo-docker/commit/fece42fb2be9da27a9b72548c686e6d893efdafb))
+
 ## [1.19.1](https://github.com/mbabic84/kilo-docker/compare/v1.19.0...v1.19.1) (2026-03-27)
 
 ### Bug Fixes
