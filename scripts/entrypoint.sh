@@ -1,9 +1,5 @@
 #!/bin/sh
-# =============================================================================
-# BREAKING CHANGE (2026-03-27): The container user home changed from
-# /home/kilo to /home/kilo-t8x3m7kp. Existing Docker volumes are incompatible
-# and must be recreated with: kilo-docker init
-# =============================================================================
+# kilo-docker entrypoint — Container initialization and user setup.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
