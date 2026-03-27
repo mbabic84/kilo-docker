@@ -1,3 +1,15 @@
+## [1.22.0](https://github.com/mbabic84/kilo-docker/compare/v1.21.0...v1.22.0) (2026-03-27)
+
+### Features
+
+* add --volume flag to restore command for specifying target volume ([730790e](https://github.com/mbabic84/kilo-docker/commit/730790efd827589831bf36cc4ab65a010a993aa1))
+* add backup and restore commands for volume management ([e35912f](https://github.com/mbabic84/kilo-docker/commit/e35912f1307ff2ec8cb96b8d683e72205af8e20b))
+* randomize container user home from /home/kilo to /home/kilo-t8x3m7kp ([07fd6df](https://github.com/mbabic84/kilo-docker/commit/07fd6df69cdb1529f3f0cb1f53adb24700801f87))
+
+### Bug Fixes
+
+* remove incorrect path translation and misleading breaking change from help ([9774aa9](https://github.com/mbabic84/kilo-docker/commit/9774aa91a5b4292d9697821fdf046d1bed7d0efc))
+
 ## [1.21.0](https://github.com/mbabic84/kilo-docker/compare/v1.20.0...v1.21.0) (2026-03-27)
 
 ### Features
