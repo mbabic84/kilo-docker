@@ -24,6 +24,5 @@ COPY scripts/setup-kilo-config.sh /usr/local/bin/setup-kilo-config.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/setup-kilo-config.sh
 
 ENV HOME=/home/kilo
-WORKDIR /workspace
 
 ENTRYPOINT ["docker-entrypoint.sh"]
