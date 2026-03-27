@@ -10,8 +10,9 @@ export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:$PATH}"
 
 readonly REPO="ghcr.io/mbabic84/kilo-docker"
 readonly GITHUB_RAW="https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker"
-readonly TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env"
-readonly ENCRYPTED_TOKEN_FILE="/home/kilo/.local/share/kilo/.tokens.env.enc"
+readonly KILO_HOME="/home/kilo-t8x3m7kp"
+readonly TOKEN_FILE="${KILO_HOME}/.local/share/kilo/.tokens.env"
+readonly ENCRYPTED_TOKEN_FILE="${KILO_HOME}/.local/share/kilo/.tokens.env.enc"
 readonly INSTALL_DIR="$HOME/.local/bin"
 readonly INSTALL_TARGET="${INSTALL_DIR}/kilo-docker"
 
@@ -94,7 +95,7 @@ encrypt_tokens() {
     printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
         openssl enc -aes-256-cbc -salt -pbkdf2 -pass "pass:${VOLUME_PASSWORD}" -out /dev/stdout 2>/dev/null | \
         docker run --rm -i --entrypoint "" \
-            -v "${DATA_VOLUME}:/home/kilo" \
+            -v "${DATA_VOLUME}:${KILO_HOME}" \
             "$IMAGE" \
             sh -c "mkdir -p \"\$(dirname '${ENCRYPTED_TOKEN_FILE}')\" && cat > '${ENCRYPTED_TOKEN_FILE}' && chmod 600 '${ENCRYPTED_TOKEN_FILE}'"
 }
@@ -102,7 +103,7 @@ encrypt_tokens() {
 decrypt_tokens() {
     local decrypted
     decrypted=$(docker run --rm --entrypoint "" \
-        -v "${DATA_VOLUME}:/home/kilo" \
+        -v "${DATA_VOLUME}:${KILO_HOME}" \
         "$IMAGE" \
         cat "${ENCRYPTED_TOKEN_FILE}" 2>/dev/null | \
         openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:${VOLUME_PASSWORD}" 2>/dev/null) || return 1
@@ -135,7 +136,7 @@ prompt_new_tokens() {
         else
             printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
                 docker run --rm -i --entrypoint "" \
-                    -v "${DATA_VOLUME}:/home/kilo" \
+                    -v "${DATA_VOLUME}:${KILO_HOME}" \
                     "$IMAGE" \
                     sh -c "mkdir -p \"\$(dirname '${TOKEN_FILE}')\" && cat > '${TOKEN_FILE}'"
         fi
@@ -224,6 +225,8 @@ Commands:
   (no command)      Start Kilo in interactive mode
   run "prompt"      Run Kilo in autonomous mode with a prompt
   networks          List available Docker networks
+  backup [-f]       Create backup of volume to tar.gz (auto-names with timestamp)
+  restore <file> [-f] [--volume <name>]  Restore volume from backup
   init              Reset configuration (remove volume)
   cleanup           Remove volume, containers, images, and installed script
   install           Install kilo-docker as a global command (~/.local/bin)
@@ -261,6 +264,9 @@ Examples:
   kilo-docker run "fix build errors"             # autonomous mode
   kilo-docker --password                         # interactive mode with encryption
   kilo-docker --password init                    # reset encrypted volume
+  kilo-docker backup                             # create backup with auto-generated name
+  kilo-docker backup -f backup.tar.gz            # create backup with custom name
+  kilo-docker restore backup.tar.gz              # restore from backup
   kilo-docker --once                             # one-time interactive session
   kilo-docker --once run "prompt"                # one-time autonomous session
   kilo-docker --playwright                       # with Playwright browser automation
@@ -349,12 +355,12 @@ if [ "${1:-}" = "update-config" ]; then
     fi
     echo "Updating opencode.json from repository template..." >&2
     docker run --rm --entrypoint "" \
-        -v "${DATA_VOLUME}:/home/kilo" \
+        -v "${DATA_VOLUME}:${KILO_HOME}" \
         "$IMAGE" \
         sh -c '
             set -e
             TEMPLATE=$(mktemp)
-            CONFIG="/home/kilo/.config/kilo/opencode.json"
+            CONFIG="${HOME}/.config/kilo/opencode.json"
             if curl -fsSL "https://raw.githubusercontent.com/mbabic84/kilo-docker/main/configs/opencode.json" -o "$TEMPLATE"; then
                 if [ -f "$CONFIG" ]; then
                     jq -s ".[0] * .[1]" "$TEMPLATE" "$CONFIG" > "${CONFIG}.tmp" && mv "${CONFIG}.tmp" "$CONFIG"
@@ -427,6 +433,151 @@ if [ "${1:-}" = "cleanup" ]; then
     fi
 
     echo "Cleanup complete." >&2
+    exit 0
+fi
+
+# --- Handle "backup" argument ----------------------------------------------
+
+if [ "${1:-}" = "backup" ]; then
+    shift
+    BACKUP_FILE=""
+    FORCE_BACKUP=0
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -f|--force)
+                FORCE_BACKUP=1
+                ;;
+            -*)
+                echo "Unknown option: $1" >&2
+                exit 1
+                ;;
+            *)
+                BACKUP_FILE="$1"
+                ;;
+        esac
+        shift
+    done
+
+    if [ -z "$DATA_VOLUME" ]; then
+        echo "Error: backup is not available in --once mode." >&2
+        exit 1
+    fi
+
+    if ! docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+        echo "Error: volume '${DATA_VOLUME}' does not exist." >&2
+        exit 1
+    fi
+
+    if [ -z "$BACKUP_FILE" ]; then
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        if [ "$ENCRYPTED" -eq 1 ]; then
+            BACKUP_FILE="kilo-backup-${TIMESTAMP}.tar.gz.enc"
+        else
+            BACKUP_FILE="kilo-backup-${TIMESTAMP}.tar.gz"
+        fi
+    fi
+
+    if [ -f "$BACKUP_FILE" ] && [ "$FORCE_BACKUP" -eq 0 ]; then
+        if ! confirm "Backup file '${BACKUP_FILE}' exists. Overwrite? [y/N]: "; then
+            echo "Aborted." >&2
+            exit 0
+        fi
+    fi
+
+    echo "Creating backup of volume '${DATA_VOLUME}' to '${BACKUP_FILE}'..." >&2
+
+    TEMP_DIR=$(mktemp -d)
+    TEMP_CONTAINER="kilo-backup-temp-$$"
+    docker run --rm -d --name "$TEMP_CONTAINER" -v "${DATA_VOLUME}:/src:ro" alpine:latest tail -f /dev/null >/dev/null 2>&1
+    sleep 0.5
+    docker cp "$TEMP_CONTAINER:/src/." "$TEMP_DIR/src" 2>/dev/null
+    docker rm -f "$TEMP_CONTAINER" >/dev/null 2>&1
+    tar czf "${BACKUP_FILE}" -C "$TEMP_DIR/src" .
+    rm -rf "$TEMP_DIR"
+
+    if [ "$ENCRYPTED" -eq 1 ]; then
+        echo "Backup created (encrypted): ${BACKUP_FILE}" >&2
+    else
+        echo "Backup created: ${BACKUP_FILE}" >&2
+    fi
+    exit 0
+fi
+
+# --- Handle "restore" argument ----------------------------------------------
+
+if [ "${1:-}" = "restore" ]; then
+    shift
+    BACKUP_FILE=""
+    FORCE_RESTORE=0
+    TARGET_VOLUME=""
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -f|--force)
+                FORCE_RESTORE=1
+                ;;
+            -v|--volume)
+                shift
+                TARGET_VOLUME="$1"
+                ;;
+            -*)
+                echo "Unknown option: $1" >&2
+                exit 1
+                ;;
+            *)
+                BACKUP_FILE="$1"
+                ;;
+        esac
+        shift
+    done
+
+    if [ -z "$TARGET_VOLUME" ]; then
+        if [ -z "$DATA_VOLUME" ]; then
+            echo "Error: no volume specified. Use --once mode or provide --volume." >&2
+            exit 1
+        fi
+        TARGET_VOLUME="$DATA_VOLUME"
+    fi
+
+    if [ -z "$BACKUP_FILE" ]; then
+        echo "Error: backup file path required." >&2
+        echo "Usage: kilo-docker restore <backup-file> [-f] [--volume <name>]" >&2
+        exit 1
+    fi
+
+    if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Error: backup file '${BACKUP_FILE}' not found." >&2
+        exit 1
+    fi
+
+    if ! tar -tzf "$BACKUP_FILE" >/dev/null 2>&1; then
+        echo "Error: invalid or corrupted backup file." >&2
+        exit 1
+    fi
+
+    if docker volume inspect "$TARGET_VOLUME" >/dev/null 2>&1; then
+        if [ "$FORCE_RESTORE" -eq 0 ]; then
+            if ! confirm "Volume '${TARGET_VOLUME}' exists and will be overwritten. Continue? [y/N]: "; then
+                echo "Aborted." >&2
+                exit 0
+            fi
+        fi
+        docker volume rm "$TARGET_VOLUME" >/dev/null 2>&1 || true
+    fi
+
+    echo "Restoring backup '${BACKUP_FILE}' to volume '${TARGET_VOLUME}'..." >&2
+
+    docker volume create "$TARGET_VOLUME" >/dev/null
+
+    if ! tar -xzf "$BACKUP_FILE" -C "$(docker run --rm -v "${TARGET_VOLUME}:/dest" alpine echo /dest)" 2>/dev/null; then
+        docker run --rm -v "${TARGET_VOLUME}:/dest" -v "$(dirname "$BACKUP_FILE"):/backup:ro" alpine \
+            tar xzf /backup/"$(basename "$BACKUP_FILE")" -C /dest
+    fi
+
+    docker run --rm -v "${TARGET_VOLUME}:/dest" alpine chown -R 1000:1000 /dest 2>/dev/null || true
+
+    echo "Restore complete." >&2
     exit 0
 fi
 
@@ -548,7 +699,7 @@ if [ "$ONCE" -eq 0 ]; then
             if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ]; then
                 # Check if old plaintext token file exists (migration)
                 PLAINTEXT=$(docker run --rm --entrypoint "" \
-                    -v "${DATA_VOLUME}:/home/kilo" \
+                    -v "${DATA_VOLUME}:${KILO_HOME}" \
                     "$IMAGE" \
                     cat "$TOKEN_FILE" 2>/dev/null || true)
 
@@ -561,7 +712,7 @@ if [ "$ONCE" -eq 0 ]; then
                         encrypt_tokens "$TOKEN_1" "$TOKEN_2"
                         # Remove old plaintext file
                         docker run --rm --entrypoint "" \
-                            -v "${DATA_VOLUME}:/home/kilo" \
+                            -v "${DATA_VOLUME}:${KILO_HOME}" \
                             "$IMAGE" \
                             rm -f "$TOKEN_FILE" 2>/dev/null || true
                         echo "Migration complete. Old plaintext token file removed." >&2
@@ -571,7 +722,7 @@ if [ "$ONCE" -eq 0 ]; then
         else
             # Plaintext mode: read tokens directly
             EXISTING=$(docker run --rm --entrypoint "" \
-                -v "${DATA_VOLUME}:/home/kilo" \
+                -v "${DATA_VOLUME}:${KILO_HOME}" \
                 "$IMAGE" \
                 cat "$TOKEN_FILE" 2>/dev/null || true)
 
@@ -675,6 +826,18 @@ if [ "$PLAYWRIGHT" -eq 1 ]; then
     NETWORK="$PLAYWRIGHT_NETWORK"
 fi
 
+# --- Workspace path conflict check ----------------------------------------
+
+CURRENT_PWD="$(pwd)"
+if [ -z "$ONCE" ] || [ "$ONCE" -eq 0 ]; then
+    case "$CURRENT_PWD" in
+        "/home/kilo-t8x3m7kp"|"/home/kilo-t8x3m7kp"/*)
+            echo "Warning: Current directory (${CURRENT_PWD}) overlaps with the container's home path." >&2
+            echo "This may cause permission issues or unexpected behavior." >&2
+            ;;
+    esac
+fi
+
 # --- Build docker run args -------------------------------------------------
 
 DOCKER_ARGS=(
@@ -683,12 +846,12 @@ DOCKER_ARGS=(
     --ipc=host
     -e "PUID=$(id -u)"
     -e "PGID=$(id -g)"
-    -v "$(pwd):/mnt/$(basename "$(pwd)")"
-    -w "/mnt/$(basename "$(pwd)")"
+    -v "${CURRENT_PWD}:${CURRENT_PWD}"
+    -w "${CURRENT_PWD}"
 )
 
 if [ "$ONCE" -eq 0 ] && [ -n "$DATA_VOLUME" ]; then
-    DOCKER_ARGS+=(-v "${DATA_VOLUME}:/home/kilo")
+    DOCKER_ARGS+=(-v "${DATA_VOLUME}:${KILO_HOME}")
 fi
 
 if [ -n "$TOKEN_1" ]; then

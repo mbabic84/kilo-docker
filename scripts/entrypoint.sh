@@ -1,4 +1,9 @@
 #!/bin/sh
+# =============================================================================
+# BREAKING CHANGE (2026-03-27): The container user home changed from
+# /home/kilo to /home/kilo-t8x3m7kp. Existing Docker volumes are incompatible
+# and must be recreated with: kilo-docker init
+# =============================================================================
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -8,9 +13,9 @@ PGID="${PGID:-1000}"
 
 if [ "$(id -u)" = "0" ]; then
     if [ "$PUID" != "1000" ] || [ "$PGID" != "1000" ]; then
-        deluser kilo 2>/dev/null || true
-        addgroup -g "$PGID" kilo 2>/dev/null || true
-        adduser -u "$PUID" -G kilo -D -s /bin/sh kilo
+        deluser kilo-t8x3m7kp 2>/dev/null || true
+        addgroup -g "$PGID" kilo-t8x3m7kp 2>/dev/null || true
+        adduser -u "$PUID" -G kilo-t8x3m7kp -D -s /bin/sh kilo-t8x3m7kp
     fi
     if [ "${DOCKER_ENABLED:-}" = "1" ]; then
         if ! command -v docker >/dev/null 2>&1; then
@@ -38,17 +43,17 @@ if [ "$(id -u)" = "0" ]; then
     fi
     if [ -n "${DOCKER_GID:-}" ]; then
         if addgroup -g "$DOCKER_GID" docker 2>/dev/null; then
-            addgroup kilo docker 2>/dev/null || true
+            addgroup kilo-t8x3m7kp docker 2>/dev/null || true
         else
             DOCKER_GROUP=$(getent group "$DOCKER_GID" | cut -d: -f1)
             if [ -n "$DOCKER_GROUP" ]; then
-                addgroup kilo "$DOCKER_GROUP" 2>/dev/null || true
+                addgroup kilo-t8x3m7kp "$DOCKER_GROUP" 2>/dev/null || true
             fi
         fi
     fi
-    mkdir -p /home/kilo/.local /workspace
-    chown -R kilo:kilo /home/kilo /workspace
-    exec su-exec kilo "$0" "$@"
+    mkdir -p /home/kilo-t8x3m7kp/.local /workspace
+    chown -R kilo-t8x3m7kp:kilo-t8x3m7kp /home/kilo-t8x3m7kp /workspace
+    exec su-exec kilo-t8x3m7kp "$0" "$@"
 fi
 
 . "$SCRIPT_DIR/setup-kilo-config.sh"
