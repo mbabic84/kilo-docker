@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ── Builder: download Kilo binary ──
-FROM alpine:3.21 AS builder
+FROM alpine:latest AS builder
 
 ARG KILO_VERSION=7.1.8
 
@@ -10,9 +10,9 @@ RUN apk add --no-cache curl tar \
     && chmod +x /tmp/kilo
 
 # ── Runtime: Alpine with tools ──
-FROM alpine:3.21
+FROM alpine:latest
 
-RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec sudo jq \
+RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec sudo jq curl \
     && adduser -D -u 1000 kilo \
     && echo "kilo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
