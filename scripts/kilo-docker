@@ -199,10 +199,6 @@ set -- "${FILTERED_ARGS[@]}"
 
 DOCKER_GID=""
 if [ "$DOCKER" -eq 1 ]; then
-    echo "WARNING: --docker grants full Docker API access inside the container." >&2
-    echo "         This is equivalent to root access on the host." >&2
-    echo "" >&2
-
     if [ ! -S /var/run/docker.sock ]; then
         echo "Error: /var/run/docker.sock not found. Is Docker running?" >&2
         exit 1
