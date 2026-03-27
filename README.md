@@ -76,6 +76,8 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 |---------|-------------|
 | *(none)* | Start Kilo in interactive mode |
 | `run "prompt"` | Run Kilo in autonomous mode |
+| `backup [-f]` | Create backup of volume to tar.gz |
+| `restore <file>` | Restore volume from backup |
 | `init` | Reset configuration (remove volume, re-enter tokens) |
 | `cleanup` | Remove volume, containers, image, and installed script |
 | `install` | Install as a global command (`~/.local/bin/kilo-docker`) |
@@ -204,6 +206,25 @@ kilo-docker update-config
 ```
 
 This downloads the latest `opencode.json` template from the repository and merges it with your existing config. New servers are added, existing customizations are preserved. Run `kilo-docker --password update-config` for encrypted volumes.
+
+## Backup and Restore
+
+Create a backup of your volume to transfer data between hosts or protect against data loss:
+
+```bash
+# Create backup with auto-generated filename
+kilo-docker backup
+
+# Create backup with custom filename
+kilo-docker backup -f ~/my-kilo-backup.tar.gz
+
+# Restore from backup
+kilo-docker restore ~/my-kilo-backup.tar.gz
+```
+
+Backups are portable tar.gz archives containing all volume data. The restore command validates the archive and preserves file ownership (UID 1000).
+
+> **Note:** Encrypted volumes (`--password`) require the same password for backup and restore. Backups from encrypted volumes are standard tar.gz files (the encryption applies only to tokens at rest, not the backup archive itself).
 
 ## MCP Servers
 
