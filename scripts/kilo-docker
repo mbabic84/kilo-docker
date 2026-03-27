@@ -225,6 +225,8 @@ Commands:
   (no command)      Start Kilo in interactive mode
   run "prompt"      Run Kilo in autonomous mode with a prompt
   networks          List available Docker networks
+  backup [-f]       Create backup of volume to tar.gz (auto-names with timestamp)
+  restore <file>    Restore volume from backup (with path translation)
   init              Reset configuration (remove volume)
   cleanup           Remove volume, containers, images, and installed script
   install           Install kilo-docker as a global command (~/.local/bin)
@@ -267,6 +269,9 @@ Examples:
   kilo-docker run "fix build errors"             # autonomous mode
   kilo-docker --password                         # interactive mode with encryption
   kilo-docker --password init                    # reset encrypted volume
+  kilo-docker backup                             # create backup with auto-generated name
+  kilo-docker backup -f backup.tar.gz            # create backup with custom name
+  kilo-docker restore backup.tar.gz              # restore from backup
   kilo-docker --once                             # one-time interactive session
   kilo-docker --once run "prompt"                # one-time autonomous session
   kilo-docker --playwright                       # with Playwright browser automation
@@ -433,6 +438,143 @@ if [ "${1:-}" = "cleanup" ]; then
     fi
 
     echo "Cleanup complete." >&2
+    exit 0
+fi
+
+# --- Handle "backup" argument ----------------------------------------------
+
+if [ "${1:-}" = "backup" ]; then
+    shift
+    BACKUP_FILE=""
+    FORCE_BACKUP=0
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -f|--force)
+                FORCE_BACKUP=1
+                ;;
+            -*)
+                echo "Unknown option: $1" >&2
+                exit 1
+                ;;
+            *)
+                BACKUP_FILE="$1"
+                ;;
+        esac
+        shift
+    done
+
+    if [ -z "$DATA_VOLUME" ]; then
+        echo "Error: backup is not available in --once mode." >&2
+        exit 1
+    fi
+
+    if ! docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+        echo "Error: volume '${DATA_VOLUME}' does not exist." >&2
+        exit 1
+    fi
+
+    if [ -z "$BACKUP_FILE" ]; then
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        if [ "$ENCRYPTED" -eq 1 ]; then
+            BACKUP_FILE="kilo-backup-${TIMESTAMP}.tar.gz.enc"
+        else
+            BACKUP_FILE="kilo-backup-${TIMESTAMP}.tar.gz"
+        fi
+    fi
+
+    if [ -f "$BACKUP_FILE" ] && [ "$FORCE_BACKUP" -eq 0 ]; then
+        if ! confirm "Backup file '${BACKUP_FILE}' exists. Overwrite? [y/N]: "; then
+            echo "Aborted." >&2
+            exit 0
+        fi
+    fi
+
+    echo "Creating backup of volume '${DATA_VOLUME}' to '${BACKUP_FILE}'..." >&2
+
+    TEMP_DIR=$(mktemp -d)
+    TEMP_CONTAINER="kilo-backup-temp-$$"
+    docker run --rm -d --name "$TEMP_CONTAINER" -v "${DATA_VOLUME}:/src:ro" alpine:latest tail -f /dev/null >/dev/null 2>&1
+    sleep 0.5
+    docker cp "$TEMP_CONTAINER:/src/." "$TEMP_DIR/src" 2>/dev/null
+    docker rm -f "$TEMP_CONTAINER" >/dev/null 2>&1
+    tar czf "${BACKUP_FILE}" -C "$TEMP_DIR/src" .
+    rm -rf "$TEMP_DIR"
+
+    if [ "$ENCRYPTED" -eq 1 ]; then
+        echo "Backup created (encrypted): ${BACKUP_FILE}" >&2
+    else
+        echo "Backup created: ${BACKUP_FILE}" >&2
+    fi
+    exit 0
+fi
+
+# --- Handle "restore" argument ----------------------------------------------
+
+if [ "${1:-}" = "restore" ]; then
+    shift
+    BACKUP_FILE=""
+    FORCE_RESTORE=0
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -f|--force)
+                FORCE_RESTORE=1
+                ;;
+            -*)
+                echo "Unknown option: $1" >&2
+                exit 1
+                ;;
+            *)
+                BACKUP_FILE="$1"
+                ;;
+        esac
+        shift
+    done
+
+    if [ -z "$DATA_VOLUME" ]; then
+        echo "Error: restore is not available in --once mode." >&2
+        exit 1
+    fi
+
+    if [ -z "$BACKUP_FILE" ]; then
+        echo "Error: backup file path required." >&2
+        echo "Usage: kilo-docker restore <backup-file> [-f]" >&2
+        exit 1
+    fi
+
+    if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Error: backup file '${BACKUP_FILE}' not found." >&2
+        exit 1
+    fi
+
+    if ! tar -tzf "$BACKUP_FILE" >/dev/null 2>&1; then
+        echo "Error: invalid or corrupted backup file." >&2
+        exit 1
+    fi
+
+    if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+        if [ "$FORCE_RESTORE" -eq 0 ]; then
+            if ! confirm "Volume '${DATA_VOLUME}' exists and will be overwritten. Continue? [y/N]: "; then
+                echo "Aborted." >&2
+                exit 0
+            fi
+        fi
+        docker volume rm "$DATA_VOLUME" >/dev/null 2>&1 || true
+    fi
+
+    echo "Restoring backup '${BACKUP_FILE}' to volume '${DATA_VOLUME}'..." >&2
+
+    docker volume create "$DATA_VOLUME" >/dev/null
+
+    if ! tar -xzf "$BACKUP_FILE" -C "$(docker run --rm -v "${DATA_VOLUME}:/dest" alpine echo /dest)" 2>/dev/null; then
+        docker run --rm -v "${DATA_VOLUME}:/dest" -v "$(dirname "$BACKUP_FILE"):/backup:ro" alpine \
+            tar xzf /backup/"$(basename "$BACKUP_FILE")" -C /dest
+    fi
+
+    docker run --rm -v "${DATA_VOLUME}:/dest" alpine chown -R 1000:1000 /dest 2>/dev/null || true
+
+    echo "Restore complete." >&2
     exit 0
 fi
 
