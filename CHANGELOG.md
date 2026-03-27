@@ -1,3 +1,9 @@
+## [1.19.1](https://github.com/mbabic84/kilo-docker/compare/v1.19.0...v1.19.1) (2026-03-27)
+
+### Bug Fixes
+
+* quote workdir argument and remove redundant WORKDIR from Dockerfile ([ffd513c](https://github.com/mbabic84/kilo-docker/commit/ffd513c7a47140aeaaaf2dc5d2089ed21d396e12))
+
 ## [1.19.0](https://github.com/mbabic84/kilo-docker/compare/v1.18.0...v1.19.0) (2026-03-27)
 
 ### Features
