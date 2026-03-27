@@ -1,3 +1,13 @@
+## [1.19.0](https://github.com/mbabic84/kilo-docker/compare/v1.18.0...v1.19.0) (2026-03-27)
+
+### Features
+
+* bump Kilo CLI to v7.1.8 ([3c64e73](https://github.com/mbabic84/kilo-docker/commit/3c64e73393c52e4e1d47e3f834b9a19171d5255d))
+
+### Bug Fixes
+
+* mount workspace to /mnt/<project-name> for correct docker compose project detection ([fbb5c9a](https://github.com/mbabic84/kilo-docker/commit/fbb5c9a95d1d0fb248f3d9dca017b0f95c0af2f5))
+
 ## [1.18.0](https://github.com/mbabic84/kilo-docker/compare/v1.17.0...v1.18.0) (2026-03-26)
 
 ### Features
