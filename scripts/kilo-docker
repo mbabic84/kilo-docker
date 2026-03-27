@@ -226,7 +226,7 @@ Commands:
   run "prompt"      Run Kilo in autonomous mode with a prompt
   networks          List available Docker networks
   backup [-f]       Create backup of volume to tar.gz (auto-names with timestamp)
-  restore <file>    Restore volume from backup
+  restore <file> [-f] [--volume <name>]  Restore volume from backup
   init              Reset configuration (remove volume)
   cleanup           Remove volume, containers, images, and installed script
   install           Install kilo-docker as a global command (~/.local/bin)
@@ -510,11 +510,16 @@ if [ "${1:-}" = "restore" ]; then
     shift
     BACKUP_FILE=""
     FORCE_RESTORE=0
+    TARGET_VOLUME=""
 
     while [ $# -gt 0 ]; do
         case "$1" in
             -f|--force)
                 FORCE_RESTORE=1
+                ;;
+            -v|--volume)
+                shift
+                TARGET_VOLUME="$1"
                 ;;
             -*)
                 echo "Unknown option: $1" >&2
@@ -527,14 +532,17 @@ if [ "${1:-}" = "restore" ]; then
         shift
     done
 
-    if [ -z "$DATA_VOLUME" ]; then
-        echo "Error: restore is not available in --once mode." >&2
-        exit 1
+    if [ -z "$TARGET_VOLUME" ]; then
+        if [ -z "$DATA_VOLUME" ]; then
+            echo "Error: no volume specified. Use --once mode or provide --volume." >&2
+            exit 1
+        fi
+        TARGET_VOLUME="$DATA_VOLUME"
     fi
 
     if [ -z "$BACKUP_FILE" ]; then
         echo "Error: backup file path required." >&2
-        echo "Usage: kilo-docker restore <backup-file> [-f]" >&2
+        echo "Usage: kilo-docker restore <backup-file> [-f] [--volume <name>]" >&2
         exit 1
     fi
 
@@ -548,26 +556,26 @@ if [ "${1:-}" = "restore" ]; then
         exit 1
     fi
 
-    if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+    if docker volume inspect "$TARGET_VOLUME" >/dev/null 2>&1; then
         if [ "$FORCE_RESTORE" -eq 0 ]; then
-            if ! confirm "Volume '${DATA_VOLUME}' exists and will be overwritten. Continue? [y/N]: "; then
+            if ! confirm "Volume '${TARGET_VOLUME}' exists and will be overwritten. Continue? [y/N]: "; then
                 echo "Aborted." >&2
                 exit 0
             fi
         fi
-        docker volume rm "$DATA_VOLUME" >/dev/null 2>&1 || true
+        docker volume rm "$TARGET_VOLUME" >/dev/null 2>&1 || true
     fi
 
-    echo "Restoring backup '${BACKUP_FILE}' to volume '${DATA_VOLUME}'..." >&2
+    echo "Restoring backup '${BACKUP_FILE}' to volume '${TARGET_VOLUME}'..." >&2
 
-    docker volume create "$DATA_VOLUME" >/dev/null
+    docker volume create "$TARGET_VOLUME" >/dev/null
 
-    if ! tar -xzf "$BACKUP_FILE" -C "$(docker run --rm -v "${DATA_VOLUME}:/dest" alpine echo /dest)" 2>/dev/null; then
-        docker run --rm -v "${DATA_VOLUME}:/dest" -v "$(dirname "$BACKUP_FILE"):/backup:ro" alpine \
+    if ! tar -xzf "$BACKUP_FILE" -C "$(docker run --rm -v "${TARGET_VOLUME}:/dest" alpine echo /dest)" 2>/dev/null; then
+        docker run --rm -v "${TARGET_VOLUME}:/dest" -v "$(dirname "$BACKUP_FILE"):/backup:ro" alpine \
             tar xzf /backup/"$(basename "$BACKUP_FILE")" -C /dest
     fi
 
-    docker run --rm -v "${DATA_VOLUME}:/dest" alpine chown -R 1000:1000 /dest 2>/dev/null || true
+    docker run --rm -v "${TARGET_VOLUME}:/dest" alpine chown -R 1000:1000 /dest 2>/dev/null || true
 
     echo "Restore complete." >&2
     exit 0
