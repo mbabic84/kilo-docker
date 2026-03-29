@@ -884,29 +884,29 @@ if [ "$PLAYWRIGHT_ENABLED" -eq 1 ]; then
     PLAYWRIGHT_NETWORK="kilo-playwright-$(whoami)"
 
     # Create network (idempotent)
-    if ! docker network inspect "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null 2>&1; then
-        docker network create "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null
+    if ! docker network inspect "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1; then
+        docker network create "$PLAYWRIGHT_NETWORK" >/dev/null
     fi
 
     # Pull Playwright MCP image
     echo "Pulling Playwright MCP image..." >&2
-    docker pull "$PLAYWRIGHT_ENABLED_IMAGE" >/dev/null 2>&1
+    docker pull "$PLAYWRIGHT_IMAGE" >/dev/null 2>&1
 
     # Ensure output directory exists
     mkdir -p "$(pwd)/.playwright-mcp"
 
     # Remove any stale container
-    docker rm -f "$PLAYWRIGHT_ENABLED_CONTAINER" >/dev/null 2>&1 || true
+    docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
 
     # Start Playwright MCP in HTTP mode.
     # Uses --entrypoint node (overrides default entrypoint) with cli.js
     # relative to image WORKDIR /app.
     docker run -d --rm --init \
-        --name "$PLAYWRIGHT_ENABLED_CONTAINER" \
-        --network "$PLAYWRIGHT_ENABLED_NETWORK" \
+        --name "$PLAYWRIGHT_CONTAINER" \
+        --network "$PLAYWRIGHT_NETWORK" \
         --entrypoint node \
         -v "$(pwd):/mnt/$(basename "$(pwd)")" \
-        "$PLAYWRIGHT_ENABLED_IMAGE" \
+        "$PLAYWRIGHT_IMAGE" \
         cli.js --headless --browser chromium --no-sandbox --port 8931 --host 0.0.0.0 --output-dir "/mnt/$(basename "$(pwd)")/.playwright-mcp" --allowed-hosts '*' \
         >/dev/null
 
@@ -914,16 +914,16 @@ if [ "$PLAYWRIGHT_ENABLED" -eq 1 ]; then
     echo -n "Waiting for Playwright MCP..." >&2
     for i in $(seq 1 30); do
         # Check container is still running
-        if [ "$(docker inspect -f '{{.State.Status}}' "$PLAYWRIGHT_ENABLED_CONTAINER" 2>/dev/null)" != "running" ]; then
+        if [ "$(docker inspect -f '{{.State.Status}}' "$PLAYWRIGHT_CONTAINER" 2>/dev/null)" != "running" ]; then
             echo " container stopped." >&2
             echo "Error: Playwright MCP container exited unexpectedly." >&2
-            docker logs "$PLAYWRIGHT_ENABLED_CONTAINER" 2>&1 | tail -5 >&2
-            docker rm -f "$PLAYWRIGHT_ENABLED_CONTAINER" >/dev/null 2>&1 || true
-            docker network rm "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null 2>&1 || true
+            docker logs "$PLAYWRIGHT_CONTAINER" 2>&1 | tail -5 >&2
+            docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
+            docker network rm "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1 || true
             exit 1
         fi
         # Check if port 8931 is listening (MCP endpoint rejects plain GET, so use TCP check)
-        if docker exec "$PLAYWRIGHT_ENABLED_CONTAINER" node -e "
+        if docker exec "$PLAYWRIGHT_CONTAINER" node -e "
             const net = require('net');
             const s = net.connect(8931, '127.0.0.1', () => { s.destroy(); process.exit(0); });
             s.on('error', () => process.exit(1));
@@ -935,9 +935,9 @@ if [ "$PLAYWRIGHT_ENABLED" -eq 1 ]; then
         if [ "$i" -eq 30 ]; then
             echo " timeout." >&2
             echo "Error: Playwright MCP did not become ready in 30s." >&2
-            docker logs "$PLAYWRIGHT_ENABLED_CONTAINER" 2>&1 | tail -5 >&2
-            docker rm -f "$PLAYWRIGHT_ENABLED_CONTAINER" >/dev/null 2>&1 || true
-            docker network rm "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null 2>&1 || true
+            docker logs "$PLAYWRIGHT_CONTAINER" 2>&1 | tail -5 >&2
+            docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
+            docker network rm "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1 || true
             exit 1
         fi
         sleep 1
@@ -946,13 +946,13 @@ if [ "$PLAYWRIGHT_ENABLED" -eq 1 ]; then
 
     # Cleanup function called on EXIT (fires after exec'd docker run exits)
     cleanup_playwright() {
-        docker rm -f "$PLAYWRIGHT_ENABLED_CONTAINER" >/dev/null 2>&1 || true
-        docker network rm "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null 2>&1 || true
+        docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
+        docker network rm "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1 || true
     }
     trap cleanup_playwright EXIT
 
     # Use the Playwright network for the Kilo container
-    NETWORK="$PLAYWRIGHT_ENABLED_NETWORK"
+    NETWORK="$PLAYWRIGHT_NETWORK"
 fi
 
 # --- Workspace path conflict check ----------------------------------------

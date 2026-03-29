@@ -12,7 +12,7 @@ RUN apk add --no-cache curl tar \
 # ── Runtime: Alpine with tools ──
 FROM alpine:latest
 
-RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec sudo jq curl \
+RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec sudo jq curl util-linux \
     && adduser -D -u 1000 kilo-t8x3m7kp \
     && echo "kilo-t8x3m7kp ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 

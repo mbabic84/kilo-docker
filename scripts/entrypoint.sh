@@ -68,6 +68,7 @@ if [ "${KD_AINSTRUCT_ENABLED:-}" = "1" ]; then
     AINSTRUCT_COLLECTION_ID=""
     AINSTRUCT_AUTH_EXPIRED=""
     AINSTRUCT_HASH_FILE="$HOME/.config/kilo/.ainstruct-hashes"
+    AINSTRUCT_HASH_LOCK="${AINSTRUCT_HASH_FILE}.lock"
 
     ainstruct_hash_get() {
         local relpath="$1"
@@ -77,22 +78,28 @@ if [ "${KD_AINSTRUCT_ENABLED:-}" = "1" ]; then
     ainstruct_hash_set() {
         local relpath="$1" hash="$2"
         mkdir -p "$(dirname "$AINSTRUCT_HASH_FILE")"
-        if grep -qF "${relpath}=" "$AINSTRUCT_HASH_FILE" 2>/dev/null; then
-            local tmp="${AINSTRUCT_HASH_FILE}.tmp"
-            grep -vF "${relpath}=" "$AINSTRUCT_HASH_FILE" > "$tmp" 2>/dev/null
-            echo "${relpath}=${hash}" >> "$tmp"
-            mv "$tmp" "$AINSTRUCT_HASH_FILE"
-        else
-            echo "${relpath}=${hash}" >> "$AINSTRUCT_HASH_FILE"
-        fi
+        (
+            flock 9
+            if grep -qF "${relpath}=" "$AINSTRUCT_HASH_FILE" 2>/dev/null; then
+                local tmp="${AINSTRUCT_HASH_FILE}.tmp"
+                grep -vF "${relpath}=" "$AINSTRUCT_HASH_FILE" > "$tmp" 2>/dev/null
+                echo "${relpath}=${hash}" >> "$tmp"
+                mv "$tmp" "$AINSTRUCT_HASH_FILE"
+            else
+                echo "${relpath}=${hash}" >> "$AINSTRUCT_HASH_FILE"
+            fi
+        ) 9>"$AINSTRUCT_HASH_LOCK"
     }
 
     ainstruct_hash_delete() {
         local relpath="$1"
         if [ -f "$AINSTRUCT_HASH_FILE" ]; then
-            local tmp="${AINSTRUCT_HASH_FILE}.tmp"
-            grep -vF "${relpath}=" "$AINSTRUCT_HASH_FILE" > "$tmp" 2>/dev/null
-            mv "$tmp" "$AINSTRUCT_HASH_FILE"
+            (
+                flock 9
+                local tmp="${AINSTRUCT_HASH_FILE}.tmp"
+                grep -vF "${relpath}=" "$AINSTRUCT_HASH_FILE" > "$tmp" 2>/dev/null
+                mv "$tmp" "$AINSTRUCT_HASH_FILE"
+            ) 9>"$AINSTRUCT_HASH_LOCK"
         fi
     }
 
@@ -324,6 +331,9 @@ if [ "${KD_AINSTRUCT_ENABLED:-}" = "1" ]; then
                 echo "[ainstruct-sync] Watcher stopped due to expired auth token" >&2
                 break
             fi
+            # TODO: This debounce causes each rapid event to sleep independently —
+            # e.g. a create+modify pair triggers two 5s sleeps sequentially.
+            # Consider draining the event queue and syncing once after a quiet period.
             NOW=$(date +%s)
             if [ $((NOW - LAST_SYNC)) -lt 5 ]; then
                 sleep 5
