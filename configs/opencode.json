@@ -7,7 +7,7 @@
       "url": "https://ainstruct-dev.kralicinora.cz/mcp",
       "enabled": false,
       "headers": {
-        "Authorization": "Bearer {env:AINSTRUCT_TOKEN}"
+        "Authorization": "Bearer {env:KD_AINSTRUCT_TOKEN}"
       }
     },
     "context7": {
@@ -15,7 +15,7 @@
       "url": "https://mcp.context7.com/mcp",
       "enabled": false,
       "headers": {
-        "Authorization": "Bearer {env:CONTEXT7_TOKEN}"
+        "Authorization": "Bearer {env:KD_CONTEXT7_TOKEN}"
       }
     },
     "playwright": {
@@ -28,6 +28,7 @@
     "~/.config/kilo/rules/*.md"
   ],
   "permission": {
+    "*": "ask",
     "ainstruct_*": "allow",
     "context7_*": "allow",
     "playwright_*": "allow"

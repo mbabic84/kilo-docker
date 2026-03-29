@@ -8,7 +8,7 @@
 # the user config and any workspace config must be patched.
 
 JQ_FILTER='
-  {"ainstruct":"AINSTRUCT_TOKEN","context7":"CONTEXT7_TOKEN"} as $mapping |
+  {"ainstruct":"KD_AINSTRUCT_TOKEN","context7":"KD_CONTEXT7_TOKEN"} as $mapping |
   .mcp |= with_entries(
     if .key == "playwright" then
       if (env["PLAYWRIGHT_ENABLED"] // "") == "1" then

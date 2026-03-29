@@ -15,6 +15,7 @@ readonly TOKEN_FILE="${KILO_HOME}/.local/share/kilo/.tokens.env"
 readonly ENCRYPTED_TOKEN_FILE="${KILO_HOME}/.local/share/kilo/.tokens.env.enc"
 readonly INSTALL_DIR="$HOME/.local/bin"
 readonly INSTALL_TARGET="${INSTALL_DIR}/kilo-docker"
+readonly KD_AINSTRUCT_API_URL="https://ainstruct-dev.kralicinora.cz/api/v1"
 
 # --- Helper functions --------------------------------------------------------
 
@@ -92,7 +93,7 @@ derive_volume_name() {
 
 encrypt_tokens() {
     local token1="$1" token2="$2"
-    printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
+    printf 'KD_CONTEXT7_TOKEN=%s\nKD_AINSTRUCT_TOKEN=%s\n' "$token1" "$token2" | \
         openssl enc -aes-256-cbc -salt -pbkdf2 -pass "pass:${VOLUME_PASSWORD}" -out /dev/stdout 2>/dev/null | \
         docker run --rm -i --entrypoint "" \
             -v "${DATA_VOLUME}:${KILO_HOME}" \
@@ -110,7 +111,7 @@ decrypt_tokens() {
     echo "$decrypted"
 }
 
-prompt_new_tokens() {
+prompt_missing_tokens() {
     local token1="" token2=""
 
     echo "First-time setup: Enter API tokens for remote MCP servers." >&2
@@ -118,13 +119,17 @@ prompt_new_tokens() {
     echo >&2
 
     if [ -t 2 ]; then
-        echo -n "Context7 API token: " >&2
-        read -s -r token1 </dev/tty || true
-        echo >&2
+        if [ -z "$KD_CONTEXT7_TOKEN" ]; then
+            echo -n "Context7 API token: " >&2
+            read -s -r token1 </dev/tty || true
+            echo >&2
+        fi
 
-        echo -n "Ainstruct API token: " >&2
-        read -s -r token2 </dev/tty || true
-        echo >&2
+        if [ -z "$KD_AINSTRUCT_TOKEN" ]; then
+            echo -n "Ainstruct API token: " >&2
+            read -s -r token2 </dev/tty || true
+            echo >&2
+        fi
     else
         echo "No TTY available. Tokens must be set manually in the volume." >&2
     fi
@@ -134,26 +139,154 @@ prompt_new_tokens() {
             echo "Encrypting tokens..." >&2
             encrypt_tokens "$token1" "$token2"
         else
-            printf 'KMCP_TOKEN_1=%s\nKMCP_TOKEN_2=%s\n' "$token1" "$token2" | \
+            printf 'KD_CONTEXT7_TOKEN=%s\nKD_AINSTRUCT_TOKEN=%s\n' "$token1" "$token2" | \
                 docker run --rm -i --entrypoint "" \
                     -v "${DATA_VOLUME}:${KILO_HOME}" \
                     "$IMAGE" \
                     sh -c "mkdir -p \"\$(dirname '${TOKEN_FILE}')\" && cat > '${TOKEN_FILE}'"
         fi
-        TOKEN_1="$token1"
-        TOKEN_2="$token2"
+        KD_CONTEXT7_TOKEN="$token1"
+        KD_AINSTRUCT_TOKEN="$token2"
     fi
+}
+
+ainstruct_login() {
+    local username=""
+    local password=""
+    local response=""
+    local http_code=""
+    local access_token=""
+    local refresh_token=""
+    local expires_in=""
+    local user_id=""
+
+    echo "Ainstruct authentication:" >&2
+
+    while true; do
+        echo -n "Username: " >&2
+        read -r username </dev/tty || { echo "Error: Failed to read username." >&2; exit 1; }
+
+        if [ -n "$username" ]; then
+            break
+        fi
+        echo "Username cannot be empty." >&2
+    done
+
+    echo -n "Password: " >&2
+    read -s -r password </dev/tty || { echo >&2; echo "Error: Failed to read password." >&2; exit 1; }
+    echo >&2
+
+    if [ -z "$password" ]; then
+        echo "Error: Password cannot be empty." >&2
+        exit 1
+    fi
+
+    echo "Logging in..." >&2
+
+    response=$(docker run --rm --entrypoint "" \
+        -e "USERNAME=${username}" \
+        -e "PASSWORD=${password}" \
+        -e "API_URL=${KD_AINSTRUCT_API_URL}" \
+        "$IMAGE" \
+        sh -c 'curl -s -w "\n%{http_code}" -X POST "${API_URL}/auth/login" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg u "$USERNAME" --arg p "$PASSWORD" "{username: \$u, password: \$p}")"
+    ' 2>/dev/null)
+
+    http_code=$(echo "$response" | tail -n1)
+    response=$(echo "$response" | sed '$d')
+
+    case "$http_code" in
+        200)
+            access_token=$(echo "$response" | jq -r '.access_token // empty' 2>/dev/null)
+            refresh_token=$(echo "$response" | jq -r '.refresh_token // empty' 2>/dev/null)
+            expires_in=$(echo "$response" | jq -r '.expires_in // empty' 2>/dev/null)
+            if [ -z "$access_token" ]; then
+                echo "Error: Login succeeded but no access token in response." >&2
+                exit 1
+            fi
+            if [ -n "$expires_in" ]; then
+                echo "Token expires in ${expires_in}s" >&2
+            fi
+            ;;
+        401)
+            echo "Error: Invalid credentials." >&2
+            echo "Register: https://ainstruct-dev.kralicinora.cz/register" >&2
+            echo "Reset password: https://ainstruct-dev.kralicinora.cz/login" >&2
+            exit 1
+            ;;
+        403)
+            echo "Error: Account is disabled." >&2
+            echo "Register: https://ainstruct-dev.kralicinora.cz/register" >&2
+            echo "Reset password: https://ainstruct-dev.kralicinora.cz/login" >&2
+            exit 1
+            ;;
+        0)
+            echo "Error: Failed to connect to Ainstruct API. Check your network connection." >&2
+            exit 1
+            ;;
+        *)
+            error_message=$(echo "$response" | jq -r '.detail.message // "Unknown error"' 2>/dev/null)
+            echo "Error: Login failed with status ${http_code}: ${error_message}" >&2
+            echo "Register: https://ainstruct-dev.kralicinora.cz/register" >&2
+            echo "Reset password: https://ainstruct-dev.kralicinora.cz/login" >&2
+            exit 1
+            ;;
+    esac
+
+    echo "Login successful. Fetching user profile..." >&2
+
+    response=$(docker run --rm --entrypoint "" \
+        -e "ACCESS_TOKEN=${access_token}" \
+        -e "API_URL=${KD_AINSTRUCT_API_URL}" \
+        "$IMAGE" \
+        sh -c 'curl -s -w "\n%{http_code}" -X GET "${API_URL}/auth/profile" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}"
+    ' 2>/dev/null)
+
+    http_code=$(echo "$response" | tail -n1)
+    response=$(echo "$response" | sed '$d')
+
+    case "$http_code" in
+        200)
+            user_id=$(echo "$response" | jq -r '.user_id // empty' 2>/dev/null)
+            if [ -z "$user_id" ]; then
+                echo "Error: Profile fetched but no user_id in response." >&2
+                exit 1
+            fi
+            ;;
+        0)
+            echo "Error: Failed to connect to Ainstruct API for profile." >&2
+            exit 1
+            ;;
+        *)
+            echo "Error: Failed to fetch profile with status ${http_code}." >&2
+            exit 1
+            ;;
+    esac
+
+    VOLUME_PASSWORD="$user_id"
+    derive_volume_name
+
+    KD_AINSTRUCT_SYNC_TOKEN="$access_token"
+    KD_AINSTRUCT_SYNC_REFRESH_TOKEN="$refresh_token"
+    if [ -n "$expires_in" ]; then
+        KD_AINSTRUCT_SYNC_TOKEN_EXPIRY="$(($(date +%s) + expires_in))"
+    fi
+
+    echo "Authenticated as ${username} (user_id: ${user_id})." >&2
 }
 
 # --- Parse flags -------------------------------------------------------------
 
 ONCE=0
 ENCRYPTED=0
-PLAYWRIGHT=0
-DOCKER=0
-ZELLIJ=0
+PLAYWRIGHT_ENABLED=0
+DOCKER_ENABLED=0
+ZELLIJ_ENABLED=0
 NETWORK=""
 NETWORK_FLAG=0
+KD_AINSTRUCT_ENABLED=0
 FILTERED_ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -163,14 +296,18 @@ while [ $# -gt 0 ]; do
         --password|-p)
             ENCRYPTED=1
             ;;
+        --ainstruct)
+            KD_AINSTRUCT_ENABLED=1
+            ENCRYPTED=1
+            ;;
         --playwright)
-            PLAYWRIGHT=1
+            PLAYWRIGHT_ENABLED=1
             ;;
         --docker)
-            DOCKER=1
+            DOCKER_ENABLED=1
             ;;
         --zellij)
-            ZELLIJ=1
+            ZELLIJ_ENABLED=1
             ;;
         --network)
             NETWORK_FLAG=1
@@ -199,7 +336,7 @@ set -- "${FILTERED_ARGS[@]}"
 # --- Docker socket access ----------------------------------------------------
 
 DOCKER_GID=""
-if [ "$DOCKER" -eq 1 ]; then
+if [ "$DOCKER_ENABLED" -eq 1 ]; then
     if [ ! -S /var/run/docker.sock ]; then
         echo "Error: /var/run/docker.sock not found. Is Docker running?" >&2
         exit 1
@@ -219,7 +356,7 @@ fi
 
 if [ "${1:-}" = "help" ]; then
     cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [--password] [--playwright] [--docker] [--zellij] [--network <name>] [command] [args...]
+Usage: kilo-docker [--once] [--password] [--ainstruct] [--playwright] [--docker] [--zellij] [--network <name>] [command] [args...]
 
 Commands:
   (no command)      Start Kilo in interactive mode
@@ -237,6 +374,7 @@ Commands:
 Options:
   --once            Run a one-time session without persisting data (no volume)
   --password, -p    Protect volume with a password (encrypts tokens, derives volume name from password)
+  --ainstruct       Encrypt tokens using Ainstruct user_id for volume naming
   --playwright      Start a Playwright MCP sidecar container for browser automation
   --docker          Mount Docker socket for container management from within Kilo
   --zellij          Run Kilo inside a Zellij session (detach with Ctrl+O D, re-attach with: docker exec -it <c> zellij attach kilo)
@@ -249,6 +387,9 @@ Security (--password):
 
   Without --password, the volume name is kilo-data-<username> and tokens are
   stored in plaintext (original behavior).
+
+Security (--ainstruct):
+  Encrypts tokens using AES-256-CBC. Uses Ainstruct user_id for volume naming.
 
 Security (--docker):
   Mounting the Docker socket grants full Docker API access inside the container.
@@ -263,6 +404,7 @@ Examples:
   kilo-docker                                    # interactive mode
   kilo-docker run "fix build errors"             # autonomous mode
   kilo-docker --password                         # interactive mode with encryption
+  kilo-docker --ainstruct                        # interactive mode with Ainstruct encryption
   kilo-docker --password init                    # reset encrypted volume
   kilo-docker backup                             # create backup with auto-generated name
   kilo-docker backup -f backup.tar.gz            # create backup with custom name
@@ -324,6 +466,14 @@ VOLUME_PASSWORD=""
 if [ "$ONCE" -eq 1 ]; then
     # --once: no volume, no password
     DATA_VOLUME=""
+elif [ "$KD_AINSTRUCT_ENABLED" -eq 1 ]; then
+    # --ainstruct: authenticate with Ainstruct API
+    if [ -t 2 ] && [ -t 0 ]; then
+        ainstruct_login
+    else
+        echo "Error: --ainstruct requires a TTY." >&2
+        exit 1
+    fi
 elif [ "$ENCRYPTED" -eq 1 ]; then
     # --password: derive volume name from password
     if [ -t 2 ] && [ -t 0 ]; then
@@ -682,8 +832,11 @@ fi
 
 # --- Read/load tokens -------------------------------------------------------
 
-TOKEN_1=""
-TOKEN_2=""
+KD_CONTEXT7_TOKEN=""
+KD_AINSTRUCT_TOKEN=""
+KD_AINSTRUCT_SYNC_TOKEN=""
+KD_AINSTRUCT_SYNC_REFRESH_TOKEN=""
+KD_AINSTRUCT_SYNC_TOKEN_EXPIRY=""
 
 if [ "$ONCE" -eq 0 ]; then
     if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
@@ -692,32 +845,8 @@ if [ "$ONCE" -eq 0 ]; then
             DECRYPTED=$(decrypt_tokens) || true
 
             if [ -n "$DECRYPTED" ]; then
-                TOKEN_1=$(echo "$DECRYPTED" | grep '^KMCP_TOKEN_1=' | cut -d= -f2- || true)
-                TOKEN_2=$(echo "$DECRYPTED" | grep '^KMCP_TOKEN_2=' | cut -d= -f2- || true)
-            fi
-
-            if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ]; then
-                # Check if old plaintext token file exists (migration)
-                PLAINTEXT=$(docker run --rm --entrypoint "" \
-                    -v "${DATA_VOLUME}:${KILO_HOME}" \
-                    "$IMAGE" \
-                    cat "$TOKEN_FILE" 2>/dev/null || true)
-
-                if [ -n "$PLAINTEXT" ]; then
-                    echo "Migrating plaintext tokens to encrypted storage..." >&2
-                    TOKEN_1=$(echo "$PLAINTEXT" | grep '^KMCP_TOKEN_1=' | cut -d= -f2- || true)
-                    TOKEN_2=$(echo "$PLAINTEXT" | grep '^KMCP_TOKEN_2=' | cut -d= -f2- || true)
-
-                    if [ -n "$TOKEN_1" ] || [ -n "$TOKEN_2" ]; then
-                        encrypt_tokens "$TOKEN_1" "$TOKEN_2"
-                        # Remove old plaintext file
-                        docker run --rm --entrypoint "" \
-                            -v "${DATA_VOLUME}:${KILO_HOME}" \
-                            "$IMAGE" \
-                            rm -f "$TOKEN_FILE" 2>/dev/null || true
-                        echo "Migration complete. Old plaintext token file removed." >&2
-                    fi
-                fi
+                KD_CONTEXT7_TOKEN=$(echo "$DECRYPTED" | grep '^KD_CONTEXT7_TOKEN=' | cut -d= -f2- || true)
+                KD_AINSTRUCT_TOKEN=$(echo "$DECRYPTED" | grep '^KD_AINSTRUCT_TOKEN=' | cut -d= -f2- || true)
             fi
         else
             # Plaintext mode: read tokens directly
@@ -727,15 +856,15 @@ if [ "$ONCE" -eq 0 ]; then
                 cat "$TOKEN_FILE" 2>/dev/null || true)
 
             if [ -n "$EXISTING" ]; then
-                TOKEN_1=$(echo "$EXISTING" | grep '^KMCP_TOKEN_1=' | cut -d= -f2- || true)
-                TOKEN_2=$(echo "$EXISTING" | grep '^KMCP_TOKEN_2=' | cut -d= -f2- || true)
+                KD_CONTEXT7_TOKEN=$(echo "$EXISTING" | grep '^KD_CONTEXT7_TOKEN=' | cut -d= -f2- || true)
+                KD_AINSTRUCT_TOKEN=$(echo "$EXISTING" | grep '^KD_AINSTRUCT_TOKEN=' | cut -d= -f2- || true)
             fi
         fi
     fi
 
     # If still no tokens, prompt for new ones
-    if [ -z "$TOKEN_1" ] && [ -z "$TOKEN_2" ]; then
-        prompt_new_tokens
+    if [ -z "$KD_CONTEXT7_TOKEN" ] && [ -z "$KD_AINSTRUCT_TOKEN" ]; then
+        prompt_missing_tokens
     fi
 fi
 
@@ -745,7 +874,7 @@ PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright/mcp"
 PLAYWRIGHT_NETWORK=""
 PLAYWRIGHT_CONTAINER="playwright-mcp"
 
-if [ "$PLAYWRIGHT" -eq 1 ]; then
+if [ "$PLAYWRIGHT_ENABLED" -eq 1 ]; then
     if [ -n "$NETWORK" ]; then
         echo "Error: --playwright and --network are mutually exclusive." >&2
         echo "       Playwright creates its own network." >&2
@@ -755,29 +884,29 @@ if [ "$PLAYWRIGHT" -eq 1 ]; then
     PLAYWRIGHT_NETWORK="kilo-playwright-$(whoami)"
 
     # Create network (idempotent)
-    if ! docker network inspect "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1; then
-        docker network create "$PLAYWRIGHT_NETWORK" >/dev/null
+    if ! docker network inspect "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null 2>&1; then
+        docker network create "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null
     fi
 
     # Pull Playwright MCP image
     echo "Pulling Playwright MCP image..." >&2
-    docker pull "$PLAYWRIGHT_IMAGE" >/dev/null 2>&1
+    docker pull "$PLAYWRIGHT_ENABLED_IMAGE" >/dev/null 2>&1
 
     # Ensure output directory exists
     mkdir -p "$(pwd)/.playwright-mcp"
 
     # Remove any stale container
-    docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
+    docker rm -f "$PLAYWRIGHT_ENABLED_CONTAINER" >/dev/null 2>&1 || true
 
     # Start Playwright MCP in HTTP mode.
     # Uses --entrypoint node (overrides default entrypoint) with cli.js
     # relative to image WORKDIR /app.
     docker run -d --rm --init \
-        --name "$PLAYWRIGHT_CONTAINER" \
-        --network "$PLAYWRIGHT_NETWORK" \
+        --name "$PLAYWRIGHT_ENABLED_CONTAINER" \
+        --network "$PLAYWRIGHT_ENABLED_NETWORK" \
         --entrypoint node \
         -v "$(pwd):/mnt/$(basename "$(pwd)")" \
-        "$PLAYWRIGHT_IMAGE" \
+        "$PLAYWRIGHT_ENABLED_IMAGE" \
         cli.js --headless --browser chromium --no-sandbox --port 8931 --host 0.0.0.0 --output-dir "/mnt/$(basename "$(pwd)")/.playwright-mcp" --allowed-hosts '*' \
         >/dev/null
 
@@ -785,16 +914,16 @@ if [ "$PLAYWRIGHT" -eq 1 ]; then
     echo -n "Waiting for Playwright MCP..." >&2
     for i in $(seq 1 30); do
         # Check container is still running
-        if [ "$(docker inspect -f '{{.State.Status}}' "$PLAYWRIGHT_CONTAINER" 2>/dev/null)" != "running" ]; then
+        if [ "$(docker inspect -f '{{.State.Status}}' "$PLAYWRIGHT_ENABLED_CONTAINER" 2>/dev/null)" != "running" ]; then
             echo " container stopped." >&2
             echo "Error: Playwright MCP container exited unexpectedly." >&2
-            docker logs "$PLAYWRIGHT_CONTAINER" 2>&1 | tail -5 >&2
-            docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
-            docker network rm "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1 || true
+            docker logs "$PLAYWRIGHT_ENABLED_CONTAINER" 2>&1 | tail -5 >&2
+            docker rm -f "$PLAYWRIGHT_ENABLED_CONTAINER" >/dev/null 2>&1 || true
+            docker network rm "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null 2>&1 || true
             exit 1
         fi
         # Check if port 8931 is listening (MCP endpoint rejects plain GET, so use TCP check)
-        if docker exec "$PLAYWRIGHT_CONTAINER" node -e "
+        if docker exec "$PLAYWRIGHT_ENABLED_CONTAINER" node -e "
             const net = require('net');
             const s = net.connect(8931, '127.0.0.1', () => { s.destroy(); process.exit(0); });
             s.on('error', () => process.exit(1));
@@ -806,9 +935,9 @@ if [ "$PLAYWRIGHT" -eq 1 ]; then
         if [ "$i" -eq 30 ]; then
             echo " timeout." >&2
             echo "Error: Playwright MCP did not become ready in 30s." >&2
-            docker logs "$PLAYWRIGHT_CONTAINER" 2>&1 | tail -5 >&2
-            docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
-            docker network rm "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1 || true
+            docker logs "$PLAYWRIGHT_ENABLED_CONTAINER" 2>&1 | tail -5 >&2
+            docker rm -f "$PLAYWRIGHT_ENABLED_CONTAINER" >/dev/null 2>&1 || true
+            docker network rm "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null 2>&1 || true
             exit 1
         fi
         sleep 1
@@ -817,13 +946,13 @@ if [ "$PLAYWRIGHT" -eq 1 ]; then
 
     # Cleanup function called on EXIT (fires after exec'd docker run exits)
     cleanup_playwright() {
-        docker rm -f "$PLAYWRIGHT_CONTAINER" >/dev/null 2>&1 || true
-        docker network rm "$PLAYWRIGHT_NETWORK" >/dev/null 2>&1 || true
+        docker rm -f "$PLAYWRIGHT_ENABLED_CONTAINER" >/dev/null 2>&1 || true
+        docker network rm "$PLAYWRIGHT_ENABLED_NETWORK" >/dev/null 2>&1 || true
     }
     trap cleanup_playwright EXIT
 
     # Use the Playwright network for the Kilo container
-    NETWORK="$PLAYWRIGHT_NETWORK"
+    NETWORK="$PLAYWRIGHT_ENABLED_NETWORK"
 fi
 
 # --- Workspace path conflict check ----------------------------------------
@@ -854,26 +983,40 @@ if [ "$ONCE" -eq 0 ] && [ -n "$DATA_VOLUME" ]; then
     DOCKER_ARGS+=(-v "${DATA_VOLUME}:${KILO_HOME}")
 fi
 
-if [ -n "$TOKEN_1" ]; then
-    DOCKER_ARGS+=(-e "CONTEXT7_TOKEN=${TOKEN_1}")
+if [ -n "$KD_CONTEXT7_TOKEN" ]; then
+    DOCKER_ARGS+=(-e "KD_CONTEXT7_TOKEN=${KD_CONTEXT7_TOKEN}")
 fi
 
-if [ -n "$TOKEN_2" ]; then
-    DOCKER_ARGS+=(-e "AINSTRUCT_TOKEN=${TOKEN_2}")
+if [ -n "$KD_AINSTRUCT_TOKEN" ]; then
+    DOCKER_ARGS+=(-e "KD_AINSTRUCT_TOKEN=${KD_AINSTRUCT_TOKEN}")
 fi
 
-if [ "$PLAYWRIGHT" -eq 1 ]; then
+if [ "$PLAYWRIGHT_ENABLED" -eq 1 ]; then
     DOCKER_ARGS+=(-e "PLAYWRIGHT_ENABLED=1")
 fi
 
-if [ "$DOCKER" -eq 1 ]; then
+if [ "$DOCKER_ENABLED" -eq 1 ]; then
     DOCKER_ARGS+=(-v /var/run/docker.sock:/var/run/docker.sock)
     DOCKER_ARGS+=(-e "DOCKER_ENABLED=1")
     DOCKER_ARGS+=(-e "DOCKER_GID=${DOCKER_GID}")
 fi
 
-if [ "$ZELLIJ" -eq 1 ]; then
-    DOCKER_ARGS+=(-e "ZELLIJ=1")
+if [ "$ZELLIJ_ENABLED" -eq 1 ]; then
+    DOCKER_ARGS+=(-e "ZELLIJ_ENABLED=1")
+fi
+
+if [ "$KD_AINSTRUCT_ENABLED" -eq 1 ]; then
+    DOCKER_ARGS+=(-e "KD_AINSTRUCT_ENABLED=1")
+    DOCKER_ARGS+=(-e "KD_AINSTRUCT_API_URL=${KD_AINSTRUCT_API_URL}")
+    if [ -n "$KD_AINSTRUCT_SYNC_TOKEN" ]; then
+        DOCKER_ARGS+=(-e "KD_AINSTRUCT_SYNC_TOKEN=${KD_AINSTRUCT_SYNC_TOKEN}")
+    fi
+    if [ -n "$KD_AINSTRUCT_SYNC_REFRESH_TOKEN" ]; then
+        DOCKER_ARGS+=(-e "KD_AINSTRUCT_SYNC_REFRESH_TOKEN=${KD_AINSTRUCT_SYNC_REFRESH_TOKEN}")
+    fi
+    if [ -n "$KD_AINSTRUCT_SYNC_TOKEN_EXPIRY" ]; then
+        DOCKER_ARGS+=(-e "KD_AINSTRUCT_SYNC_TOKEN_EXPIRY=${KD_AINSTRUCT_SYNC_TOKEN_EXPIRY}")
+    fi
 fi
 
 if [ -n "$NETWORK" ]; then
@@ -886,6 +1029,15 @@ for var in TERM COLORTERM LANG LC_ALL; do
         DOCKER_ARGS+=(-e "${var}=${!var}")
     fi
 done
+
+# Pass host timezone
+if [ -n "${TZ:-}" ]; then
+    DOCKER_ARGS+=(-e "TZ=${TZ}")
+elif [ -f /etc/timezone ]; then
+    DOCKER_ARGS+=(-e "TZ=$(cat /etc/timezone)")
+elif [ -L /etc/localtime ]; then
+    DOCKER_ARGS+=(-e "TZ=$(readlink /etc/localtime | sed 's|.*zoneinfo/||')")
+fi
 
 # --- Clear sensitive data from shell ----------------------------------------
 
