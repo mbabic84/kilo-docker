@@ -2,6 +2,7 @@
 # kilo-docker — Wrapper script for running Kilo in a Docker container.
 #
 # Usage: kilo-docker [--once] [--password] [--playwright] [--docker] [--zellij] [--network <name>] [command] [args...]
+#        kilo-docker sessions [name|index]
 # See:   kilo-docker help
 #
 set -euo pipefail
@@ -89,6 +90,21 @@ derive_volume_name() {
     local hash
     hash=$(printf '%s' "$VOLUME_PASSWORD" | sha256sum | cut -c1-12)
     DATA_VOLUME="kilo-${hash}"
+}
+
+reset_terminal() {
+    # Restore terminal state after docker attach/start hijacks the PTY.
+    # Drain leftover stdin bytes (e.g. Ctrl+P Ctrl+Q from docker detach)
+    # so the shell doesn't interpret them as input.
+    # Operate on /dev/tty directly — not the script's inherited stdin —
+    # because stty and dd need the real terminal device to take effect
+    # for the parent shell that resumes after this script exits.
+    if [ -t 0 ]; then
+        dd bs=1 count=256 iflag=nonblock of=/dev/null </dev/tty 2>/dev/null || true
+        stty sane </dev/tty 2>/dev/null || true
+        stty echo </dev/tty 2>/dev/null || true
+        printf '\033c' >/dev/tty 2>/dev/null || true
+    fi
 }
 
 encrypt_tokens() {
@@ -361,6 +377,7 @@ Usage: kilo-docker [--once] [--password] [--ainstruct] [--playwright] [--docker]
 Commands:
   (no command)      Start Kilo in interactive mode
   run "prompt"      Run Kilo in autonomous mode with a prompt
+  sessions [name]   List sessions or attach to one by name/index
   networks          List available Docker networks
   backup [-f]       Create backup of volume to tar.gz (auto-names with timestamp)
   restore <file> [-f] [--volume <name>]  Restore volume from backup
@@ -377,7 +394,7 @@ Options:
   --ainstruct       Encrypt tokens using Ainstruct user_id for volume naming
   --playwright      Start a Playwright MCP sidecar container for browser automation
   --docker          Mount Docker socket for container management from within Kilo
-  --zellij          Run Kilo inside a Zellij session (detach with Ctrl+O D, re-attach with: docker exec -it <c> zellij attach kilo)
+  --zellij          Start with Zellij multiplexer (detach: Ctrl+P Ctrl+Q, reattach: kilo-docker sessions)
   --network <name>  Connect the container to a Docker network
 
 Security (--password):
@@ -413,8 +430,11 @@ Examples:
   kilo-docker --once run "prompt"                # one-time autonomous session
   kilo-docker --playwright                       # with Playwright browser automation
   kilo-docker --docker                           # with Docker socket access
-  kilo-docker --zellij                           # run Kilo in a Zellij session
+  kilo-docker --zellij                           # start/reattach Zellij container for this workspace
   kilo-docker --network host                     # connect to host network
+  kilo-docker sessions                           # list all sessions
+  kilo-docker sessions 1                         # attach to session by index
+  kilo-docker sessions kilo-abc123def456         # attach to session by name
   kilo-docker networks                           # list available Docker networks
   kilo-docker init                               # reset configuration
   kilo-docker cleanup                            # remove volume, containers, images, script
@@ -430,6 +450,81 @@ fi
 if [ "${1:-}" = "networks" ]; then
     docker network ls --format "{{.Name}}"
     exit 0
+fi
+
+# --- Handle "sessions" argument -----------------------------------------------
+
+if [ "${1:-}" = "sessions" ]; then
+    shift
+    ATTACH_TARGET=""
+
+    if [ $# -gt 0 ]; then
+        ATTACH_TARGET="$1"
+    fi
+
+    # List mode: show all kilo sessions
+    if [ -z "$ATTACH_TARGET" ]; then
+        SESSIONS=$(docker ps -a --filter "label=kilo.workspace" --format "{{.Names}}\t{{.Status}}\t{{.Labels}}" 2>/dev/null)
+
+        if [ -z "$SESSIONS" ]; then
+            echo "No active sessions." >&2
+            exit 0
+        fi
+
+        printf "%-4s %-22s %-32s %-52s %s\n" "#" "NAME" "STATUS" "WORKSPACE" "ARGS" >&2
+        printf "%-4s %-22s %-32s %-52s %s\n" "---" "----------------------" "--------------------------------" "----------------------------------------------------" "-----" >&2
+
+        INDEX=1
+        while IFS=$'\t' read -r name status labels; do
+            workspace=$(echo "$labels" | tr ',' '\n' | grep '^kilo.workspace=' | cut -d= -f2-)
+            args=$(echo "$labels" | tr ',' '\n' | grep '^kilo.args=' | cut -d= -f2-)
+            printf "%-4s %-22s %-32s %-52s %s\n" "$INDEX" "$name" "$status" "${workspace:-}" "${args:-}" >&2
+            INDEX=$((INDEX + 1))
+        done <<< "$SESSIONS"
+
+        exit 0
+    fi
+
+    # Attach mode: resolve target by name or index
+    CONTAINER_TO_ATTACH=""
+
+    if [[ "$ATTACH_TARGET" =~ ^[0-9]+$ ]]; then
+        # Numeric index
+        SESSIONS=$(docker ps -a --filter "label=kilo.workspace" --format "{{.Names}}\t{{.Status}}" 2>/dev/null)
+        CONTAINER_TO_ATTACH=$(echo "$SESSIONS" | sed -n "${ATTACH_TARGET}p" | cut -f1)
+        if [ -z "$CONTAINER_TO_ATTACH" ]; then
+            echo "Error: No session at index ${ATTACH_TARGET}." >&2
+            exit 1
+        fi
+    else
+        # Container name
+        if docker inspect "$ATTACH_TARGET" >/dev/null 2>&1; then
+            CONTAINER_TO_ATTACH="$ATTACH_TARGET"
+        else
+            echo "Error: Container '${ATTACH_TARGET}' not found." >&2
+            exit 1
+        fi
+    fi
+
+    CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_TO_ATTACH" 2>/dev/null)
+    case "$CONTAINER_STATUS" in
+        running)
+            echo "Attaching to running session '${CONTAINER_TO_ATTACH}' (detach: Ctrl+P Ctrl+Q)..." >&2
+            docker attach "$CONTAINER_TO_ATTACH" || true
+            reset_terminal
+            exit 0
+            ;;
+        exited|created)
+            echo "Starting session '${CONTAINER_TO_ATTACH}'..." >&2
+            docker start -ai "$CONTAINER_TO_ATTACH" || true
+            reset_terminal
+            exit 0
+            ;;
+        *)
+            echo "Error: Container '${CONTAINER_TO_ATTACH}' is in state '${CONTAINER_STATUS}'." >&2
+            exit 1
+            ;;
+    esac
 fi
 
 # --- Handle "update" argument ----------------------------------------------
@@ -955,6 +1050,28 @@ if [ "$PLAYWRIGHT_ENABLED" -eq 1 ]; then
     NETWORK="$PLAYWRIGHT_NETWORK"
 fi
 
+# --- Container name ---------------------------------------------------------
+
+WORKSPACE_HASH="$(printf '%s' "$(pwd)" | sha256sum | cut -c1-12)"
+CONTAINER_NAME="kilo-${WORKSPACE_HASH}"
+
+# Clean up any existing container with the same name
+CONTAINER_STATE=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo "not_found")
+if [ "$ONCE" -eq 1 ]; then
+    # --once: force remove any existing container (including running)
+    if [ "$CONTAINER_STATE" != "not_found" ]; then
+        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+    fi
+    CONTAINER_STATE="not_found"
+else
+    case "$CONTAINER_STATE" in
+        exited|dead|created)
+            docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+            CONTAINER_STATE="not_found"
+            ;;
+    esac
+fi
+
 # --- Workspace path conflict check ----------------------------------------
 
 CURRENT_PWD="$(pwd)"
@@ -970,7 +1087,6 @@ fi
 # --- Build docker run args -------------------------------------------------
 
 DOCKER_ARGS=(
-    --rm
     --init
     --ipc=host
     -e "PUID=$(id -u)"
@@ -982,6 +1098,24 @@ DOCKER_ARGS=(
 if [ "$ONCE" -eq 0 ] && [ -n "$DATA_VOLUME" ]; then
     DOCKER_ARGS+=(-v "${DATA_VOLUME}:${KILO_HOME}")
 fi
+
+if [ "$ONCE" -eq 1 ]; then
+    DOCKER_ARGS+=(--rm)
+fi
+
+DOCKER_ARGS+=(--label "kilo.workspace=${CURRENT_PWD}")
+
+# Build kilo.args label from active flags and positional args
+KD_SESSION_ARGS=""
+[ "$ONCE" -eq 1 ] && KD_SESSION_ARGS+="--once "
+[ "$ZELLIJ_ENABLED" -eq 1 ] && KD_SESSION_ARGS+="--zellij "
+[ "$PLAYWRIGHT_ENABLED" -eq 1 ] && KD_SESSION_ARGS+="--playwright "
+[ "$DOCKER_ENABLED" -eq 1 ] && KD_SESSION_ARGS+="--docker "
+[ "$ENCRYPTED" -eq 1 ] && [ "$KD_AINSTRUCT_ENABLED" -eq 0 ] && KD_SESSION_ARGS+="-p "
+[ "$KD_AINSTRUCT_ENABLED" -eq 1 ] && KD_SESSION_ARGS+="--ainstruct "
+[ -n "$NETWORK" ] && KD_SESSION_ARGS+="--network ${NETWORK} "
+[ $# -gt 0 ] && KD_SESSION_ARGS+="$* "
+DOCKER_ARGS+=(--label "kilo.args=${KD_SESSION_ARGS% }")
 
 if [ -n "$KD_CONTEXT7_TOKEN" ]; then
     DOCKER_ARGS+=(-e "KD_CONTEXT7_TOKEN=${KD_CONTEXT7_TOKEN}")
@@ -1004,6 +1138,8 @@ fi
 if [ "$ZELLIJ_ENABLED" -eq 1 ]; then
     DOCKER_ARGS+=(-e "ZELLIJ_ENABLED=1")
 fi
+
+DOCKER_ARGS+=(--name "$CONTAINER_NAME")
 
 if [ "$KD_AINSTRUCT_ENABLED" -eq 1 ]; then
     DOCKER_ARGS+=(-e "KD_AINSTRUCT_ENABLED=1")
@@ -1045,16 +1181,26 @@ unset VOLUME_PASSWORD 2>/dev/null || true
 
 # --- Run --------------------------------------------------------------------
 
-if [ $# -gt 0 ]; then
-    if [ -t 0 ]; then
-        exec docker run -it "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
-    else
-        exec docker run "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
-    fi
+if [ "$CONTAINER_STATE" = "running" ]; then
+    docker attach "$CONTAINER_NAME" || true
+    reset_terminal
+    exit 0
+elif [ "$CONTAINER_STATE" = "exited" ] || [ "$CONTAINER_STATE" = "created" ]; then
+    docker start -ai "$CONTAINER_NAME" || true
+    reset_terminal
+    exit 0
 else
-    if [ -t 0 ]; then
-        exec docker run -it "${DOCKER_ARGS[@]}" "$IMAGE"
+    if [ $# -gt 0 ]; then
+        if [ -t 0 ]; then
+            exec docker run -it "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
+        else
+            exec docker run "${DOCKER_ARGS[@]}" "$IMAGE" "$@"
+        fi
     else
-        exec docker run -i "${DOCKER_ARGS[@]}" "$IMAGE"
+        if [ -t 0 ]; then
+            exec docker run -it "${DOCKER_ARGS[@]}" "$IMAGE"
+        else
+            exec docker run -i "${DOCKER_ARGS[@]}" "$IMAGE"
+        fi
     fi
 fi
