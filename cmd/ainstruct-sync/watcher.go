@@ -186,7 +186,6 @@ func debounceLoop(ctx context.Context, s *Syncer, pending map[string]*pendingEve
 			case <-wake:
 				continue
 			}
-			continue
 		}
 
 		deadline := earliest.Add(debounceInterval)
