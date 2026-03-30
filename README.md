@@ -202,7 +202,7 @@ The Docker CLI and Compose plugin are installed at runtime inside the container.
 
 ## SSH Agent Forwarding
 
-SSH agent forwarding is enabled automatically. The script detects whether an SSH agent is running on the host:
+Use the `--ssh` flag to enable SSH agent forwarding. The script detects whether an SSH agent is running on the host:
 
 - **Agent running** — Uses the existing agent via `$SSH_AUTH_SOCK`
 - **No agent** — Starts one automatically, loads all private keys from `~/.ssh/`, and cleans up on exit
@@ -210,8 +210,7 @@ SSH agent forwarding is enabled automatically. The script detects whether an SSH
 The container mounts the host's SSH agent socket, allowing `git`, `ssh`, and `scp` to use your host SSH keys without copying private keys into the container.
 
 ```bash
-# Just run kilo-docker — SSH works automatically
-kilo-docker
+kilo-docker --ssh
 ```
 
 > **Security:** Private keys never enter the container. The container communicates with the host's SSH agent via a Unix socket.

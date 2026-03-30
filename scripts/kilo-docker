@@ -303,6 +303,7 @@ ZELLIJ_ENABLED=0
 NETWORK=""
 NETWORK_FLAG=0
 KD_AINSTRUCT_ENABLED=0
+SSH_ENABLED=0
 FILTERED_ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -324,6 +325,9 @@ while [ $# -gt 0 ]; do
             ;;
         --zellij)
             ZELLIJ_ENABLED=1
+            ;;
+        --ssh)
+            SSH_ENABLED=1
             ;;
         --network)
             NETWORK_FLAG=1
@@ -365,26 +369,28 @@ fi
 
 SSH_AGENT_FORWARDING=0
 SSH_AGENT_STARTED=0
-if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
-    SSH_AGENT_FORWARDING=1
-else
-    # Auto-start ssh-agent if none is running
-    _agent_output=$(ssh-agent -s 2>/dev/null) || true
-    if [ -n "$_agent_output" ]; then
-        eval "$_agent_output"
-        export SSH_AUTH_SOCK SSH_AGENT_PID
-        SSH_AGENT_STARTED=1
+if [ "$SSH_ENABLED" -eq 1 ]; then
+    if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
         SSH_AGENT_FORWARDING=1
-        # Auto-add all private keys found in ~/.ssh/
-        if [ -d "$HOME/.ssh" ]; then
-            for _key in "$HOME/.ssh"/*; do
-                [ -f "$_key" ] || continue
-                case "$_key" in *.pub) continue ;; esac
-                head -1 "$_key" 2>/dev/null | grep -q "PRIVATE KEY" || continue
-                ssh-add "$_key" 2>/dev/null || true
-            done
+    else
+        # Auto-start ssh-agent if none is running
+        _agent_output=$(ssh-agent -s 2>/dev/null) || true
+        if [ -n "$_agent_output" ]; then
+            eval "$_agent_output"
+            export SSH_AUTH_SOCK SSH_AGENT_PID
+            SSH_AGENT_STARTED=1
+            SSH_AGENT_FORWARDING=1
+            # Auto-add all private keys found in ~/.ssh/
+            if [ -d "$HOME/.ssh" ]; then
+                for _key in "$HOME/.ssh"/*; do
+                    [ -f "$_key" ] || continue
+                    case "$_key" in *.pub) continue ;; esac
+                    head -1 "$_key" 2>/dev/null | grep -q "PRIVATE KEY" || continue
+                    ssh-add "$_key" 2>/dev/null || true
+                done
+            fi
+            unset _key _agent_output
         fi
-        unset _key _agent_output
     fi
 fi
 
@@ -399,7 +405,7 @@ fi
 
 if [ "${1:-}" = "help" ]; then
     cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [--password] [--ainstruct] [--playwright] [--docker] [--zellij] [--network <name>] [command] [args...]
+Usage: kilo-docker [--once] [--password] [--ainstruct] [--playwright] [--docker] [--ssh] [--zellij] [--network <name>] [command] [args...]
 
 Commands:
   (no command)      Start Kilo in interactive mode
@@ -422,6 +428,7 @@ Options:
   --ainstruct       Encrypt tokens using Ainstruct user_id for volume naming
   --playwright      Start a Playwright MCP sidecar container for browser automation
   --docker          Mount Docker socket for container management from within Kilo
+  --ssh             Enable SSH agent forwarding into the container
   --zellij          Start with Zellij multiplexer (detach: Ctrl+P Ctrl+Q, reattach: kilo-docker sessions)
   --network <name>  Connect the container to a Docker network
 
@@ -441,10 +448,11 @@ Security (--docker):
   This is equivalent to root access on the host. Only use this in trusted
   environments.
 
-SSH Agent:
-  SSH agent forwarding is automatic when $SSH_AUTH_SOCK is set and the
-  agent socket exists. The host SSH agent is mounted into the container,
+SSH Agent (--ssh):
+  When --ssh is passed, the host SSH agent is mounted into the container,
   so git and ssh use your host keys without copying private keys.
+  If no SSH agent is running, one is started automatically and all private
+  keys found in ~/.ssh/ are added.
   Ensure your key is loaded: ssh-add -l
 
 Note:
@@ -464,6 +472,7 @@ Examples:
   kilo-docker --once run "prompt"                # one-time autonomous session
   kilo-docker --playwright                       # with Playwright browser automation
   kilo-docker --docker                           # with Docker socket access
+  kilo-docker --ssh                              # with SSH agent forwarding
   kilo-docker --zellij                           # start/reattach Zellij container for this workspace
   kilo-docker --network host                     # connect to host network
   kilo-docker sessions                           # list all sessions
