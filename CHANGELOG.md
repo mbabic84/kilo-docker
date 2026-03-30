@@ -1,3 +1,9 @@
+## [1.28.0](https://github.com/mbabic84/kilo-docker/compare/v1.27.0...v1.28.0) (2026-03-30)
+
+### Features
+
+* require --ssh flag for SSH agent forwarding ([e112317](https://github.com/mbabic84/kilo-docker/commit/e11231767a06718a0140fdefc4b912c86a4c4c65))
+
 ## [1.27.0](https://github.com/mbabic84/kilo-docker/compare/v1.26.0...v1.27.0) (2026-03-30)
 
 ### Features
