@@ -1,0 +1,277 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+const collectionName = "kilo-docker"
+
+type Syncer struct {
+	apiURL       string
+	accessToken  string
+	refreshToken string
+	tokenExpiry  int64
+	homeDir      string
+	hashFile     string
+	hashMu       sync.Mutex
+	collectionID string
+	authExpired  bool
+	client       *http.Client
+}
+
+func NewSyncer() *Syncer {
+	home := os.Getenv("HOME")
+	apiURL := os.Getenv("KD_AINSTRUCT_API_URL")
+	if apiURL == "" {
+		apiURL = "https://ainstruct-dev.kralicinora.cz/api/v1"
+	}
+	var expiry int64
+	if v := os.Getenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY"); v != "" {
+		expiry, _ = strconv.ParseInt(v, 10, 64)
+	}
+	return &Syncer{
+		apiURL:       apiURL,
+		accessToken:  os.Getenv("KD_AINSTRUCT_SYNC_TOKEN"),
+		refreshToken: os.Getenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN"),
+		tokenExpiry:  expiry,
+		homeDir:      home,
+		hashFile:     filepath.Join(home, ".config", "kilo", ".ainstruct-hashes"),
+		client:       &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+// ── Collection management ──
+
+type collection struct {
+	CollectionID string `json:"collection_id"`
+	Name         string `json:"name"`
+}
+
+type collectionsResponse struct {
+	Collections []collection `json:"collections"`
+}
+
+func (s *Syncer) ensureCollection() error {
+	if s.collectionID != "" {
+		return nil
+	}
+	data, err := s.apiRequest("GET", "/collections", nil)
+	if err != nil {
+		return err
+	}
+	var cr collectionsResponse
+	json.Unmarshal(data, &cr)
+	for _, c := range cr.Collections {
+		if c.Name == collectionName {
+			s.collectionID = c.CollectionID
+			break
+		}
+	}
+	if s.collectionID == "" {
+		body := map[string]string{"name": collectionName}
+		data, err = s.apiRequest("POST", "/collections", body)
+		if err != nil {
+			return err
+		}
+		var created struct {
+			CollectionID string `json:"collection_id"`
+		}
+		json.Unmarshal(data, &created)
+		s.collectionID = created.CollectionID
+	}
+	if s.collectionID == "" {
+		return fmt.Errorf("failed to initialize collection")
+	}
+	log.Printf("[ainstruct-sync] Collection ready: %s", s.collectionID)
+	return nil
+}
+
+// ── Document operations ──
+
+type document struct {
+	DocumentID  string `json:"document_id"`
+	Content     string `json:"content"`
+	ContentHash string `json:"content_hash"`
+	Metadata    struct {
+		LocalPath string `json:"local_path"`
+	} `json:"metadata"`
+}
+
+type documentsResponse struct {
+	Documents []document `json:"documents"`
+}
+
+func (s *Syncer) getDocumentByPath(relPath string) (*document, error) {
+	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
+	if err != nil {
+		return nil, err
+	}
+	var dr documentsResponse
+	json.Unmarshal(data, &dr)
+	for _, d := range dr.Documents {
+		if d.Metadata.LocalPath == relPath {
+			return &d, nil
+		}
+	}
+	return nil, nil
+}
+
+func (s *Syncer) syncFile(absPath string) error {
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		return nil
+	}
+	if err := s.ensureCollection(); err != nil {
+		return err
+	}
+	relPath := strings.TrimPrefix(absPath, s.homeDir+"/")
+	title := filepath.Base(absPath)
+	content, err := os.ReadFile(absPath)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", absPath, err)
+	}
+	existing, err := s.getDocumentByPath(relPath)
+	if err != nil {
+		return err
+	}
+	if s.authExpired {
+		return fmt.Errorf("auth expired")
+	}
+	if existing != nil {
+		body := map[string]string{"content": string(content)}
+		data, err := s.apiRequest("PATCH", "/documents/"+existing.DocumentID, body)
+		if err != nil {
+			return err
+		}
+		if s.authExpired {
+			return fmt.Errorf("auth expired")
+		}
+		var result struct {
+			ContentHash string `json:"content_hash"`
+		}
+		json.Unmarshal(data, &result)
+		if result.ContentHash != "" {
+			s.hashSet(relPath, result.ContentHash)
+		}
+		log.Printf("[ainstruct-sync] Updated: %s", relPath)
+	} else {
+		body := map[string]any{
+			"title":         title,
+			"content":       string(content),
+			"document_type": "markdown",
+			"collection_id": s.collectionID,
+			"metadata":      map[string]string{"local_path": relPath},
+		}
+		data, err := s.apiRequest("POST", "/documents", body)
+		if err != nil {
+			return err
+		}
+		if s.authExpired {
+			return fmt.Errorf("auth expired")
+		}
+		var result struct {
+			ContentHash string `json:"content_hash"`
+		}
+		json.Unmarshal(data, &result)
+		if result.ContentHash != "" {
+			s.hashSet(relPath, result.ContentHash)
+		}
+		log.Printf("[ainstruct-sync] Created: %s", relPath)
+	}
+	return nil
+}
+
+func (s *Syncer) deleteByPath(relPath string) error {
+	if err := s.ensureCollection(); err != nil {
+		return err
+	}
+	existing, err := s.getDocumentByPath(relPath)
+	if err != nil {
+		return err
+	}
+	if s.authExpired {
+		return fmt.Errorf("auth expired")
+	}
+	if existing != nil {
+		_, err := s.apiRequest("DELETE", "/documents/"+existing.DocumentID, nil)
+		if err != nil {
+			return err
+		}
+		if s.authExpired {
+			return fmt.Errorf("auth expired")
+		}
+		s.hashDelete(relPath)
+		log.Printf("[ainstruct-sync] Deleted: %s", relPath)
+	}
+	return nil
+}
+
+func (s *Syncer) pullCollection() error {
+	data, err := s.apiRequest("GET", "/collections", nil)
+	if err != nil {
+		return err
+	}
+	var cr collectionsResponse
+	json.Unmarshal(data, &cr)
+	for _, c := range cr.Collections {
+		if c.Name == collectionName {
+			s.collectionID = c.CollectionID
+			break
+		}
+	}
+	if s.collectionID == "" {
+		log.Println("[ainstruct-sync] No existing collection — nothing to pull")
+		return nil
+	}
+	log.Printf("[ainstruct-sync] Pulling documents from collection %s", s.collectionID)
+	data, err = s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
+	if err != nil {
+		return err
+	}
+	var dr documentsResponse
+	json.Unmarshal(data, &dr)
+	if len(dr.Documents) == 0 {
+		log.Println("[ainstruct-sync] Collection is empty — nothing to pull")
+		return nil
+	}
+	for _, doc := range dr.Documents {
+		relPath := doc.Metadata.LocalPath
+		if relPath == "" {
+			continue
+		}
+		apiHash := doc.ContentHash
+		storedHash := s.hashGet(relPath)
+		if storedHash == apiHash {
+			continue
+		}
+		docData, err := s.apiRequest("GET", "/documents/"+doc.DocumentID, nil)
+		if err != nil {
+			log.Printf("[ainstruct-sync] Failed to pull %s: %v", relPath, err)
+			continue
+		}
+		var fullDoc struct {
+			Content string `json:"content"`
+		}
+		json.Unmarshal(docData, &fullDoc)
+		if fullDoc.Content == "" {
+			continue
+		}
+		absPath := filepath.Join(s.homeDir, relPath)
+		os.MkdirAll(filepath.Dir(absPath), 0o755)
+		if err := os.WriteFile(absPath, []byte(fullDoc.Content), 0o644); err != nil {
+			log.Printf("[ainstruct-sync] Failed to write %s: %v", relPath, err)
+			continue
+		}
+		s.hashSet(relPath, apiHash)
+		log.Printf("[ainstruct-sync] Pulled: %s", relPath)
+	}
+	return nil
+}

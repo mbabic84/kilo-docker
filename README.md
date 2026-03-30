@@ -157,7 +157,7 @@ When `--ainstruct` is used, configuration files are automatically synced to and 
 - `~/.kilo/command/*.md` — Custom slash commands
 - `~/.kilo/agent/*.md` — Custom agent definitions
 
-**Push (local → API):** A file watcher (`inotifywait`) detects local changes with a 5-second debounce and pushes updates to the Ainstruct API.
+**Push (local → API):** A Go-based file watcher (`ainstruct-sync`) detects local changes via inotify with a 5-second quiet-period debounce (rapid events are coalesced into a single sync) and pushes updates to the Ainstruct API.
 
 **Pull (API → local):** On container startup, the sync state file (`~/.config/kilo/.ainstruct-hashes`) is compared against the API's `content_hash` values. Only changed or new files are downloaded. Unchanged files are skipped without any API calls.
 
@@ -333,7 +333,12 @@ docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-
 ## Project Structure
 
 ```
-├── Dockerfile                  # Base image (Alpine, musl kilo binary)
+├── Dockerfile                  # Multi-stage build (Go builder + Alpine runtime)
+├── go.mod                      # Go module definition
+├── go.sum                      # Go dependency checksums
+├── cmd/
+│   └── ainstruct-sync/
+│       └── main.go             # File sync watcher (inotify, JWT, REST API)
 ├── configs/
 │   ├── opencode.json           # Kilo config for base image
 │   └── zellij.kdl              # Zellij config (keybinds, pane settings)
