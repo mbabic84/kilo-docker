@@ -1,3 +1,9 @@
+## [1.26.0](https://github.com/mbabic84/kilo-docker/compare/v1.25.1...v1.26.0) (2026-03-30)
+
+### Features
+
+* add automatic SSH agent forwarding ([f7ae1f1](https://github.com/mbabic84/kilo-docker/commit/f7ae1f187b654bd90079aec6a2643d653ef8f68b))
+
 ## [1.25.1](https://github.com/mbabic84/kilo-docker/compare/v1.25.0...v1.25.1) (2026-03-30)
 
 ### Bug Fixes
