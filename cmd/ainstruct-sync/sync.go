@@ -15,6 +15,39 @@ import (
 
 const collectionName = "kilo-docker"
 
+func documentType(path string) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".md":
+		return "markdown"
+	case ".js":
+		return "javascript"
+	case ".ts":
+		return "typescript"
+	case ".json", ".jsonc":
+		return "json"
+	case ".py":
+		return "python"
+	case ".go":
+		return "go"
+	case ".rs":
+		return "rust"
+	case ".java":
+		return "java"
+	case ".html":
+		return "html"
+	case ".css":
+		return "css"
+	case ".sql":
+		return "sql"
+	case ".xml":
+		return "xml"
+	case ".yaml", ".yml":
+		return "yaml"
+	default:
+		return "text"
+	}
+}
+
 type Syncer struct {
 	apiURL       string
 	accessToken  string
@@ -176,7 +209,7 @@ func (s *Syncer) syncFile(absPath string) error {
 		body := map[string]any{
 			"title":         title,
 			"content":       string(content),
-			"document_type": "markdown",
+			"document_type": documentType(absPath),
 			"collection_id": s.collectionID,
 			"metadata":      map[string]string{"local_path": relPath},
 		}

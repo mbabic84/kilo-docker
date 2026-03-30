@@ -64,21 +64,48 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 
 	watchDirs := []string{
 		filepath.Join(s.homeDir, ".config", "kilo", "rules"),
-		filepath.Join(s.homeDir, ".kilo", "command"),
-		filepath.Join(s.homeDir, ".kilo", "agent"),
+		filepath.Join(s.homeDir, ".config", "kilo", "commands"),
+		filepath.Join(s.homeDir, ".config", "kilo", "agents"),
+		filepath.Join(s.homeDir, ".config", "kilo", "plugins"),
+		filepath.Join(s.homeDir, ".config", "kilo", "skills"),
+		filepath.Join(s.homeDir, ".config", "kilo", "tools"),
 	}
 	for _, dir := range watchDirs {
 		os.MkdirAll(dir, 0o755)
 	}
+
+	const watchMask = unix.IN_CREATE | unix.IN_MODIFY | unix.IN_DELETE | unix.IN_MOVED_TO | unix.IN_MOVED_FROM
+
 	wdToDir := make(map[int32]string)
-	for _, dir := range watchDirs {
-		wd, err := unix.InotifyAddWatch(fd, dir, unix.IN_CREATE|unix.IN_MODIFY|unix.IN_DELETE|unix.IN_MOVED_TO|unix.IN_MOVED_FROM)
+	addWatch := func(dir string) {
+		wd, err := unix.InotifyAddWatch(fd, dir, watchMask)
 		if err != nil {
 			log.Printf("[ainstruct-sync] Failed to watch %s: %v", dir, err)
-			continue
+			return
 		}
 		wdToDir[int32(wd)] = dir
 	}
+
+	// Add watches on flat directories directly
+	for _, dir := range watchDirs[:4] { // rules, commands, agents, plugins
+		addWatch(dir)
+	}
+
+	// Skills uses nested directories (skills/<name>/SKILL.md) — watch recursively
+	skillsDir := watchDirs[4]
+	addWatch(skillsDir)
+	filepath.Walk(skillsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() && path != skillsDir {
+			addWatch(path)
+		}
+		return nil
+	})
+
+	// Tools directory — watch directly
+	addWatch(watchDirs[5])
 	opencodePath := filepath.Join(s.homeDir, ".config", "kilo", "opencode.json")
 	if _, err := os.Stat(opencodePath); err == nil {
 		wd, err := unix.InotifyAddWatch(fd, opencodePath, unix.IN_MODIFY|unix.IN_DELETE|unix.IN_MOVED_TO|unix.IN_MOVED_FROM)
@@ -134,6 +161,12 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 			} else {
 				fullPath = filepath.Join(dir, ev.name)
 			}
+
+			// Dynamically watch new subdirectories under skills/
+			if ev.mask&unix.IN_ISDIR != 0 && ev.mask&unix.IN_CREATE != 0 && strings.HasPrefix(dir, skillsDir) {
+				addWatch(fullPath)
+			}
+
 			var eventType string
 			if ev.mask&(unix.IN_DELETE|unix.IN_MOVED_FROM) != 0 {
 				eventType = "DELETE"

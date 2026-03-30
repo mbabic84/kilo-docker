@@ -154,8 +154,11 @@ When `--ainstruct` is used, configuration files are automatically synced to and 
 **Synced files:**
 - `~/.config/kilo/opencode.json` — Kilo configuration
 - `~/.config/kilo/rules/*.md` — Instruction files
-- `~/.kilo/command/*.md` — Custom slash commands
-- `~/.kilo/agent/*.md` — Custom agent definitions
+- `~/.config/kilo/commands/*.md` — Custom slash commands (markdown with YAML frontmatter)
+- `~/.config/kilo/agents/*.md` — Custom agent definitions (markdown with YAML frontmatter)
+- `~/.config/kilo/plugins/*.{js,ts}` — Plugins (JavaScript/TypeScript hook modules)
+- `~/.config/kilo/skills/*/SKILL.md` — Agent skills (per-skill directories with optional `scripts/`, `references/`, `assets/`)
+- `~/.config/kilo/tools/*.{js,ts}` — Custom tools (JavaScript/TypeScript tool definitions)
 
 **Push (local → API):** A Go-based file watcher (`ainstruct-sync`) detects local changes via inotify with a per-file 5-second debounce. Each file has an independent timer that resets on every change — the file is synced only after 5 seconds with no further modifications. Multiple files are synced independently without blocking each other.
 
@@ -239,7 +242,8 @@ The script uses a named Docker volume mounted at `/home/kilo-t8x3m7kp`. This sto
 
 - SQLite database, auth state, logs
 - Configuration (`opencode.json` — model selection, provider connections, MCP settings)
-- Custom commands (`.kilo/command/*.md`) and agents (`.kilo/agent/*.md`)
+- Custom commands (`.config/kilo/commands/*.md`) and agents (`.config/kilo/agents/*.md`)
+- Plugins (`.config/kilo/plugins/*.{js,ts}`), skills (`.config/kilo/skills/*/SKILL.md`), tools (`.config/kilo/tools/*.{js,ts}`)
 - Instruction files (`.config/kilo/rules/*.md`)
 - Session state and snapshots
 - Cache
