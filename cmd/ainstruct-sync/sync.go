@@ -66,10 +66,13 @@ func (s *Syncer) ensureCollection() error {
 	}
 	data, err := s.apiRequest("GET", "/collections", nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("listing collections: %w", err)
 	}
+	log.Printf("[ainstruct-sync] GET /collections response: %s", string(data))
 	var cr collectionsResponse
-	json.Unmarshal(data, &cr)
+	if err := json.Unmarshal(data, &cr); err != nil {
+		return fmt.Errorf("parsing collections response: %w (body: %s)", err, string(data))
+	}
 	for _, c := range cr.Collections {
 		if c.Name == collectionName {
 			s.collectionID = c.CollectionID
@@ -80,16 +83,19 @@ func (s *Syncer) ensureCollection() error {
 		body := map[string]string{"name": collectionName}
 		data, err = s.apiRequest("POST", "/collections", body)
 		if err != nil {
-			return err
+			return fmt.Errorf("creating collection: %w", err)
 		}
+		log.Printf("[ainstruct-sync] POST /collections response: %s", string(data))
 		var created struct {
 			CollectionID string `json:"collection_id"`
 		}
-		json.Unmarshal(data, &created)
+		if err := json.Unmarshal(data, &created); err != nil {
+			return fmt.Errorf("parsing create collection response: %w (body: %s)", err, string(data))
+		}
 		s.collectionID = created.CollectionID
 	}
 	if s.collectionID == "" {
-		return fmt.Errorf("failed to initialize collection")
+		return fmt.Errorf("failed to initialize collection — no collection_id in response")
 	}
 	log.Printf("[ainstruct-sync] Collection ready: %s", s.collectionID)
 	return nil
@@ -116,7 +122,9 @@ func (s *Syncer) getDocumentByPath(relPath string) (*document, error) {
 		return nil, err
 	}
 	var dr documentsResponse
-	json.Unmarshal(data, &dr)
+	if err := json.Unmarshal(data, &dr); err != nil {
+		return nil, fmt.Errorf("parsing documents response: %w (body: %s)", err, string(data))
+	}
 	for _, d := range dr.Documents {
 		if d.Metadata.LocalPath == relPath {
 			return &d, nil
@@ -157,7 +165,9 @@ func (s *Syncer) syncFile(absPath string) error {
 		var result struct {
 			ContentHash string `json:"content_hash"`
 		}
-		json.Unmarshal(data, &result)
+		if err := json.Unmarshal(data, &result); err != nil {
+			return fmt.Errorf("parsing PATCH response: %w (body: %s)", err, string(data))
+		}
 		if result.ContentHash != "" {
 			s.hashSet(relPath, result.ContentHash)
 		}
@@ -180,7 +190,9 @@ func (s *Syncer) syncFile(absPath string) error {
 		var result struct {
 			ContentHash string `json:"content_hash"`
 		}
-		json.Unmarshal(data, &result)
+		if err := json.Unmarshal(data, &result); err != nil {
+			return fmt.Errorf("parsing POST response: %w (body: %s)", err, string(data))
+		}
 		if result.ContentHash != "" {
 			s.hashSet(relPath, result.ContentHash)
 		}
@@ -217,10 +229,13 @@ func (s *Syncer) deleteByPath(relPath string) error {
 func (s *Syncer) pullCollection() error {
 	data, err := s.apiRequest("GET", "/collections", nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("listing collections: %w", err)
 	}
+	log.Printf("[ainstruct-sync] Pull: GET /collections response: %s", string(data))
 	var cr collectionsResponse
-	json.Unmarshal(data, &cr)
+	if err := json.Unmarshal(data, &cr); err != nil {
+		return fmt.Errorf("parsing collections response: %w (body: %s)", err, string(data))
+	}
 	for _, c := range cr.Collections {
 		if c.Name == collectionName {
 			s.collectionID = c.CollectionID
@@ -234,10 +249,13 @@ func (s *Syncer) pullCollection() error {
 	log.Printf("[ainstruct-sync] Pulling documents from collection %s", s.collectionID)
 	data, err = s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("listing documents: %w", err)
 	}
+	log.Printf("[ainstruct-sync] Pull: GET /documents response: %s", string(data))
 	var dr documentsResponse
-	json.Unmarshal(data, &dr)
+	if err := json.Unmarshal(data, &dr); err != nil {
+		return fmt.Errorf("parsing documents response: %w (body: %s)", err, string(data))
+	}
 	if len(dr.Documents) == 0 {
 		log.Println("[ainstruct-sync] Collection is empty — nothing to pull")
 		return nil
@@ -260,7 +278,10 @@ func (s *Syncer) pullCollection() error {
 		var fullDoc struct {
 			Content string `json:"content"`
 		}
-		json.Unmarshal(docData, &fullDoc)
+		if err := json.Unmarshal(docData, &fullDoc); err != nil {
+			log.Printf("[ainstruct-sync] Failed to parse %s: %v (body: %s)", relPath, err, string(docData))
+			continue
+		}
 		if fullDoc.Content == "" {
 			continue
 		}

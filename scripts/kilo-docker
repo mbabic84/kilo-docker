@@ -623,12 +623,23 @@ if [ "$ONCE" -eq 1 ]; then
     # --once: no volume, no password
     DATA_VOLUME=""
 elif [ "$KD_AINSTRUCT_ENABLED" -eq 1 ]; then
-    # --ainstruct: authenticate with Ainstruct API
+    # --ainstruct: authenticate with Ainstruct API (always, for fresh JWT tokens)
     if [ -t 2 ] && [ -t 0 ]; then
         ainstruct_login
     else
         echo "Error: --ainstruct requires a TTY." >&2
         exit 1
+    fi
+    # Volume is derived from user_id; check if it already exists
+    if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+        # Existing volume: load MCP tokens (sync tokens are runtime-only from login)
+        if [ "$ENCRYPTED" -eq 1 ]; then
+            DECRYPTED=$(decrypt_tokens) || true
+            if [ -n "$DECRYPTED" ]; then
+                KD_CONTEXT7_TOKEN=$(echo "$DECRYPTED" | grep '^KD_CONTEXT7_TOKEN=' | cut -d= -f2- || true)
+                KD_AINSTRUCT_TOKEN=$(echo "$DECRYPTED" | grep '^KD_AINSTRUCT_TOKEN=' | cut -d= -f2- || true)
+            fi
+        fi
     fi
 elif [ "$ENCRYPTED" -eq 1 ]; then
     # --password: derive volume name from password
@@ -990,11 +1001,13 @@ fi
 
 KD_CONTEXT7_TOKEN=""
 KD_AINSTRUCT_TOKEN=""
-KD_AINSTRUCT_SYNC_TOKEN=""
-KD_AINSTRUCT_SYNC_REFRESH_TOKEN=""
-KD_AINSTRUCT_SYNC_TOKEN_EXPIRY=""
+if [ "$KD_AINSTRUCT_ENABLED" -eq 0 ]; then
+    KD_AINSTRUCT_SYNC_TOKEN=""
+    KD_AINSTRUCT_SYNC_REFRESH_TOKEN=""
+    KD_AINSTRUCT_SYNC_TOKEN_EXPIRY=""
+fi
 
-if [ "$ONCE" -eq 0 ]; then
+if [ "$ONCE" -eq 0 ] && [ "$KD_AINSTRUCT_ENABLED" -eq 0 ]; then
     if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
         if [ "$ENCRYPTED" -eq 1 ]; then
             # Encrypted mode: decrypt existing tokens

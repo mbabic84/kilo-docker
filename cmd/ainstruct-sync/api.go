@@ -64,6 +64,11 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
+	log.Printf("[ainstruct-sync] API %s %s => %d", method, path, resp.StatusCode)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("[ainstruct-sync] API error response body: %s", string(respBody))
+		return nil, fmt.Errorf("API %s %s returned %d: %s", method, path, resp.StatusCode, string(respBody))
+	}
 	var apiErr apiError
 	if json.Unmarshal(respBody, &apiErr) == nil && apiErr.Error == "INVALID_TOKEN" {
 		if s.refreshToken == "" {
@@ -76,14 +81,19 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 			s.authExpired = true
 			return nil, err
 		}
-		resp, err = s.doAPIRequest(method, path, body)
-		if err != nil {
-			return nil, err
+		retryResp, retryErr := s.doAPIRequest(method, path, body)
+		if retryErr != nil {
+			return nil, retryErr
 		}
-		defer resp.Body.Close()
-		respBody, err = io.ReadAll(resp.Body)
+		defer retryResp.Body.Close()
+		respBody, err = io.ReadAll(retryResp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("reading response: %w", err)
+			return nil, fmt.Errorf("reading retry response: %w", err)
+		}
+		log.Printf("[ainstruct-sync] API %s %s (retry) => %d", method, path, retryResp.StatusCode)
+		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
+			log.Printf("[ainstruct-sync] API retry error response body: %s", string(respBody))
+			return nil, fmt.Errorf("API %s %s (retry) returned %d: %s", method, path, retryResp.StatusCode, string(respBody))
 		}
 		if json.Unmarshal(respBody, &apiErr) == nil && apiErr.Error == "INVALID_TOKEN" {
 			log.Println("[ainstruct-sync] Token invalid after refresh — stopping watcher")
