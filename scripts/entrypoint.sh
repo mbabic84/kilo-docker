@@ -31,7 +31,7 @@ if [ "$(id -u)" = "0" ]; then
             ln -sf /usr/local/bin/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
         fi
     fi
-    if [ "${ZELLIJ:-}" = "1" ] && ! command -v zellij >/dev/null 2>&1; then
+    if [ "${ZELLIJ_ENABLED:-}" = "1" ] && ! command -v zellij >/dev/null 2>&1; then
         echo "[kilo-docker] Downloading latest Zellij..." >&2
         wget -qO /tmp/zellij.tar.gz "https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz"
         tar xzf /tmp/zellij.tar.gz -C /usr/local/bin
@@ -49,17 +49,30 @@ if [ "$(id -u)" = "0" ]; then
     fi
     mkdir -p /home/kilo-t8x3m7kp/.local /workspace
     chown -R kilo-t8x3m7kp:kilo-t8x3m7kp /home/kilo-t8x3m7kp /workspace
+    if [ "${KD_AINSTRUCT_ENABLED:-}" = "1" ]; then
+        mkdir -p /home/kilo-t8x3m7kp/.config/kilo
+        mkdir -p /home/kilo-t8x3m7kp/.kilo/command /home/kilo-t8x3m7kp/.kilo/agent
+        chown -R kilo-t8x3m7kp:kilo-t8x3m7kp /home/kilo-t8x3m7kp/.config /home/kilo-t8x3m7kp/.kilo
+        su-exec kilo-t8x3m7kp sh -c 'exec ainstruct-sync &' 
+        echo "[kilo-docker] Ainstruct sync started" >&2
+    fi
     exec su-exec kilo-t8x3m7kp "$0" "$@"
 fi
 
 . "$SCRIPT_DIR/setup-kilo-config.sh"
 
-if [ "${ZELLIJ:-}" = "1" ]; then
+if [ "${ZELLIJ_ENABLED:-}" = "1" ]; then
     mkdir -p "$HOME/.config/zellij"
     if [ ! -f "$HOME/.config/zellij/config.kdl" ]; then
         cp /etc/zellij/config.kdl "$HOME/.config/zellij/config.kdl"
     fi
-    exec zellij
+    exec zellij "$@"
 fi
 
-exec kilo "$@"
+# If no arguments passed, start Kilo (interactive mode by default)
+# Otherwise pass through to allow testing with custom commands
+if [ $# -eq 0 ]; then
+    exec kilo
+else
+    exec "$@"
+fi
