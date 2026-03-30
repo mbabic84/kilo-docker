@@ -1,3 +1,9 @@
+## [1.27.0](https://github.com/mbabic84/kilo-docker/compare/v1.26.0...v1.27.0) (2026-03-30)
+
+### Features
+
+* use ~/.config/kilo/ for all Kilo subdirectories ([58d0b6b](https://github.com/mbabic84/kilo-docker/commit/58d0b6bdfa61c7040b57cedc46ec8388cae06f83))
+
 ## [1.26.0](https://github.com/mbabic84/kilo-docker/compare/v1.25.1...v1.26.0) (2026-03-30)
 
 ### Features
