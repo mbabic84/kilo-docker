@@ -377,7 +377,8 @@ Usage: kilo-docker [--once] [--password] [--ainstruct] [--playwright] [--docker]
 Commands:
   (no command)      Start Kilo in interactive mode
   run "prompt"      Run Kilo in autonomous mode with a prompt
-  sessions [name]   List sessions or attach to one by name/index
+  sessions [name]       List sessions or attach to one by name/index
+  sessions cleanup [-y] [name]  Remove a session (interactive if no name given)
   networks          List available Docker networks
   backup [-f]       Create backup of volume to tar.gz (auto-names with timestamp)
   restore <file> [-f] [--volume <name>]  Restore volume from backup
@@ -435,6 +436,8 @@ Examples:
   kilo-docker sessions                           # list all sessions
   kilo-docker sessions 1                         # attach to session by index
   kilo-docker sessions kilo-abc123def456         # attach to session by name
+  kilo-docker sessions cleanup                   # interactively remove a session
+  kilo-docker sessions cleanup -y 2              # remove session at index 2 without confirmation
   kilo-docker networks                           # list available Docker networks
   kilo-docker init                               # reset configuration
   kilo-docker cleanup                            # remove volume, containers, images, script
@@ -457,54 +460,112 @@ fi
 if [ "${1:-}" = "sessions" ]; then
     shift
     ATTACH_TARGET=""
+    CLEANUP_MODE=0
+    CLEANUP_YES=0
+
+    if [ "${1:-}" = "cleanup" ]; then
+        CLEANUP_MODE=1
+        shift
+        if [ "${1:-}" = "-y" ] || [ "${1:-}" = "--yes" ]; then
+            CLEANUP_YES=1
+            shift
+        fi
+    fi
 
     if [ $# -gt 0 ]; then
         ATTACH_TARGET="$1"
     fi
 
-    # List mode: show all kilo sessions
-    if [ -z "$ATTACH_TARGET" ]; then
-        SESSIONS=$(docker ps -a --filter "label=kilo.workspace" --format "{{.Names}}\t{{.Status}}\t{{.Labels}}" 2>/dev/null)
+    # --- Helper: get session list ---
+    _get_sessions() {
+        docker ps -a --filter "label=kilo.workspace" --format "{{.Names}}\t{{.Status}}\t{{.Labels}}" 2>/dev/null
+    }
 
-        if [ -z "$SESSIONS" ]; then
-            echo "No active sessions." >&2
-            exit 0
-        fi
-
+    # --- Helper: display session table ---
+    _show_sessions() {
+        local SESSIONS="$1"
         printf "%-4s %-22s %-32s %-52s %s\n" "#" "NAME" "STATUS" "WORKSPACE" "ARGS" >&2
         printf "%-4s %-22s %-32s %-52s %s\n" "---" "----------------------" "--------------------------------" "----------------------------------------------------" "-----" >&2
-
-        INDEX=1
+        local INDEX=1
         while IFS=$'\t' read -r name status labels; do
             workspace=$(echo "$labels" | tr ',' '\n' | grep '^kilo.workspace=' | cut -d= -f2-)
             args=$(echo "$labels" | tr ',' '\n' | grep '^kilo.args=' | cut -d= -f2-)
             printf "%-4s %-22s %-32s %-52s %s\n" "$INDEX" "$name" "$status" "${workspace:-}" "${args:-}" >&2
             INDEX=$((INDEX + 1))
         done <<< "$SESSIONS"
+    }
 
+    # --- Helper: resolve target by name or index ---
+    _resolve_target() {
+        local target="$1"
+        local result=""
+        if [[ "$target" =~ ^[0-9]+$ ]]; then
+            local SESSIONS
+            SESSIONS=$(_get_sessions)
+            result=$(echo "$SESSIONS" | sed -n "${target}p" | cut -f1)
+            if [ -z "$result" ]; then
+                echo "Error: No session at index ${target}." >&2
+                return 1
+            fi
+        else
+            if docker inspect "$target" >/dev/null 2>&1; then
+                result="$target"
+            else
+                echo "Error: Container '${target}' not found." >&2
+                return 1
+            fi
+        fi
+        echo "$result"
+    }
+
+    # --- Cleanup mode ---
+    if [ "$CLEANUP_MODE" -eq 1 ]; then
+        SESSIONS=$(_get_sessions)
+        CONTAINER_TO_CLEAN=""
+
+        if [ -n "$ATTACH_TARGET" ]; then
+            CONTAINER_TO_CLEAN=$(_resolve_target "$ATTACH_TARGET") || exit 1
+        else
+            if [ -z "$SESSIONS" ]; then
+                echo "No sessions to clean up." >&2
+                exit 0
+            fi
+            _show_sessions "$SESSIONS"
+            echo -n "Select session to remove (number or name): " >&2
+            local_selection=""
+            read -r local_selection </dev/tty || { echo "Error: Failed to read input." >&2; exit 1; }
+            if [ -z "$local_selection" ]; then
+                echo "Aborted." >&2
+                exit 0
+            fi
+            CONTAINER_TO_CLEAN=$(_resolve_target "$local_selection") || exit 1
+        fi
+
+        if [ "$CLEANUP_YES" -eq 1 ] || confirm "Remove session '${CONTAINER_TO_CLEAN}'? [y/N]: "; then
+            docker rm -f "$CONTAINER_TO_CLEAN" >/dev/null 2>&1
+            echo "Session '${CONTAINER_TO_CLEAN}' removed." >&2
+        else
+            echo "Aborted." >&2
+        fi
         exit 0
     fi
 
-    # Attach mode: resolve target by name or index
-    CONTAINER_TO_ATTACH=""
+    # --- List mode: show all kilo sessions ---
+    if [ -z "$ATTACH_TARGET" ]; then
+        SESSIONS=$(_get_sessions)
 
-    if [[ "$ATTACH_TARGET" =~ ^[0-9]+$ ]]; then
-        # Numeric index
-        SESSIONS=$(docker ps -a --filter "label=kilo.workspace" --format "{{.Names}}\t{{.Status}}" 2>/dev/null)
-        CONTAINER_TO_ATTACH=$(echo "$SESSIONS" | sed -n "${ATTACH_TARGET}p" | cut -f1)
-        if [ -z "$CONTAINER_TO_ATTACH" ]; then
-            echo "Error: No session at index ${ATTACH_TARGET}." >&2
-            exit 1
+        if [ -z "$SESSIONS" ]; then
+            echo "No active sessions." >&2
+            exit 0
         fi
-    else
-        # Container name
-        if docker inspect "$ATTACH_TARGET" >/dev/null 2>&1; then
-            CONTAINER_TO_ATTACH="$ATTACH_TARGET"
-        else
-            echo "Error: Container '${ATTACH_TARGET}' not found." >&2
-            exit 1
-        fi
+
+        _show_sessions "$SESSIONS"
+        exit 0
     fi
+
+    # --- Attach mode: resolve target by name or index ---
+    CONTAINER_TO_ATTACH=""
+    CONTAINER_TO_ATTACH=$(_resolve_target "$ATTACH_TARGET") || exit 1
 
     CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' "$CONTAINER_TO_ATTACH" 2>/dev/null)
     case "$CONTAINER_STATUS" in
