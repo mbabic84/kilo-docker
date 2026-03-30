@@ -1,3 +1,10 @@
+## [1.25.0](https://github.com/mbabic84/kilo-docker/compare/v1.24.0...v1.25.0) (2026-03-30)
+
+### Features
+
+* add session management with persistent containers ([252c780](https://github.com/mbabic84/kilo-docker/commit/252c78074eb4e2587f547a01db50176590d2906a))
+* add sessions cleanup subcommand with -y flag ([e3a2554](https://github.com/mbabic84/kilo-docker/commit/e3a25546207d8793bca7318483a9ee5c763527cc))
+
 ## [1.24.0](https://github.com/mbabic84/kilo-docker/compare/v1.23.0...v1.24.0) (2026-03-30)
 
 ### Features
