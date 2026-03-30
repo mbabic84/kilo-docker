@@ -1,3 +1,9 @@
+## [1.25.1](https://github.com/mbabic84/kilo-docker/compare/v1.25.0...v1.25.1) (2026-03-30)
+
+### Bug Fixes
+
+* resolve ainstruct-sync collection initialization failure ([1930c48](https://github.com/mbabic84/kilo-docker/commit/1930c48871ec4308615253c19e7be7587ecc661f))
+
 ## [1.25.0](https://github.com/mbabic84/kilo-docker/compare/v1.24.0...v1.25.0) (2026-03-30)
 
 ### Features
