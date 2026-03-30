@@ -304,6 +304,7 @@ NETWORK=""
 NETWORK_FLAG=0
 KD_AINSTRUCT_ENABLED=0
 SSH_ENABLED=0
+MCP_ENABLED=0
 FILTERED_ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -328,6 +329,9 @@ while [ $# -gt 0 ]; do
             ;;
         --ssh)
             SSH_ENABLED=1
+            ;;
+        --mcp)
+            MCP_ENABLED=1
             ;;
         --network)
             NETWORK_FLAG=1
@@ -405,7 +409,7 @@ fi
 
 if [ "${1:-}" = "help" ]; then
     cat >&2 <<'EOF'
-Usage: kilo-docker [--once] [--password] [--ainstruct] [--playwright] [--docker] [--ssh] [--zellij] [--network <name>] [command] [args...]
+Usage: kilo-docker [--once] [--password] [--ainstruct] [--mcp] [--playwright] [--docker] [--ssh] [--zellij] [--network <name>] [command] [args...]
 
 Commands:
   (no command)      Start Kilo in interactive mode
@@ -426,6 +430,7 @@ Options:
   --once            Run a one-time session without persisting data (no volume)
   --password, -p    Protect volume with a password (encrypts tokens, derives volume name from password)
   --ainstruct       Encrypt tokens using Ainstruct user_id for volume naming
+  --mcp             Enable MCP servers (prompts for Context7 and Ainstruct API tokens)
   --playwright      Start a Playwright MCP sidecar container for browser automation
   --docker          Mount Docker socket for container management from within Kilo
   --ssh             Enable SSH agent forwarding into the container
@@ -469,7 +474,9 @@ Examples:
   kilo-docker backup -f backup.tar.gz            # create backup with custom name
   kilo-docker restore backup.tar.gz              # restore from backup
   kilo-docker --once                             # one-time interactive session
+  kilo-docker --once --mcp                       # one-time session with MCP servers
   kilo-docker --once run "prompt"                # one-time autonomous session
+  kilo-docker --mcp                              # with Context7 and Ainstruct MCP servers
   kilo-docker --playwright                       # with Playwright browser automation
   kilo-docker --docker                           # with Docker socket access
   kilo-docker --ssh                              # with SSH agent forwarding
@@ -661,10 +668,7 @@ fi
 
 VOLUME_PASSWORD=""
 
-if [ "$ONCE" -eq 1 ]; then
-    # --once: no volume, no password
-    DATA_VOLUME=""
-elif [ "$KD_AINSTRUCT_ENABLED" -eq 1 ]; then
+if [ "$KD_AINSTRUCT_ENABLED" -eq 1 ]; then
     # --ainstruct: authenticate with Ainstruct API (always, for fresh JWT tokens)
     if [ -t 2 ] && [ -t 0 ]; then
         ainstruct_login
@@ -672,17 +676,12 @@ elif [ "$KD_AINSTRUCT_ENABLED" -eq 1 ]; then
         echo "Error: --ainstruct requires a TTY." >&2
         exit 1
     fi
-    # Volume is derived from user_id; check if it already exists
-    if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
-        # Existing volume: load MCP tokens (sync tokens are runtime-only from login)
-        if [ "$ENCRYPTED" -eq 1 ]; then
-            DECRYPTED=$(decrypt_tokens) || true
-            if [ -n "$DECRYPTED" ]; then
-                KD_CONTEXT7_TOKEN=$(echo "$DECRYPTED" | grep '^KD_CONTEXT7_TOKEN=' | cut -d= -f2- || true)
-                KD_AINSTRUCT_TOKEN=$(echo "$DECRYPTED" | grep '^KD_AINSTRUCT_TOKEN=' | cut -d= -f2- || true)
-            fi
-        fi
+    if [ "$ONCE" -eq 1 ]; then
+        DATA_VOLUME=""
     fi
+elif [ "$ONCE" -eq 1 ]; then
+    # --once: no volume, no password
+    DATA_VOLUME=""
 elif [ "$ENCRYPTED" -eq 1 ]; then
     # --password: derive volume name from password
     if [ -t 2 ] && [ -t 0 ]; then
@@ -1043,13 +1042,11 @@ fi
 
 KD_CONTEXT7_TOKEN=""
 KD_AINSTRUCT_TOKEN=""
-if [ "$KD_AINSTRUCT_ENABLED" -eq 0 ]; then
-    KD_AINSTRUCT_SYNC_TOKEN=""
-    KD_AINSTRUCT_SYNC_REFRESH_TOKEN=""
-    KD_AINSTRUCT_SYNC_TOKEN_EXPIRY=""
-fi
+KD_AINSTRUCT_SYNC_TOKEN="${KD_AINSTRUCT_SYNC_TOKEN:-}"
+KD_AINSTRUCT_SYNC_REFRESH_TOKEN="${KD_AINSTRUCT_SYNC_REFRESH_TOKEN:-}"
+KD_AINSTRUCT_SYNC_TOKEN_EXPIRY="${KD_AINSTRUCT_SYNC_TOKEN_EXPIRY:-}"
 
-if [ "$ONCE" -eq 0 ] && [ "$KD_AINSTRUCT_ENABLED" -eq 0 ]; then
+if [ "$MCP_ENABLED" -eq 1 ]; then
     if docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
         if [ "$ENCRYPTED" -eq 1 ]; then
             # Encrypted mode: decrypt existing tokens
@@ -1073,8 +1070,8 @@ if [ "$ONCE" -eq 0 ] && [ "$KD_AINSTRUCT_ENABLED" -eq 0 ]; then
         fi
     fi
 
-    # If still no tokens, prompt for new ones
-    if [ -z "$KD_CONTEXT7_TOKEN" ] && [ -z "$KD_AINSTRUCT_TOKEN" ]; then
+    # Prompt for any missing tokens
+    if [ -z "$KD_CONTEXT7_TOKEN" ] || [ -z "$KD_AINSTRUCT_TOKEN" ]; then
         prompt_missing_tokens
     fi
 fi
@@ -1230,15 +1227,16 @@ KD_SESSION_ARGS=""
 [ "$SSH_AGENT_FORWARDING" -eq 1 ] && KD_SESSION_ARGS+="ssh-agent "
 [ "$ENCRYPTED" -eq 1 ] && [ "$KD_AINSTRUCT_ENABLED" -eq 0 ] && KD_SESSION_ARGS+="-p "
 [ "$KD_AINSTRUCT_ENABLED" -eq 1 ] && KD_SESSION_ARGS+="--ainstruct "
+[ "$MCP_ENABLED" -eq 1 ] && KD_SESSION_ARGS+="--mcp "
 [ -n "$NETWORK" ] && KD_SESSION_ARGS+="--network ${NETWORK} "
 [ $# -gt 0 ] && KD_SESSION_ARGS+="$* "
 DOCKER_ARGS+=(--label "kilo.args=${KD_SESSION_ARGS% }")
 
-if [ -n "$KD_CONTEXT7_TOKEN" ]; then
+if [ "$MCP_ENABLED" -eq 1 ] && [ -n "$KD_CONTEXT7_TOKEN" ]; then
     DOCKER_ARGS+=(-e "KD_CONTEXT7_TOKEN=${KD_CONTEXT7_TOKEN}")
 fi
 
-if [ -n "$KD_AINSTRUCT_TOKEN" ]; then
+if [ "$MCP_ENABLED" -eq 1 ] && [ -n "$KD_AINSTRUCT_TOKEN" ]; then
     DOCKER_ARGS+=(-e "KD_AINSTRUCT_TOKEN=${KD_AINSTRUCT_TOKEN}")
 fi
 
