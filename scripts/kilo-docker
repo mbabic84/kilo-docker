@@ -1070,8 +1070,8 @@ if [ "$MCP_ENABLED" -eq 1 ]; then
         fi
     fi
 
-    # Prompt only for first-time setup (no existing volume)
-    if ! docker volume inspect "$DATA_VOLUME" >/dev/null 2>&1; then
+    # Prompt for any missing tokens
+    if [ -z "$KD_CONTEXT7_TOKEN" ] || [ -z "$KD_AINSTRUCT_TOKEN" ]; then
         prompt_missing_tokens
     fi
 fi
