@@ -6,7 +6,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 
 | Image | Base | Size | Description |
 |-------|------|------|-------------|
-| `ghcr.io/mbabic84/kilo-docker:latest` | Alpine | ~192 MB | Lightweight base with `git`, `openssh-client`, `ripgrep`, and `libstdc++` |
+| `ghcr.io/mbabic84/kilo-docker:latest` | Alpine | ~201 MB | Lightweight base with `git`, `openssh-client`, `ripgrep`, and `libstdc++` |
 
 ## Features
 
@@ -157,11 +157,13 @@ When `--ainstruct` is used, configuration files are automatically synced to and 
 - `~/.kilo/command/*.md` — Custom slash commands
 - `~/.kilo/agent/*.md` — Custom agent definitions
 
-**Push (local → API):** A Go-based file watcher (`ainstruct-sync`) detects local changes via inotify with a 5-second quiet-period debounce (rapid events are coalesced into a single sync) and pushes updates to the Ainstruct API.
+**Push (local → API):** A Go-based file watcher (`ainstruct-sync`) detects local changes via inotify with a per-file 5-second debounce. Each file has an independent timer that resets on every change — the file is synced only after 5 seconds with no further modifications. Multiple files are synced independently without blocking each other.
 
 **Pull (API → local):** On container startup, the sync state file (`~/.config/kilo/.ainstruct-hashes`) is compared against the API's `content_hash` values. Only changed or new files are downloaded. Unchanged files are skipped without any API calls.
 
 **Token refresh:** JWT access tokens (30 min lifetime) are refreshed automatically before API calls when within 60 seconds of expiry.
+
+The sync engine is a static Go binary — no `bash`, `inotify-tools`, or `jq` runtime dependencies. It uses native Linux inotify via `golang.org/x/sys/unix` and communicates with the Ainstruct API using Go's `net/http` stdlib.
 
 ## Browser Automation
 
@@ -320,7 +322,7 @@ Host remote
 ## Building Locally
 
 ```bash
-# Build image
+# Build image (includes Go binary compilation)
 docker build -t kilo-docker .
 
 # Test
@@ -330,6 +332,8 @@ docker run --rm kilo-docker --version
 docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-docker
 ```
 
+The build uses a multi-stage Dockerfile: a `golang:1.26-alpine` builder compiles the `ainstruct-sync` binary as a static binary, then the runtime stage copies it into the final Alpine image. No Go toolchain is needed on the host.
+
 ## Project Structure
 
 ```
@@ -338,7 +342,11 @@ docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-
 ├── go.sum                      # Go dependency checksums
 ├── cmd/
 │   └── ainstruct-sync/
-│       └── main.go             # File sync watcher (inotify, JWT, REST API)
+│       ├── main.go             # Entry point, signal handling
+│       ├── api.go              # HTTP client, JWT token management
+│       ├── hash.go             # Hash file read/write (mutex-guarded)
+│       ├── sync.go             # Syncer struct, collections, documents, pull
+│       └── watcher.go          # inotify watcher, per-file debounce
 ├── configs/
 │   ├── opencode.json           # Kilo config for base image
 │   └── zellij.kdl              # Zellij config (keybinds, pane settings)
