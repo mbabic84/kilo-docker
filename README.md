@@ -197,6 +197,22 @@ The Docker CLI and Compose plugin are installed at runtime inside the container.
 
 > **Security:** Mounting the Docker socket grants full Docker API access inside the container, which is equivalent to root access on the host. Only use `--docker` in trusted environments.
 
+## SSH Agent Forwarding
+
+SSH agent forwarding is enabled automatically. The script detects whether an SSH agent is running on the host:
+
+- **Agent running** — Uses the existing agent via `$SSH_AUTH_SOCK`
+- **No agent** — Starts one automatically, loads all private keys from `~/.ssh/`, and cleans up on exit
+
+The container mounts the host's SSH agent socket, allowing `git`, `ssh`, and `scp` to use your host SSH keys without copying private keys into the container.
+
+```bash
+# Just run kilo-docker — SSH works automatically
+kilo-docker
+```
+
+> **Security:** Private keys never enter the container. The container communicates with the host's SSH agent via a Unix socket.
+
 ## Zellij Sessions
 
 The `--zellij` flag starts a [Zellij](https://zellij.dev/) terminal multiplexer session:
