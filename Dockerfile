@@ -24,13 +24,13 @@ RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec sudo jq curl
     && adduser -D -u 1000 kilo-t8x3m7kp \
     && echo "kilo-t8x3m7kp ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-COPY --from=builder /tmp/kilo /usr/local/bin/kilo
-COPY --from=go-builder /out/ainstruct-sync /usr/local/bin/ainstruct-sync
-COPY configs/opencode.json /home/kilo-t8x3m7kp/.config/kilo/opencode.json
-COPY configs/zellij.kdl /etc/zellij/config.kdl
 COPY scripts/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY scripts/setup-kilo-config.sh /usr/local/bin/setup-kilo-config.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/setup-kilo-config.sh
+COPY configs/zellij.kdl /etc/zellij/config.kdl
+COPY configs/opencode.json /home/kilo-t8x3m7kp/.config/kilo/opencode.json
+COPY --from=builder /tmp/kilo /usr/local/bin/kilo
+COPY --from=go-builder /out/ainstruct-sync /usr/local/bin/ainstruct-sync
 
 ENV HOME=/home/kilo-t8x3m7kp
 

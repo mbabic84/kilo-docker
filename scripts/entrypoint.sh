@@ -56,13 +56,13 @@ if [ "$(id -u)" = "0" ]; then
     mkdir -p /home/kilo-t8x3m7kp/.ssh
     chmod 700 /home/kilo-t8x3m7kp/.ssh
     ssh-keyscan -H github.com gitlab.com bitbucket.com >> /home/kilo-t8x3m7kp/.ssh/known_hosts 2>/dev/null || true
-    chown -R kilo-t8x3m7kp:kilo-t8x3m7kp /home/kilo-t8x3m7kp/.ssh
-    chown -R kilo-t8x3m7kp:kilo-t8x3m7kp /home/kilo-t8x3m7kp /workspace
+    mkdir -p /home/kilo-t8x3m7kp/.config/kilo/commands /home/kilo-t8x3m7kp/.config/kilo/agents \
+             /home/kilo-t8x3m7kp/.config/kilo/plugins /home/kilo-t8x3m7kp/.config/kilo/skills \
+             /home/kilo-t8x3m7kp/.config/kilo/tools /home/kilo-t8x3m7kp/.config/kilo/rules
+    chown -R kilo-t8x3m7kp:kilo-t8x3m7kp /home/kilo-t8x3m7kp/.ssh /home/kilo-t8x3m7kp/.config \
+             /home/kilo-t8x3m7kp/.local /workspace
     if [ "${KD_AINSTRUCT_ENABLED:-}" = "1" ]; then
-        mkdir -p /home/kilo-t8x3m7kp/.config/kilo
-        mkdir -p /home/kilo-t8x3m7kp/.kilo/command /home/kilo-t8x3m7kp/.kilo/agent
-        chown -R kilo-t8x3m7kp:kilo-t8x3m7kp /home/kilo-t8x3m7kp/.config /home/kilo-t8x3m7kp/.kilo
-        su-exec kilo-t8x3m7kp sh -c 'exec ainstruct-sync &' 
+        su-exec kilo-t8x3m7kp sh -c 'exec ainstruct-sync &'
         echo "[kilo-docker] Ainstruct sync started" >&2
     fi
     exec su-exec kilo-t8x3m7kp "$0" "$@"
