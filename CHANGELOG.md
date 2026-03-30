@@ -1,3 +1,14 @@
+## [1.24.0](https://github.com/mbabic84/kilo-docker/compare/v1.23.0...v1.24.0) (2026-03-30)
+
+### Features
+
+* add ainstruct file sync with push/pull and KD_ env var prefix ([4feb139](https://github.com/mbabic84/kilo-docker/commit/4feb13980cea110c0fa5cc2b7253c3cbe5d44e1e))
+* rewrite ainstruct-sync from bash to Go ([d44e31f](https://github.com/mbabic84/kilo-docker/commit/d44e31f29c6f015929311f479f313800d997419d))
+
+### Bug Fixes
+
+* resolve review issues from PR [#58](https://github.com/mbabic84/kilo-docker/issues/58) ([b946969](https://github.com/mbabic84/kilo-docker/commit/b9469695b8b75ec14780813eb2ab97513ae7d0d7))
+
 ## [1.23.0](https://github.com/mbabic84/kilo-docker/compare/v1.22.0...v1.23.0) (2026-03-28)
 
 ### Features
