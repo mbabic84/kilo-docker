@@ -48,6 +48,15 @@ if [ "$(id -u)" = "0" ]; then
         fi
     fi
     mkdir -p /home/kilo-t8x3m7kp/.local /workspace
+    # Fix SSH agent socket ownership for the non-root user
+    if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
+        chown kilo-t8x3m7kp "${SSH_AUTH_SOCK}" 2>/dev/null || true
+    fi
+    # Pre-populate known_hosts to avoid interactive prompts
+    mkdir -p /home/kilo-t8x3m7kp/.ssh
+    chmod 700 /home/kilo-t8x3m7kp/.ssh
+    ssh-keyscan -H github.com gitlab.com bitbucket.com >> /home/kilo-t8x3m7kp/.ssh/known_hosts 2>/dev/null || true
+    chown -R kilo-t8x3m7kp:kilo-t8x3m7kp /home/kilo-t8x3m7kp/.ssh
     chown -R kilo-t8x3m7kp:kilo-t8x3m7kp /home/kilo-t8x3m7kp /workspace
     if [ "${KD_AINSTRUCT_ENABLED:-}" = "1" ]; then
         mkdir -p /home/kilo-t8x3m7kp/.config/kilo
