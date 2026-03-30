@@ -1,3 +1,10 @@
+## [1.28.1](https://github.com/mbabic84/kilo-docker/compare/v1.28.0...v1.28.1) (2026-03-30)
+
+### Bug Fixes
+
+* add --mcp flag and fix token prompting ([c9a94d9](https://github.com/mbabic84/kilo-docker/commit/c9a94d91cf38e598b459015485a127fe21433d4c))
+* prompt for each missing MCP token individually ([a3ef440](https://github.com/mbabic84/kilo-docker/commit/a3ef44040abcdef342d1bc7da2b8dd6527f9dd62))
+
 ## [1.28.0](https://github.com/mbabic84/kilo-docker/compare/v1.27.0...v1.28.0) (2026-03-30)
 
 ### Features
