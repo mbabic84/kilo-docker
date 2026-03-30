@@ -66,13 +66,10 @@ if [ "${ZELLIJ_ENABLED:-}" = "1" ]; then
     if [ ! -f "$HOME/.config/zellij/config.kdl" ]; then
         cp /etc/zellij/config.kdl "$HOME/.config/zellij/config.kdl"
     fi
-    exec zellij "$@"
 fi
 
-# If no arguments passed, start Kilo (interactive mode by default)
-# Otherwise pass through to allow testing with custom commands
 if [ $# -eq 0 ]; then
-    exec kilo
+    exec sh
 else
     exec "$@"
 fi
