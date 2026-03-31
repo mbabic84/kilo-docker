@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
-# ── Builder: compile ainstruct-sync ──
+# ── Builder: compile kilo-entrypoint ──
 FROM golang:1.26-alpine AS go-builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd/ cmd/
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/ainstruct-sync ./cmd/ainstruct-sync
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/kilo-entrypoint ./cmd/kilo-entrypoint
 
 # ── Builder: download Kilo binary ──
 FROM alpine:latest AS builder
@@ -20,18 +20,15 @@ RUN apk add --no-cache curl tar \
 # ── Runtime: Alpine with tools ──
 FROM alpine:latest
 
-RUN apk add --no-cache libstdc++ git openssh-client ripgrep su-exec sudo jq curl \
+RUN apk add --no-cache libstdc++ git openssh-client ripgrep sudo \
     && adduser -D -u 1000 kilo-t8x3m7kp \
     && echo "kilo-t8x3m7kp ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-COPY scripts/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-COPY scripts/setup-kilo-config.sh /usr/local/bin/setup-kilo-config.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/setup-kilo-config.sh
 COPY configs/zellij.kdl /etc/zellij/config.kdl
 COPY configs/opencode.json /home/kilo-t8x3m7kp/.config/kilo/opencode.json
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo
-COPY --from=go-builder /out/ainstruct-sync /usr/local/bin/ainstruct-sync
+COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
 
 ENV HOME=/home/kilo-t8x3m7kp
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["kilo-entrypoint"]

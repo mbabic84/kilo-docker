@@ -15,6 +15,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Build host binary
+        run: CGO_ENABLED=0 go build -o /dev/null ./cmd/kilo-docker
+
+      - name: Build container binary
+        run: CGO_ENABLED=0 go build -o /dev/null ./cmd/kilo-entrypoint
+
+      - name: Run tests
+        run: go test ./cmd/...
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 

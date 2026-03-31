@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+// hashGet retrieves the cached content hash for a relative file path.
+// Returns empty string if no hash exists or the hash file is missing.
 func (s *Syncer) hashGet(relPath string) string {
 	s.hashMu.Lock()
 	defer s.hashMu.Unlock()
@@ -22,6 +24,8 @@ func (s *Syncer) hashGet(relPath string) string {
 	return ""
 }
 
+// hashSet stores or updates the content hash for a relative file path.
+// Appends a new entry if the path isn't already tracked.
 func (s *Syncer) hashSet(relPath, hash string) {
 	s.hashMu.Lock()
 	defer s.hashMu.Unlock()
@@ -48,6 +52,8 @@ func (s *Syncer) hashSet(relPath, hash string) {
 	os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
 }
 
+// hashDelete removes the cached content hash for a relative file path.
+// No-op if the path isn't tracked or the hash file doesn't exist.
 func (s *Syncer) hashDelete(relPath string) {
 	s.hashMu.Lock()
 	defer s.hashMu.Unlock()

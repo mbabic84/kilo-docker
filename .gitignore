@@ -1,5 +1,32 @@
-# Dependencies
-node_modules/
+# Go binaries and cache
+bin/
+.cache/
+
+# Go modules (downloaded in CI)
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Environment variables (tokens)
 .env
+.env.*
+
+# Docker
+docker-compose.override.yml
+
+# Playwright output
+.playwright-mcp/
+
+# Go build artifacts
+kilo-docker-linux-*
+kilo-docker-darwin-*
+*.exe
