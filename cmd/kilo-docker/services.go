@@ -60,6 +60,20 @@ var builtInServices = []Service{
 			{Src: "/etc/zellij/config.kdl", Dst: "~/.config/zellij/config.kdl"},
 		},
 	},
+	{
+		Name:        "go",
+		Flag:        "--go",
+		Description: "Install Go 1.26.1 (latest stable) for development",
+		Install: []string{
+			"command -v go >/dev/null || (curl -fsSL https://go.dev/dl/go1.26.1.linux-amd64.tar.gz -o /tmp/go.tar.gz && tar -C /usr/local -xzf /tmp/go.tar.gz && rm -rf /tmp/go.tar.gz)",
+			"echo 'export PATH=/usr/local/go/bin:$PATH' > /etc/profile.d/go.sh",
+		},
+		EnvVars: map[string]string{
+			"GOPATH": "/root/go",
+		},
+		Volumes:        []string{},
+		RequiresSocket: "",
+	},
 }
 
 // getService returns the service with the given name, or nil if not found.
