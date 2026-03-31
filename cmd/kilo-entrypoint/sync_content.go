@@ -98,6 +98,29 @@ type collectionsResponse struct {
 	Collections []collection `json:"collections"`
 }
 
+// findCollection looks up the sync collection by name without creating it.
+// Returns true if found (s.collectionID is set), false if not.
+func (s *Syncer) findCollection() (bool, error) {
+	if s.collectionID != "" {
+		return true, nil
+	}
+	data, err := s.apiRequest("GET", "/collections", nil)
+	if err != nil {
+		return false, fmt.Errorf("listing collections: %w", err)
+	}
+	var cr collectionsResponse
+	if err := json.Unmarshal(data, &cr); err != nil {
+		return false, fmt.Errorf("parsing collections response: %w (body: %s)", err, string(data))
+	}
+	for _, c := range cr.Collections {
+		if c.Name == collectionName {
+			s.collectionID = c.CollectionID
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // ensureCollection creates or retrieves the sync collection from the API.
 // On first run, it creates a new collection named "kilo-docker"; subsequent
 // runs reuse the existing one by ID.
@@ -105,36 +128,27 @@ func (s *Syncer) ensureCollection() error {
 	if s.collectionID != "" {
 		return nil
 	}
-	data, err := s.apiRequest("GET", "/collections", nil)
+	found, err := s.findCollection()
 	if err != nil {
-		return fmt.Errorf("listing collections: %w", err)
+		return err
 	}
-	log.Printf("[ainstruct-sync] GET /collections response: %s", string(data))
-	var cr collectionsResponse
-	if err := json.Unmarshal(data, &cr); err != nil {
-		return fmt.Errorf("parsing collections response: %w (body: %s)", err, string(data))
+	if found {
+		log.Printf("[ainstruct-sync] Collection ready: %s", s.collectionID)
+		return nil
 	}
-	for _, c := range cr.Collections {
-		if c.Name == collectionName {
-			s.collectionID = c.CollectionID
-			break
-		}
+	body := map[string]string{"name": collectionName}
+	data, err := s.apiRequest("POST", "/collections", body)
+	if err != nil {
+		return fmt.Errorf("creating collection: %w", err)
 	}
-	if s.collectionID == "" {
-		body := map[string]string{"name": collectionName}
-		data, err = s.apiRequest("POST", "/collections", body)
-		if err != nil {
-			return fmt.Errorf("creating collection: %w", err)
-		}
-		log.Printf("[ainstruct-sync] POST /collections response: %s", string(data))
-		var created struct {
-			CollectionID string `json:"collection_id"`
-		}
-		if err := json.Unmarshal(data, &created); err != nil {
-			return fmt.Errorf("parsing create collection response: %w (body: %s)", err, string(data))
-		}
-		s.collectionID = created.CollectionID
+	log.Printf("[ainstruct-sync] POST /collections response: %s", string(data))
+	var created struct {
+		CollectionID string `json:"collection_id"`
 	}
+	if err := json.Unmarshal(data, &created); err != nil {
+		return fmt.Errorf("parsing create collection response: %w (body: %s)", err, string(data))
+	}
+	s.collectionID = created.CollectionID
 	if s.collectionID == "" {
 		return fmt.Errorf("failed to initialize collection — no collection_id in response")
 	}
@@ -178,7 +192,14 @@ func (s *Syncer) getDocumentByPath(relPath string) (*document, error) {
 // Creates a new document if it doesn't exist, patches the existing one
 // if it does. Updates the local hash cache on success.
 func (s *Syncer) syncFile(absPath string) error {
-	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+	info, err := os.Stat(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if info.IsDir() {
 		return nil
 	}
 	if err := s.ensureCollection(); err != nil {
@@ -213,7 +234,9 @@ func (s *Syncer) syncFile(absPath string) error {
 			return fmt.Errorf("parsing PATCH response: %w (body: %s)", err, string(data))
 		}
 		if result.ContentHash != "" {
-			s.hashSet(relPath, result.ContentHash)
+			if err := s.hashSet(relPath, result.ContentHash); err != nil {
+				log.Printf("[ainstruct-sync] Warning: hash update failed for %s: %v", relPath, err)
+			}
 		}
 		log.Printf("[ainstruct-sync] Updated: %s", relPath)
 	} else {
@@ -238,7 +261,9 @@ func (s *Syncer) syncFile(absPath string) error {
 			return fmt.Errorf("parsing POST response: %w (body: %s)", err, string(data))
 		}
 		if result.ContentHash != "" {
-			s.hashSet(relPath, result.ContentHash)
+			if err := s.hashSet(relPath, result.ContentHash); err != nil {
+				log.Printf("[ainstruct-sync] Warning: hash update failed for %s: %v", relPath, err)
+			}
 		}
 		log.Printf("[ainstruct-sync] Created: %s", relPath)
 	}
@@ -266,7 +291,9 @@ func (s *Syncer) deleteByPath(relPath string) error {
 		if s.authExpired {
 			return fmt.Errorf("auth expired")
 		}
-		s.hashDelete(relPath)
+		if err := s.hashDelete(relPath); err != nil {
+			log.Printf("[ainstruct-sync] Warning: hash delete failed for %s: %v", relPath, err)
+		}
 		log.Printf("[ainstruct-sync] Deleted: %s", relPath)
 	}
 	return nil
@@ -276,27 +303,16 @@ func (s *Syncer) deleteByPath(relPath string) error {
 // writes them to local paths, skipping files whose hash matches the remote.
 // On first run (no collection), it returns nil with no action.
 func (s *Syncer) pullCollection() error {
-	data, err := s.apiRequest("GET", "/collections", nil)
+	found, err := s.findCollection()
 	if err != nil {
-		return fmt.Errorf("listing collections: %w", err)
+		return err
 	}
-	log.Printf("[ainstruct-sync] Pull: GET /collections response: %s", string(data))
-	var cr collectionsResponse
-	if err := json.Unmarshal(data, &cr); err != nil {
-		return fmt.Errorf("parsing collections response: %w (body: %s)", err, string(data))
-	}
-	for _, c := range cr.Collections {
-		if c.Name == collectionName {
-			s.collectionID = c.CollectionID
-			break
-		}
-	}
-	if s.collectionID == "" {
+	if !found {
 		log.Println("[ainstruct-sync] No existing collection — nothing to pull")
 		return nil
 	}
 	log.Printf("[ainstruct-sync] Pulling documents from collection %s", s.collectionID)
-	data, err = s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
+	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
 	if err != nil {
 		return fmt.Errorf("listing documents: %w", err)
 	}
@@ -340,7 +356,9 @@ func (s *Syncer) pullCollection() error {
 			log.Printf("[ainstruct-sync] Failed to write %s: %v", relPath, err)
 			continue
 		}
-		s.hashSet(relPath, apiHash)
+		if err := s.hashSet(relPath, apiHash); err != nil {
+			log.Printf("[ainstruct-sync] Warning: hash update failed for %s: %v", relPath, err)
+		}
 		log.Printf("[ainstruct-sync] Pulled: %s", relPath)
 	}
 	return nil

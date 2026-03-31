@@ -25,6 +25,16 @@ func (s *Syncer) refreshTokenIfNeeded() error {
 	if remaining >= 60 {
 		return nil
 	}
+	return s.forceRefreshToken()
+}
+
+// forceRefreshToken unconditionally refreshes the access token using the
+// refresh token. Used when the API returns INVALID_TOKEN, overriding the
+// local expiry-based skip logic.
+func (s *Syncer) forceRefreshToken() error {
+	if s.refreshToken == "" {
+		return fmt.Errorf("no refresh token available")
+	}
 	reqBody, _ := json.Marshal(map[string]string{"refresh_token": s.refreshToken})
 	resp, err := s.client.Post(s.apiURL+"/auth/refresh", "application/json", bytes.NewReader(reqBody))
 	if err != nil {
@@ -71,10 +81,9 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
 	log.Printf("[ainstruct-sync] API %s %s => %d", method, path, resp.StatusCode)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Printf("[ainstruct-sync] API error response body: %s", string(respBody))
-		return nil, fmt.Errorf("API %s %s returned %d: %s", method, path, resp.StatusCode, string(respBody))
-	}
+
+	// Check for INVALID_TOKEN before the non-2xx early return so the
+	// retry path is reachable when the API returns 401 with this error.
 	var apiErr apiError
 	if json.Unmarshal(respBody, &apiErr) == nil && apiErr.Error == "INVALID_TOKEN" {
 		if s.refreshToken == "" {
@@ -82,7 +91,8 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 			s.authExpired = true
 			return nil, fmt.Errorf("INVALID_TOKEN and no refresh token")
 		}
-		if err := s.refreshTokenIfNeeded(); err != nil {
+		// Force refresh — the server explicitly told us the token is invalid.
+		if err := s.forceRefreshToken(); err != nil {
 			log.Println("[ainstruct-sync] Token refresh failed — stopping watcher")
 			s.authExpired = true
 			return nil, err
@@ -97,15 +107,25 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 			return nil, fmt.Errorf("reading retry response: %w", err)
 		}
 		log.Printf("[ainstruct-sync] API %s %s (retry) => %d", method, path, retryResp.StatusCode)
-		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
-			log.Printf("[ainstruct-sync] API retry error response body: %s", string(respBody))
-			return nil, fmt.Errorf("API %s %s (retry) returned %d: %s", method, path, retryResp.StatusCode, string(respBody))
-		}
-		if json.Unmarshal(respBody, &apiErr) == nil && apiErr.Error == "INVALID_TOKEN" {
+		// Check INVALID_TOKEN before non-2xx return for retry response too.
+		// Use a fresh variable — json.Unmarshal does not reset fields absent
+		// from the JSON, so reusing apiErr would keep the stale error value.
+		var retryTokenErr apiError
+		if json.Unmarshal(respBody, &retryTokenErr) == nil && retryTokenErr.Error == "INVALID_TOKEN" {
 			log.Println("[ainstruct-sync] Token invalid after refresh — stopping watcher")
 			s.authExpired = true
 			return nil, fmt.Errorf("INVALID_TOKEN after refresh")
 		}
+		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
+			log.Printf("[ainstruct-sync] API retry error response body: %s", string(respBody))
+			return nil, fmt.Errorf("API %s %s (retry) returned %d: %s", method, path, retryResp.StatusCode, string(respBody))
+		}
+		return respBody, nil
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("[ainstruct-sync] API error response body: %s", string(respBody))
+		return nil, fmt.Errorf("API %s %s returned %d: %s", method, path, resp.StatusCode, string(respBody))
 	}
 	return respBody, nil
 }
