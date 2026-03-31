@@ -1,3 +1,9 @@
+## [1.30.2](https://github.com/mbabic84/kilo-docker/compare/v1.30.1...v1.30.2) (2026-03-31)
+
+### Bug Fixes
+
+* SSH agent key loading, logging, and socket permissions ([f5e73ef](https://github.com/mbabic84/kilo-docker/commit/f5e73efe4876fb9a46d0fbeedcebf5949e29fae8))
+
 ## [1.30.1](https://github.com/mbabic84/kilo-docker/compare/v1.30.0...v1.30.1) (2026-03-31)
 
 ### Bug Fixes
