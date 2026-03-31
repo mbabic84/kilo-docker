@@ -33,4 +33,9 @@ if [ ! -s "$TARGET" ]; then
 fi
 
 chmod +x "$TARGET"
-exec "$TARGET" install "$@"
+
+# Pull Docker image during install
+if command -v docker >/dev/null 2>&1; then
+  echo "Pulling Docker image..."
+  docker pull ghcr.io/mbabic84/kilo-docker:latest 2>/dev/null || true
+fi
