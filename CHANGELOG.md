@@ -1,3 +1,9 @@
+## [1.32.0](https://github.com/mbabic84/kilo-docker/compare/v1.31.3...v1.32.0) (2026-03-31)
+
+### Features
+
+* **sessions:** add recreate command and fix attach/start error handling ([01da946](https://github.com/mbabic84/kilo-docker/commit/01da9467099ec241fa5eb9a63a39758771c3dd1f))
+
 ## [1.31.3](https://github.com/mbabic84/kilo-docker/compare/v1.31.2...v1.31.3) (2026-03-31)
 
 ### Bug Fixes
