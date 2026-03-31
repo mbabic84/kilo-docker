@@ -77,7 +77,20 @@ func runInit() error {
 
 		if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
 			if info, err := os.Stat(sshAuthSock); err == nil && info.Mode()&os.ModeSocket != 0 {
-				os.Chown(sshAuthSock, puid, pgid)
+				if err := os.Chown(sshAuthSock, puid, pgid); err != nil {
+					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to chown SSH socket: %v\n", err)
+				}
+				if err := os.Chmod(sshAuthSock, 0600); err != nil {
+					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to chmod SSH socket: %v\n", err)
+				}
+				if testFile, err := os.OpenFile(sshAuthSock, os.O_RDWR, 0); err != nil {
+					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH socket not accessible after fix: %v\n", err)
+				} else {
+					testFile.Close()
+					fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent socket ready: %s\n", sshAuthSock)
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
 			}
 		}
 
