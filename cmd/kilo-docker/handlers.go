@@ -5,32 +5,80 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
-// handleUpdate pulls the latest Docker image and optionally updates the
-// installed host script from the repository.
+// downloadFile downloads a file from url to dest, trying curl first then wget.
+func downloadFile(url, dest string) error {
+	cmd := exec.Command("curl", "-fsSL", url, "-o", dest)
+	if err := cmd.Run(); err == nil {
+		return nil
+	}
+	cmd = exec.Command("wget", "-q", "-O", dest, url)
+	if err := cmd.Run(); err == nil {
+		return nil
+	}
+	return fmt.Errorf("neither curl nor wget succeeded")
+}
+
+// getOSArch returns the OS and architecture for the current system.
+func getOSArch() (osName, arch string) {
+	osName = runtime.GOOS
+	arch = runtime.GOARCH
+	switch osName {
+	case "darwin", "linux":
+		// valid
+	default:
+		osName = "linux"
+	}
+	switch arch {
+	case "arm64", "aarch64":
+		arch = "arm64"
+	default: // amd64 and unknown default to amd64
+	}
+	return
+}
+
+// handleUpdate downloads the latest kilo-docker binary from GitHub releases
+// and pulls the latest Docker image.
 func handleUpdate() {
 	home, _ := os.UserHomeDir()
 	target := filepath.Join(home, ".local", "bin", "kilo-docker")
 
-	if _, err := os.Stat(target); err == nil {
-		fmt.Fprintf(os.Stderr, "Updating kilo-docker script...\n")
-		tempFile, _ := os.CreateTemp("", "kilo-docker-*")
-		tempFile.Close()
-
-		cmd := exec.Command("curl", "-fsSL", githubRawURL, "-o", tempFile.Name())
-		if cmd.Run() == nil {
-			os.Chmod(tempFile.Name(), 0755)
-			os.Rename(tempFile.Name(), target)
-			fmt.Fprintf(os.Stderr, "Script updated: %s\n", target)
-		} else {
-			os.Remove(tempFile.Name())
-			fmt.Fprintf(os.Stderr, "Warning: Failed to download script update.\n")
-		}
-	} else {
-		fmt.Fprintf(os.Stderr, "kilo-docker script is not installed locally.\n")
+	// Check if installed
+	if _, err := os.Stat(target); err != nil {
+		fmt.Fprintf(os.Stderr, "kilo-docker is not installed locally.\n")
 		fmt.Fprintf(os.Stderr, "Run 'kilo-docker install' to install it first.\n")
+	} else {
+		// Download latest binary from GitHub releases
+		osName, arch := getOSArch()
+		downloadURL := fmt.Sprintf("https://github.com/mbabic84/kilo-docker/releases/latest/download/kilo-docker-%s-%s", osName, arch)
+
+		fmt.Fprintf(os.Stderr, "Updating kilo-docker binary...\n")
+
+		tempFile, err := os.CreateTemp("", "kilo-docker-*")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to create temp file: %v\n", err)
+		} else {
+			tempPath := tempFile.Name()
+			tempFile.Close()
+
+			if err := downloadFile(downloadURL, tempPath); err != nil {
+				os.Remove(tempPath)
+				fmt.Fprintf(os.Stderr, "Error: Failed to download update: %v\n", err)
+			} else {
+				if err := os.Chmod(tempPath, 0755); err != nil {
+					os.Remove(tempPath)
+					fmt.Fprintf(os.Stderr, "Error: failed to set permissions: %v\n", err)
+				} else if err := os.Rename(tempPath, target); err != nil {
+					os.Remove(tempPath)
+					fmt.Fprintf(os.Stderr, "Error: failed to replace binary: %v\n", err)
+				} else {
+					fmt.Fprintf(os.Stderr, "Binary updated: %s\n", target)
+				}
+			}
+		}
 	}
 
 	if !dockerDaemonRunning() {
