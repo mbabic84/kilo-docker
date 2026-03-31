@@ -32,8 +32,8 @@ func TestGetServiceUnknown(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(builtInServices) != 2 {
-		t.Errorf("expected 2 built-in services, got %d", len(builtInServices))
+	if len(builtInServices) != 4 {
+		t.Errorf("expected 4 built-in services, got %d", len(builtInServices))
 	}
 }
 
@@ -76,5 +76,16 @@ func TestZellijServiceHasCopyConfigs(t *testing.T) {
 		if cfg.Dst == "" {
 			t.Error("expected CopyConfig Dst to be set")
 		}
+	}
+}
+
+func TestGoServiceHasInstallCommands(t *testing.T) {
+	svc := getService("go")
+	if svc == nil {
+		t.Fatal("go service not found")
+	}
+
+	if len(svc.Install) != 2 {
+		t.Errorf("expected 2 Install commands for go, got %d", len(svc.Install))
 	}
 }

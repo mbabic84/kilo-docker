@@ -62,8 +62,8 @@ func TestIsServiceEnabledEmpty(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(builtInServices) != 2 {
-		t.Errorf("expected 2 built-in services, got %d", len(builtInServices))
+	if len(builtInServices) != 4 {
+		t.Errorf("expected 4 built-in services, got %d", len(builtInServices))
 	}
 }
 
@@ -116,5 +116,28 @@ func TestZellijServiceHasRequiredFields(t *testing.T) {
 	}
 	if len(svc.CopyConfigs) == 0 {
 		t.Error("expected CopyConfigs to be set for zellij")
+	}
+}
+
+func TestGoServiceHasRequiredFields(t *testing.T) {
+	svc := getService("go")
+	if svc == nil {
+		t.Fatal("go service not found")
+	}
+
+	if svc.Name != "go" {
+		t.Errorf("expected Name 'go', got %q", svc.Name)
+	}
+	if svc.Flag != "--go" {
+		t.Errorf("expected Flag '--go', got %q", svc.Flag)
+	}
+	if len(svc.Install) != 2 {
+		t.Errorf("expected 2 Install commands for go, got %d", len(svc.Install))
+	}
+	if svc.RequiresSocket != "" {
+		t.Errorf("expected RequiresSocket to be empty for go, got %q", svc.RequiresSocket)
+	}
+	if _, ok := svc.EnvVars["GOPATH"]; !ok {
+		t.Error("expected GOPATH in EnvVars")
 	}
 }
