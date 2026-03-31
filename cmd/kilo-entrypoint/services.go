@@ -48,6 +48,12 @@ var builtInServices = []Service{
 			"echo 'export PATH=/usr/local/go/bin:$PATH' > /etc/profile.d/go.sh",
 		},
 	},
+	{
+		Name: "node",
+		Install: []string{
+			"command -v node >/dev/null || apk add --no-cache nodejs npm",
+		},
+	},
 }
 
 // getService returns the service with the given name, or nil if not found.

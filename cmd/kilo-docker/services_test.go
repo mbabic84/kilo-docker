@@ -62,8 +62,8 @@ func TestIsServiceEnabledEmpty(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(builtInServices) != 3 {
-		t.Errorf("expected 3 built-in services, got %d", len(builtInServices))
+	if len(builtInServices) != 4 {
+		t.Errorf("expected 4 built-in services, got %d", len(builtInServices))
 	}
 }
 

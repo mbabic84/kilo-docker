@@ -74,6 +74,19 @@ var builtInServices = []Service{
 		Volumes:        []string{},
 		RequiresSocket: "",
 	},
+	{
+		Name:        "node",
+		Flag:        "--node",
+		Description: "Install Node.js LTS for development",
+		Install: []string{
+			"command -v node >/dev/null || apk add --no-cache nodejs npm",
+		},
+		EnvVars: map[string]string{
+			"NODE_ENABLED": "1",
+		},
+		Volumes:        []string{},
+		RequiresSocket: "",
+	},
 }
 
 // getService returns the service with the given name, or nil if not found.
