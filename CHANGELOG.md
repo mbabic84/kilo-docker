@@ -1,3 +1,9 @@
+## [1.30.3](https://github.com/mbabic84/kilo-docker/compare/v1.30.2...v1.30.3) (2026-03-31)
+
+### Bug Fixes
+
+* MCP token storage and loading for encrypted volumes ([5c034df](https://github.com/mbabic84/kilo-docker/commit/5c034df746ed4376503a2bad807d291d7524f99a))
+
 ## [1.30.2](https://github.com/mbabic84/kilo-docker/compare/v1.30.1...v1.30.2) (2026-03-31)
 
 ### Bug Fixes
