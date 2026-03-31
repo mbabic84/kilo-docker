@@ -70,13 +70,15 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	}
 	defer syscall.Close(fd)
 
+	kiloConfigDir := filepath.Join(s.homeDir, ".config", "kilo")
 	watchDirs := []string{
-		filepath.Join(s.homeDir, ".config", "kilo", "rules"),
-		filepath.Join(s.homeDir, ".config", "kilo", "commands"),
-		filepath.Join(s.homeDir, ".config", "kilo", "agents"),
-		filepath.Join(s.homeDir, ".config", "kilo", "plugins"),
-		filepath.Join(s.homeDir, ".config", "kilo", "skills"),
-		filepath.Join(s.homeDir, ".config", "kilo", "tools"),
+		kiloConfigDir,
+		filepath.Join(kiloConfigDir, "rules"),
+		filepath.Join(kiloConfigDir, "commands"),
+		filepath.Join(kiloConfigDir, "agents"),
+		filepath.Join(kiloConfigDir, "plugins"),
+		filepath.Join(kiloConfigDir, "skills"),
+		filepath.Join(kiloConfigDir, "tools"),
 	}
 	for _, dir := range watchDirs {
 		os.MkdirAll(dir, 0o755)
@@ -94,33 +96,18 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 		wdToDir[int32(wd)] = dir
 	}
 
-	for _, dir := range watchDirs[:4] {
+	for _, dir := range watchDirs {
 		addWatch(dir)
-	}
-
-	skillsDir := watchDirs[4]
-	addWatch(skillsDir)
-	filepath.Walk(skillsDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if info.IsDir() && path != dir {
+				addWatch(path)
+			}
 			return nil
-		}
-		if info.IsDir() && path != skillsDir {
-			addWatch(path)
-		}
-		return nil
-	})
-
-	addWatch(watchDirs[5])
-	opencodePath := filepath.Join(s.homeDir, ".config", "kilo", "opencode.json")
-	if _, err := os.Stat(opencodePath); err == nil {
-		wd, err := unix.InotifyAddWatch(fd, opencodePath, unix.IN_MODIFY|unix.IN_DELETE|unix.IN_MOVED_TO|unix.IN_MOVED_FROM)
-		if err != nil {
-			log.Printf("[ainstruct-sync] Failed to watch opencode.json: %v", err)
-		} else {
-			wdToDir[int32(wd)] = filepath.Dir(opencodePath)
-		}
+		})
 	}
-
 	log.Println("[ainstruct-sync] Watcher started")
 	buf := make([]byte, 4096)
 	pending := make(map[string]*pendingEvent)
@@ -160,16 +147,23 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 			if dir == "" {
 				continue
 			}
-			var fullPath string
-			if dir == filepath.Join(s.homeDir, ".config", "kilo") && ev.name == "opencode.json" {
-				fullPath = opencodePath
-			} else {
-				fullPath = filepath.Join(dir, ev.name)
+			fullPath := filepath.Join(dir, ev.name)
+
+			// Only sync opencode.json from the parent kilo config dir;
+			// skip other files like .ainstruct-hashes.
+			if dir == kiloConfigDir && ev.name != "opencode.json" {
+				continue
 			}
 
-			if ev.mask&unix.IN_ISDIR != 0 && ev.mask&unix.IN_CREATE != 0 && strings.HasPrefix(dir, skillsDir) {
+		if ev.mask&unix.IN_ISDIR != 0 {
+			// Directory events (create/modify/delete/move) are not syncable
+			// files. For new directories under any watched dir, add a watch
+			// so we track future file changes inside them, then skip the event.
+			if ev.mask&unix.IN_CREATE != 0 {
 				addWatch(fullPath)
 			}
+			continue
+		}
 
 			var eventType string
 			if ev.mask&(unix.IN_DELETE|unix.IN_MOVED_FROM) != 0 {

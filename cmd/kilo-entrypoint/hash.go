@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,10 +28,12 @@ func (s *Syncer) hashGet(relPath string) string {
 
 // hashSet stores or updates the content hash for a relative file path.
 // Appends a new entry if the path isn't already tracked.
-func (s *Syncer) hashSet(relPath, hash string) {
+func (s *Syncer) hashSet(relPath, hash string) error {
 	s.hashMu.Lock()
 	defer s.hashMu.Unlock()
-	os.MkdirAll(filepath.Dir(s.hashFile), 0o755)
+	if err := os.MkdirAll(filepath.Dir(s.hashFile), 0o755); err != nil {
+		return fmt.Errorf("creating hash directory: %w", err)
+	}
 	var lines []string
 	prefix := relPath + "="
 	found := false
@@ -49,17 +53,21 @@ func (s *Syncer) hashSet(relPath, hash string) {
 	if !found {
 		lines = append(lines, prefix+hash)
 	}
-	os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
+	if err := os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		log.Printf("[ainstruct-sync] Failed to write hash file %s: %v", s.hashFile, err)
+		return fmt.Errorf("writing hash file: %w", err)
+	}
+	return nil
 }
 
 // hashDelete removes the cached content hash for a relative file path.
 // No-op if the path isn't tracked or the hash file doesn't exist.
-func (s *Syncer) hashDelete(relPath string) {
+func (s *Syncer) hashDelete(relPath string) error {
 	s.hashMu.Lock()
 	defer s.hashMu.Unlock()
 	data, err := os.ReadFile(s.hashFile)
 	if err != nil {
-		return
+		return nil
 	}
 	prefix := relPath + "="
 	var lines []string
@@ -69,5 +77,9 @@ func (s *Syncer) hashDelete(relPath string) {
 		}
 		lines = append(lines, line)
 	}
-	os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644)
+	if err := os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		log.Printf("[ainstruct-sync] Failed to write hash file %s: %v", s.hashFile, err)
+		return fmt.Errorf("writing hash file: %w", err)
+	}
+	return nil
 }

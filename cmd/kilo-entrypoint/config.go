@@ -7,9 +7,8 @@ import (
 	"path/filepath"
 )
 
-// runConfig toggles MCP server enabled/disabled state in opencode.json
-// based on environment variables. It patches both the user config and
-// any workspace config so Kilo reads the correct state regardless of CWD.
+// runConfig toggles MCP server enabled/disabled state in the user's
+// opencode.json based on environment variables.
 func runConfig() error {
 	mapping := map[string]string{
 		"ainstruct": "KD_AINSTRUCT_TOKEN",
@@ -18,15 +17,9 @@ func runConfig() error {
 
 	playwrightEnabled := os.Getenv("PLAYWRIGHT_ENABLED") == "1"
 
-	configPaths := []string{
-		filepath.Join(os.Getenv("HOME"), ".config", "kilo", "opencode.json"),
-		filepath.Join(os.Getenv("PWD"), "configs", "opencode.json"),
-	}
-
-	for _, configPath := range configPaths {
-		if err := applyConfigFilter(configPath, mapping, playwrightEnabled); err != nil {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: config error for %s: %v\n", configPath, err)
-		}
+	configPath := filepath.Join(os.Getenv("HOME"), ".config", "kilo", "opencode.json")
+	if err := applyConfigFilter(configPath, mapping, playwrightEnabled); err != nil {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: config error for %s: %v\n", configPath, err)
 	}
 	return nil
 }
