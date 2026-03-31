@@ -53,9 +53,14 @@ func dockerRun(args ...string) (string, error) {
 // dockerRunWithStdin executes a docker command with the given input piped to
 // its stdin. Returns trimmed combined output and an error if the command fails.
 // If the first argument is not a recognized docker subcommand, "run --rm"
-// is automatically prepended.
+// is automatically prepended. The -i flag is always added so Docker keeps
+// stdin open and the input data reaches the container process.
 func dockerRunWithStdin(input string, args ...string) (string, error) {
 	args = ensureRunArgs(args)
+	// Insert -i after "run" (or "run --rm") so Docker attaches stdin.
+	// Without -i, docker run ignores stdin entirely and the container
+	// process receives empty input regardless of cmd.Stdin.
+	args = append(args[:2], append([]string{"-i"}, args[2:]...)...)
 	cmd := exec.Command("docker", args...)
 	cmd.Stdin = strings.NewReader(input)
 	output, err := cmd.CombinedOutput()

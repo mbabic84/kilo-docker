@@ -2,30 +2,64 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
 // loadTokens reads API tokens from the Docker volume. If encrypted is true,
 // it reads the encrypted file and decrypts it on the host (crypto never runs
 // inside the container). Returns (context7Token, ainstructToken).
+//
+// Returns ("", "") if tokens don't exist or if the user previously skipped
+// token entry (indicated by a .tokens.skip marker file).
 func loadTokens(image, volume string, encrypted bool, password string) (string, string) {
 	const kiloHome = "/home/kilo-t8x3m7kp"
 	volumeMount := volume + ":" + kiloHome
 
 	if encrypted {
+		// Check for skip marker first — user previously declined token entry
+		skipOutput, skipErr := dockerRun(
+			"-v", volumeMount,
+			image,
+			"cat", kiloHome+"/.local/share/kilo/.tokens.skip",
+		)
+		if skipErr == nil && skipOutput != "" {
+			return "", ""
+		}
+
 		output, err := dockerRun(
 			"-v", volumeMount,
 			image,
 			"cat", kiloHome+"/.local/share/kilo/.tokens.env.enc",
 		)
-		if err != nil || output == "" {
+		if err != nil {
+			// File doesn't exist or docker error — tokens not yet configured
+			return "", ""
+		}
+		if output == "" {
+			// 0-byte file — corrupted state from a previous failed run.
+			// Clean it up so future saves work correctly.
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: found empty token file, cleaning up.\n")
+			dockerRun("-v", volumeMount, image,
+				"rm", "-f", kiloHome+"/.local/share/kilo/.tokens.env.enc")
 			return "", ""
 		}
 		decrypted, err := decryptAES([]byte(output), password)
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to decrypt tokens (wrong account?): %v\n", err)
 			return "", ""
 		}
 		return parseTokenEnv(string(decrypted))
+	}
+
+	// Check for skip marker in non-encrypted mode
+	skipOutput, skipErr := dockerRun(
+		"-v", volumeMount,
+		image,
+		"cat", kiloHome+"/.local/share/kilo/.tokens.skip",
+	)
+	if skipErr == nil && skipOutput != "" {
+		return "", ""
 	}
 
 	output, err := dockerRun(
@@ -41,6 +75,7 @@ func loadTokens(image, volume string, encrypted bool, password string) (string, 
 
 // saveTokens writes API tokens to the Docker volume. If encrypted is true,
 // the tokens are AES-256-CBC encrypted on the host before writing.
+// Also removes any existing skip marker since the user has now provided tokens.
 func saveTokens(image, volume string, token1, token2 string, encrypted bool, password string) error {
 	const kiloHome = "/home/kilo-t8x3m7kp"
 	volumeMount := volume + ":" + kiloHome
@@ -52,11 +87,20 @@ func saveTokens(image, volume string, token1, token2 string, encrypted bool, pas
 			return err
 		}
 		encPath := kiloHome + "/.local/share/kilo/.tokens.env.enc"
+		uid := os.Getuid()
+		gid := os.Getgid()
 		_, err = dockerRunWithStdin(string(encData),
 			"-v", volumeMount,
 			image,
-			"sh", "-c", fmt.Sprintf("mkdir -p \"$(dirname '%s')\" && cat > '%s' && chmod 600 '%s'", encPath, encPath, encPath),
+			"sh", "-c", fmt.Sprintf(
+				"mkdir -p \"$(dirname '%s')\" && cat > '%s' && chmod 600 '%s' && chown %d:%d '%s'",
+				encPath, encPath, encPath, uid, gid, encPath),
 		)
+		// Remove skip marker if tokens were saved successfully
+		if err == nil {
+			dockerRun("-v", volumeMount, image,
+				"rm", "-f", kiloHome+"/.local/share/kilo/.tokens.skip")
+		}
 		return err
 	}
 
