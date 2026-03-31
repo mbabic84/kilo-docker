@@ -1,3 +1,9 @@
+## [1.31.3](https://github.com/mbabic84/kilo-docker/compare/v1.31.2...v1.31.3) (2026-03-31)
+
+### Bug Fixes
+
+* remove kilo-docker install command, simplify install.sh flow ([2f9568e](https://github.com/mbabic84/kilo-docker/commit/2f9568e13256be02c39e80cd0145422e8be89bd5))
+
 ## [1.31.2](https://github.com/mbabic84/kilo-docker/compare/v1.31.1...v1.31.2) (2026-03-31)
 
 ### Bug Fixes
