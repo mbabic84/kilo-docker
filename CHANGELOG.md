@@ -1,3 +1,9 @@
+## [1.31.2](https://github.com/mbabic84/kilo-docker/compare/v1.31.1...v1.31.2) (2026-03-31)
+
+### Bug Fixes
+
+* download kilo-docker binary from GitHub releases on update ([ca40087](https://github.com/mbabic84/kilo-docker/commit/ca40087474840810fa2e1c55f0621c230c0913d5))
+
 ## [1.31.1](https://github.com/mbabic84/kilo-docker/compare/v1.31.0...v1.31.1) (2026-03-31)
 
 ### Bug Fixes
