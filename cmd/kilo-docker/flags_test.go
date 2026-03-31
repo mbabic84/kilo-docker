@@ -80,8 +80,8 @@ func TestParseFlagsYesWithOtherFlags(t *testing.T) {
 	if !cfg.mcp {
 		t.Error("expected cfg.mcp = true")
 	}
-	if !cfg.docker {
-		t.Error("expected cfg.docker = true")
+	if !isServiceEnabled(cfg, "docker") {
+		t.Error("expected docker service to be enabled")
 	}
 	if cfg.command != "install" {
 		t.Errorf("expected command = %q, got %q", "install", cfg.command)

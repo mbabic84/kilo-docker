@@ -18,8 +18,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **Ainstruct file sync** - `--ainstruct` flag enables automatic push/pull sync of config files, commands, agents, and instructions via the Ainstruct API
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
-- **Docker access** - `--docker` flag mounts the host Docker socket for container management from within Kilo
-- **Zellij sessions** - `--zellij` flag starts a Zellij terminal multiplexer session
+- **Built-in services** - Extensible service system with `--docker`, `--zellij` and more (see [Built-in Services](#built-in-services))
 
 ## Quick Start
 
@@ -170,22 +169,6 @@ The sidecar runs headless Chromium in HTTP mode on port 8931 inside a dedicated 
 
 Screenshots and other output files are saved to `.playwright-mcp/` in the workspace directory.
 
-## Docker Socket Access
-
-The `--docker` flag mounts the host Docker socket into the container, allowing Kilo to manage containers, images, and networks from within the session:
-
-```bash
-# Interactive with Docker access
-kilo-docker --docker
-
-# Autonomous with Docker access
-kilo-docker --once --docker run "list running containers and check their logs"
-```
-
-The Docker CLI and Compose plugin are installed at runtime inside the container. The socket's group ownership is dynamically matched so `docker` commands work without `sudo`.
-
-> **Security:** Mounting the Docker socket grants full Docker API access inside the container, which is equivalent to root access on the host. Only use `--docker` in trusted environments.
-
 ## SSH Agent Forwarding
 
 Use the `--ssh` flag to enable SSH agent forwarding. The host binary detects whether an SSH agent is running on the host:
@@ -201,25 +184,25 @@ kilo-docker --ssh
 
 > **Security:** Private keys never enter the container. The container communicates with the host's SSH agent via a Unix socket.
 
-## Zellij Sessions
+## Services
 
-The `--zellij` flag starts a [Zellij](https://zellij.dev/) terminal multiplexer session:
+Kilo Docker uses a data-driven service architecture. Services are defined as structured data, making it easy to add new capabilities without modifying core logic.
 
-```bash
-# Interactive with Zellij
-kilo-docker --zellij
-```
+### How Services Work
 
-Run `kilo` inside the session to start Kilo. Zellij is installed at runtime from the latest GitHub release. Pane frames, startup tips, and release notes are hidden by default.
+Each service can specify:
 
-### Key Bindings
+- **CLI flag** — enabling the service
+- **Installation commands** — shell commands run inside the container at startup
+- **Environment variables** — passed to the container
+- **Host environment variables** — values sourced from the host
+- **Volumes** — filesystem paths mounted from the host
+- **Required socket** — optional host socket path for validation
+- **Config files** — optional files copied from container to user home
 
-| Action | Keys |
-|--------|------|
-| Enter session mode | `Ctrl+P` (pane), `Ctrl+T` (tab), `Ctrl+N` (resize) |
-| Quit | `Ctrl+Q` |
+When you pass a service flag, the host binary validates required host resources, collects socket GIDs, builds the `KD_SERVICES` env var, and mounts required volumes.
 
-Zellij configuration is stored in `configs/zellij.kdl` and copied to the container at runtime.
+Inside the container, the entrypoint reads `KD_SERVICES`, runs installation commands, copies config files, and sets environment variables.
 
 ## Data Persistence
 
@@ -364,6 +347,52 @@ The build uses a multi-stage Dockerfile: a `golang:1.26-alpine` builder compiles
 
 ## Project Structure
 
+```
+├── Dockerfile                     # Multi-stage build (Go builder + Alpine runtime)
+├── go.mod                         # Go module definition
+├── go.sum                         # Go dependency checksums
+├── cmd/
+│   ├── kilo-docker/               # Host-side CLI (21 files)
+│   │   ├── main.go                # CLI dispatch + container launch
+│   │   ├── flags.go               # Config struct, flag parsing
+│   │   ├── args.go                # Docker run argument builder
+│   │   ├── services.go             # Service definitions (docker, zellij, ...)
+│   │   ├── handlers.go            # install, update, cleanup, init, update-config
+│   │   ├── handle_sessions.go     # session list/attach/cleanup
+│   │   ├── handle_backup.go       # backup/restore handlers
+│   │   ├── setup.go               # resolveVolume, isTerminal, help
+│   │   ├── docker.go              # Docker CLI wrappers (run, exec, cp)
+│   │   ├── crypto.go              # AES-256-CBC with PBKDF2 (OpenSSL-compatible)
+│   │   ├── volume.go              # Volume name derivation, CRUD
+│   │   ├── tokens.go              # Token load/save (plaintext + encrypted)
+│   │   ├── ainstruct.go           # Login prompts, auth flow
+│   │   ├── playwright.go          # Playwright MCP sidecar management
+│   │   ├── ssh.go                 # SSH agent detection and forwarding
+│   │   ├── network.go             # Docker network selection
+│   │   ├── terminal.go            # Terminal reset after docker attach
+│   │   ├── session.go             # Session data model
+│   │   ├── install.go             # copyFile utility
+│   │   └── backup.go              # backup/restore via docker exec
+│   └── kilo-entrypoint/           # Container entrypoint (13 files)
+│       ├── main.go                 # Subcommand dispatcher
+│       ├── init.go                 # Container init (user setup, service installation, privilege drop)
+│       ├── services.go             # Service definitions (matches kilo-docker)
+│       ├── config.go               # MCP server toggling from env vars
+│       ├── loadsave.go             # Token load/save subcommands
+│       ├── login.go                # Ainstruct HTTP login + profile fetch
+│       ├── updatecfg.go            # Config template download + JSON merge
+│       ├── backup.go               # tar.gz backup/restore subcommands
+│       ├── sync.go                 # Ainstruct sync entry point
+│       ├── sync_content.go         # Collection/document sync, Syncer struct
+│       ├── api.go                  # REST client with JWT refresh
+│       ├── watcher.go              # inotify file watcher with 5s debounce
+│       └── hash.go                 # Hash tracking for sync
+├── configs/
+│   ├── opencode.json              # Kilo config for base image
+│   └── zellij.kdl                 # Zellij config (keybinds, pane settings)
+└── scripts/
+    ├── build.sh                   # Go build helper (via Docker)
+    └── install.sh                  # Bootstrap installer (curl | sh)
 ```
 ├── Dockerfile                     # Multi-stage build (Go builder + Alpine runtime)
 ├── go.mod                         # Go module definition

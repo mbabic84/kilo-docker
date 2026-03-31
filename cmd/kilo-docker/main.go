@@ -74,7 +74,7 @@ func main() {
 }
 
 // runContainer orchestrates the full container launch: SSH setup, token loading,
-// Docker socket detection, volume resolution, Playwright sidecar, and finally
+// Service socket detection, volume resolution, Playwright sidecar, and finally
 // exec'ing into the container.
 func runContainer(cfg config) {
 	if !dockerDaemonRunning() {
@@ -93,16 +93,23 @@ func runContainer(cfg config) {
 		}
 	}
 
-	// Docker socket
-	dockerGID := ""
-	if cfg.docker {
-		if _, err := os.Stat("/var/run/docker.sock"); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Error: /var/run/docker.sock not found. Is Docker running?\n")
+	// Collect host env vars needed by enabled services
+	hostEnvVars := make(map[string]string)
+	for _, svcName := range cfg.enabledServices {
+		svc := getService(svcName)
+		if svc == nil || svc.RequiresSocket == "" {
+			continue
+		}
+		if _, err := os.Stat(svc.RequiresSocket); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Error: %s not found. Is the host socket available?\n", svc.RequiresSocket)
 			os.Exit(1)
 		}
-		info, _ := os.Stat("/var/run/docker.sock")
+		info, _ := os.Stat(svc.RequiresSocket)
 		if info != nil {
-			dockerGID = strconv.FormatUint(uint64(info.Sys().(*syscall.Stat_t).Gid), 10)
+			gid := strconv.FormatUint(uint64(info.Sys().(*syscall.Stat_t).Gid), 10)
+			for key := range svc.HostEnvVars {
+				hostEnvVars[key] = gid
+			}
 		}
 	}
 
@@ -222,9 +229,9 @@ func runContainer(cfg config) {
 		}
 	}
 
-	// Build docker args
-	dockerArgs := buildDockerArgs(cfg, dataVolume, pwd, containerName, containerState,
-		sshAuthSock, dockerGID, kdContext7Token, kdAinstructToken,
+	// Build container args
+	containerArgs := buildContainerArgs(cfg, dataVolume, pwd, containerName, containerState,
+		sshAuthSock, hostEnvVars, kdContext7Token, kdAinstructToken,
 		ainstructSyncToken, ainstructSyncRefreshToken, ainstructSyncTokenExpiry)
 
 	// Clear sensitive data
@@ -250,7 +257,7 @@ func runContainer(cfg config) {
 		}
 		resetTerminal()
 	} else {
-		runArgs := buildRunArgs(dockerArgs, image, cfg.args, isTerminal())
+		runArgs := buildRunArgs(containerArgs, image, cfg.args, isTerminal())
 		execDocker(runArgs...)
 	}
 }
@@ -258,14 +265,14 @@ func runContainer(cfg config) {
 // buildRunArgs constructs the argument list for an interactive docker run
 // command. The returned slice starts with "run", followed by the interactive
 // flags (-it or -i), then the docker args, image, and any extra args.
-func buildRunArgs(dockerArgs []string, image string, extraArgs []string, terminal bool) []string {
+func buildRunArgs(containerArgs []string, image string, extraArgs []string, terminal bool) []string {
 	args := []string{"run"}
 	if terminal {
 		args = append(args, "-it")
 	} else {
 		args = append(args, "-i")
 	}
-	args = append(args, dockerArgs...)
+	args = append(args, containerArgs...)
 	args = append(args, image)
 	args = append(args, extraArgs...)
 	return args

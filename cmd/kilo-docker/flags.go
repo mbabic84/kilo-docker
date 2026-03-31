@@ -16,19 +16,18 @@ var autoConfirm bool
 
 // config holds parsed CLI flags for the host binary.
 type config struct {
-	once        bool
-	encrypted   bool
-	ainstruct   bool
-	playwright  bool
-	docker      bool
-	zellij      bool
-	ssh         bool
-	mcp         bool
-	yes         bool
-	network     string
-	networkFlag bool
-	command     string
-	args        []string
+	once            bool
+	encrypted       bool
+	ainstruct       bool
+	playwright      bool
+	ssh             bool
+	mcp             bool
+	yes             bool
+	network         string
+	networkFlag     bool
+	command         string
+	args            []string
+	enabledServices []string // Names of enabled services from builtInServices
 }
 
 // parseArgs parses the given arguments into a config struct.
@@ -46,10 +45,6 @@ func parseArgs(args []string) config {
 			cfg.encrypted = true
 		case "--playwright":
 			cfg.playwright = true
-		case "--docker":
-			cfg.docker = true
-		case "--zellij":
-			cfg.zellij = true
 		case "--ssh":
 			cfg.ssh = true
 		case "--mcp":
@@ -66,10 +61,20 @@ func parseArgs(args []string) config {
 			fmt.Println(version)
 			os.Exit(0)
 		default:
-			if cfg.command == "" {
-				cfg.command = args[i]
-			} else {
-				cfg.args = append(cfg.args, args[i])
+			matched := false
+			for _, svc := range builtInServices {
+				if args[i] == svc.Flag {
+					cfg.enabledServices = append(cfg.enabledServices, svc.Name)
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				if cfg.command == "" {
+					cfg.command = args[i]
+				} else {
+					cfg.args = append(cfg.args, args[i])
+				}
 			}
 		}
 	}
