@@ -58,8 +58,6 @@ func main() {
 		handleSessions(cfg)
 	case "update":
 		handleUpdate()
-	case "install":
-		handleInstall()
 	case "cleanup":
 		handleCleanup()
 	case "backup":

@@ -91,65 +91,6 @@ func handleUpdate() {
 	fmt.Fprintf(os.Stderr, "\nUpdate complete.\n")
 }
 
-// handleInstall installs kilo-docker as a global command by creating a
-// symlink (or copy) in ~/.local/bin and pulling the Docker image.
-func handleInstall() {
-	home, _ := os.UserHomeDir()
-	target := filepath.Join(home, ".local", "bin", "kilo-docker")
-
-	sourceScript, _ := os.Executable()
-	os.MkdirAll(filepath.Dir(target), 0755)
-
-	if info, err := os.Lstat(target); err == nil {
-		if info.Mode()&os.ModeSymlink != 0 {
-			fmt.Fprintf(os.Stderr, "kilo-docker is already installed at %s\n", target)
-			fmt.Fprintf(os.Stderr, "Updating symlink...\n")
-			os.Remove(target)
-		} else {
-			fmt.Fprintf(os.Stderr, "kilo-docker already exists at %s\n", target)
-			if !promptConfirm("Replace it? [y/N]: ") {
-				fmt.Fprintf(os.Stderr, "Aborted.\n")
-				return
-			}
-			os.Remove(target)
-		}
-	}
-
-	if err := os.Symlink(sourceScript, target); err != nil {
-		if err := copyFile(sourceScript, target); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: failed to install binary: %v\n", err)
-			os.Exit(1)
-		}
-	}
-	os.Chmod(target, 0755)
-
-	path := os.Getenv("PATH")
-	if !strings.Contains(path, filepath.Join(home, ".local", "bin")) {
-		fmt.Fprintf(os.Stderr, "\nWarning: %s is not on your PATH.\n", filepath.Join(home, ".local", "bin"))
-		fmt.Fprintf(os.Stderr, "Add the following line to your ~/.bashrc (or ~/.zshrc):\n")
-		fmt.Fprintf(os.Stderr, "  export PATH=\"$HOME/.local/bin:$PATH\"\n")
-	}
-
-	// Verify the binary runs before reporting success.
-	if out, err := exec.Command(target, "--version").CombinedOutput(); err != nil {
-		fmt.Fprintf(os.Stderr, "\nWarning: installed binary failed --version check: %v\n", err)
-		if len(out) > 0 {
-			fmt.Fprintf(os.Stderr, "  %s\n", strings.TrimSpace(string(out)))
-		}
-	}
-
-	if !dockerDaemonRunning() {
-		fmt.Fprintf(os.Stderr, "\nWarning: Docker daemon is not running. Skipping image pull.\n")
-		fmt.Fprintf(os.Stderr, "Run 'docker pull %s:latest' after starting Docker.\n", repoURL)
-	} else {
-		fmt.Fprintf(os.Stderr, "\nPulling Docker image...\n")
-		dockerRun("pull", repoURL+":latest")
-	}
-
-	fmt.Fprintf(os.Stderr, "\nInstalled successfully: %s -> %s\n", target, sourceScript)
-	fmt.Fprintf(os.Stderr, "Run 'kilo-docker' from any directory.\n")
-}
-
 // handleCleanup removes all kilo-docker artifacts: containers, volumes,
 // Docker images, and the installed script.
 func handleCleanup() {
