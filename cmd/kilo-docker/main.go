@@ -144,6 +144,22 @@ func runContainer(cfg config) {
 		ainstructSyncRefreshToken = result.RefreshToken
 		ainstructSyncTokenExpiry = result.ExpiresIn
 		os.Setenv("VOLUME_PASSWORD", result.UserID)
+
+		// MCP token loading/prompting after volume is available
+		if cfg.mcp {
+			password := result.UserID
+			token1, token2 := loadTokens(repoURL+":latest", dataVolume, true, password)
+			if token1 != "" {
+				kdContext7Token = token1
+			}
+			if token2 != "" {
+				kdAinstructToken = token2
+			}
+
+			if kdContext7Token == "" || kdAinstructToken == "" {
+				promptMissingTokens(dataVolume, true, password)
+			}
+		}
 	}
 
 	// Playwright
