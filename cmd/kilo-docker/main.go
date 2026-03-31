@@ -238,10 +238,16 @@ func runContainer(cfg config) {
 	// Run
 	image := repoURL + ":latest"
 	if containerState == "running" {
-		execDockerAttach("attach", containerName)
+		if err := execDockerAttach("attach", containerName); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 		resetTerminal()
 	} else if containerState == "exited" || containerState == "created" {
-		execDockerAttach("start", "-ai", containerName)
+		if err := execDockerAttach("start", "-ai", containerName); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 		resetTerminal()
 	} else {
 		runArgs := buildRunArgs(dockerArgs, image, cfg.args, isTerminal())

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -83,10 +84,13 @@ func runInit() error {
 				if err := os.Chmod(sshAuthSock, 0600); err != nil {
 					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to chmod SSH socket: %v\n", err)
 				}
-				if testFile, err := os.OpenFile(sshAuthSock, os.O_RDWR, 0); err != nil {
+				// Use net.DialTimeout instead of os.OpenFile to test socket connectivity.
+				// os.OpenFile with O_RDWR can falsely fail on Unix sockets even when
+				// they are fully functional for SSH agent communication.
+				if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
 					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH socket not accessible after fix: %v\n", err)
 				} else {
-					testFile.Close()
+					conn.Close()
 					fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent socket ready: %s\n", sshAuthSock)
 				}
 			} else {

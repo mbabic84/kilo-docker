@@ -31,10 +31,9 @@ type config struct {
 	args        []string
 }
 
-// parseFlags parses os.Args into a config struct.
-func parseFlags() config {
+// parseArgs parses the given arguments into a config struct.
+func parseArgs(args []string) config {
 	var cfg config
-	args := os.Args[1:]
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -76,4 +75,9 @@ func parseFlags() config {
 	}
 
 	return cfg
+}
+
+// parseFlags parses os.Args into a config struct.
+func parseFlags() config {
+	return parseArgs(os.Args[1:])
 }

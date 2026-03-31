@@ -10,7 +10,7 @@ usage() {
     echo "Commands:"
     echo "  build-entrypoint   Build kilo-entrypoint binary"
     echo "  build-host         Build kilo-docker host binary"
-    echo "  build-all          Build both binaries"
+    echo "  build-all          Build both binaries and Docker image"
     echo "  test               Run Go tests"
     echo "  tidy               Run go mod tidy"
     echo "  docker-build       Build Docker image"
@@ -64,6 +64,10 @@ case "$COMMAND" in
         run_go_env go build -ldflags="-s -w" -o /build/bin/kilo-entrypoint ./cmd/kilo-entrypoint
         run_go_env go build -ldflags="-s -w" -o /build/bin/kilo-docker ./cmd/kilo-docker
         echo "Binaries: bin/kilo-entrypoint, bin/kilo-docker"
+        echo ""
+        echo "Building Docker image..."
+        docker build -t ghcr.io/mbabic84/kilo-docker:latest "${PROJECT_DIR}"
+        echo "Image: ghcr.io/mbabic84/kilo-docker:latest"
         ;;
     test)
         echo "Running tests..."

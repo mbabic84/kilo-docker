@@ -11,8 +11,16 @@ import (
 // (authSock, agentRunning, agentStartedByUs). If SSH_AUTH_SOCK is already
 // set and points to a valid socket, it reuses it. Otherwise, it starts a new
 // ssh-agent, discovers private keys in ~/.ssh, and adds them.
+//
+// The socket is placed in ~/.ssh/kilo/agent.sock (a persistent path) rather
+// than a temp directory so that bind mounts in the container survive across
+// SSH agent restarts.
 func setupSSH() (string, bool, bool) {
 	sshDir := os.Getenv("HOME") + "/.ssh"
+	// Persistent socket path — the parent directory must exist before
+	// ssh-agent -a is called, and must be creatable by us.
+	socketDir := sshDir + "/kilo"
+	socketPath := socketDir + "/agent.sock"
 
 	sshAuthSock := os.Getenv("SSH_AUTH_SOCK")
 	if sshAuthSock != "" {
@@ -26,22 +34,25 @@ func setupSSH() (string, bool, bool) {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
 	}
 
-	output, err := exec.Command("ssh-agent", "-s").CombinedOutput()
+	// Ensure the socket directory exists (persistent across restarts).
+	if err := os.MkdirAll(socketDir, 0700); err != nil {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to create socket dir %s: %v\n", socketDir, err)
+		return "", false, false
+	}
+
+	// Start ssh-agent with a fixed socket path so the bind mount source
+	// path is always valid, even after the container is restarted.
+	output, err := exec.Command("ssh-agent", "-a", socketPath).CombinedOutput()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to start ssh-agent: %v\n", err)
 		return "", false, false
 	}
 
-	var newSock, newPid string
+	var newPid string
 	for _, segment := range strings.Split(string(output), ";") {
 		segment = strings.TrimSpace(segment)
 		segment = strings.TrimPrefix(segment, "export ")
-		if strings.HasPrefix(segment, "SSH_AUTH_SOCK=") {
-			parts := strings.SplitN(segment, "=", 2)
-			if len(parts) == 2 {
-				newSock = strings.TrimSpace(parts[1])
-			}
-		} else if strings.HasPrefix(segment, "SSH_AGENT_PID=") {
+		if strings.HasPrefix(segment, "SSH_AGENT_PID=") {
 			parts := strings.SplitN(segment, "=", 2)
 			if len(parts) == 2 {
 				newPid = strings.TrimSpace(parts[1])
@@ -49,15 +60,11 @@ func setupSSH() (string, bool, bool) {
 		}
 	}
 
-	if newSock != "" {
-		os.Setenv("SSH_AUTH_SOCK", newSock)
-		os.Setenv("SSH_AGENT_PID", newPid)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent started (pid=%s)\n", newPid)
-		loadSSHKeys(sshDir)
-		return newSock, true, true
-	}
-
-	return "", false, false
+	os.Setenv("SSH_AUTH_SOCK", socketPath)
+	os.Setenv("SSH_AGENT_PID", newPid)
+	fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent started (pid=%s, socket=%s)\n", newPid, socketPath)
+	loadSSHKeys(sshDir)
+	return socketPath, true, true
 }
 
 // loadSSHKeys reads private keys from the given ssh directory and adds them

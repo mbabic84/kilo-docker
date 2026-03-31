@@ -117,6 +117,7 @@ Commands:
   run "prompt"      Run Kilo in autonomous mode with a prompt
   sessions [name]       List sessions or attach to one by name/index
   sessions cleanup [-y|-a] [name]  Remove a session (-y: skip confirm, -a: all exited)
+  sessions recreate <name|index>  Recreate a session with the same flags (preserves volume)
   networks          List available Docker networks
   backup [-f]       Create backup of volume to tar.gz (auto-names with timestamp)
   restore <file> [-f] [--volume <name>]  Restore volume from backup
@@ -151,6 +152,7 @@ Examples:
   kilo-docker --ssh                              # with SSH agent forwarding
   kilo-docker --zellij                           # start/reattach Zellij container
   kilo-docker sessions                           # list all sessions
+  kilo-docker sessions recreate 1                # recreate session with same flags
   kilo-docker backup                             # create backup
   kilo-docker restore backup.tar.gz              # restore from backup
 `
