@@ -130,6 +130,13 @@ func runContainer(cfg config) {
 
 		if kdContext7Token == "" || kdAinstructToken == "" {
 			promptMissingTokens(dataVolume, cfg.encrypted || cfg.ainstruct, password)
+			// Refresh local vars from env (promptMissingTokens uses os.Setenv)
+			if kdContext7Token == "" {
+				kdContext7Token = os.Getenv("KD_CONTEXT7_TOKEN")
+			}
+			if kdAinstructToken == "" {
+				kdAinstructToken = os.Getenv("KD_AINSTRUCT_TOKEN")
+			}
 		}
 	}
 
@@ -158,6 +165,13 @@ func runContainer(cfg config) {
 
 			if kdContext7Token == "" || kdAinstructToken == "" {
 				promptMissingTokens(dataVolume, true, password)
+				// Refresh local vars from env (promptMissingTokens uses os.Setenv)
+				if kdContext7Token == "" {
+					kdContext7Token = os.Getenv("KD_CONTEXT7_TOKEN")
+				}
+				if kdAinstructToken == "" {
+					kdAinstructToken = os.Getenv("KD_AINSTRUCT_TOKEN")
+				}
 			}
 		}
 	}
