@@ -64,12 +64,10 @@ func parseFlags() config {
 			fmt.Println(version)
 			os.Exit(0)
 		default:
-			if !strings.HasPrefix(args[i], "-") {
-				if cfg.command == "" {
-					cfg.command = args[i]
-				} else {
-					cfg.args = append(cfg.args, args[i])
-				}
+			if cfg.command == "" {
+				cfg.command = args[i]
+			} else {
+				cfg.args = append(cfg.args, args[i])
 			}
 		}
 	}

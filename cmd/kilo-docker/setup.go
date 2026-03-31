@@ -67,7 +67,7 @@ Commands:
   (no command)      Start Kilo in interactive mode
   run "prompt"      Run Kilo in autonomous mode with a prompt
   sessions [name]       List sessions or attach to one by name/index
-  sessions cleanup [-y] [name]  Remove a session (interactive if no name given)
+  sessions cleanup [-y|-a] [name]  Remove a session (-y: skip confirm, -a: all exited)
   networks          List available Docker networks
   backup [-f]       Create backup of volume to tar.gz (auto-names with timestamp)
   restore <file> [-f] [--volume <name>]  Restore volume from backup

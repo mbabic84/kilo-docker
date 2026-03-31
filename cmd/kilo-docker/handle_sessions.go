@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 )
 
 // handleSessions lists, attaches to, or cleans up kilo-docker sessions.
@@ -11,13 +10,19 @@ func handleSessions(cfg config) {
 	args := cfg.args
 	cleanupMode := false
 	cleanupYes := false
+	cleanupAll := false
 	attachTarget := ""
 
 	if len(args) > 0 && args[0] == "cleanup" {
 		cleanupMode = true
 		args = args[1:]
-		if len(args) > 0 && (args[0] == "-y" || args[0] == "--yes") {
-			cleanupYes = true
+		for len(args) > 0 && (args[0] == "-y" || args[0] == "--yes" || args[0] == "-a" || args[0] == "--all") {
+			switch args[0] {
+			case "-y", "--yes":
+				cleanupYes = true
+			case "-a", "--all":
+				cleanupAll = true
+			}
 			args = args[1:]
 		}
 	}
@@ -33,17 +38,16 @@ func handleSessions(cfg config) {
 	}
 
 	if cleanupMode {
-		if cleanupYes && attachTarget == "" {
-			// Non-interactive: remove all exited sessions
-			exited := 0
+		if cleanupAll {
+			removed := 0
 			for _, s := range sessions {
-				if strings.Contains(s.Status, "Exited") {
+				if dockerState(s.Name) == "exited" {
 					dockerRun("rm", "-f", s.Name)
 					fmt.Fprintf(os.Stderr, "Session '%s' removed.\n", s.Name)
-					exited++
+					removed++
 				}
 			}
-			if exited == 0 {
+			if removed == 0 {
 				fmt.Fprintf(os.Stderr, "No exited sessions to clean up.\n")
 			}
 			return
