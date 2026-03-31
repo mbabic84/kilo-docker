@@ -19,7 +19,38 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"syscall"
 )
+
+// subcommands lists the internal subcommands handled by kilo-entrypoint.
+// Any argument NOT in this map is passed through to exec.LookPath for
+// direct binary execution (e.g. "kilo", "sh", "bash").
+var subcommands = map[string]bool{
+	"load-tokens":     true,
+	"save-tokens":     true,
+	"ainstruct-login": true,
+	"update-config":   true,
+	"backup":          true,
+	"restore":         true,
+	"config":          true,
+	"sync":            true,
+}
+
+// resolveCommand checks if name is a known internal subcommand.
+// If not, it resolves the name to an executable binary via LookPath.
+// Returns (binaryPath, true) for pass-through commands, ("", false) for
+// internal subcommands.
+func resolveCommand(name string) (string, bool) {
+	if subcommands[name] {
+		return "", false
+	}
+	binary, err := exec.LookPath(name)
+	if err != nil {
+		return "", true // unknown, but still a pass-through (will error in main)
+	}
+	return binary, true
+}
 
 func main() {
 	if len(os.Args) < 2 {
@@ -30,8 +61,21 @@ func main() {
 		return
 	}
 
-	subcommand := os.Args[1]
-	switch subcommand {
+	name := os.Args[1]
+	binary, passthrough := resolveCommand(name)
+	if passthrough {
+		if binary == "" {
+			fmt.Fprintf(os.Stderr, "unknown subcommand or command: %s\n", name)
+			os.Exit(1)
+		}
+		if err := syscall.Exec(binary, os.Args[1:], os.Environ()); err != nil {
+			fmt.Fprintf(os.Stderr, "exec %s: %v\n", name, err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	switch name {
 	case "load-tokens":
 		if err := runLoadTokens(); err != nil {
 			fmt.Fprintf(os.Stderr, "load-tokens error: %v\n", err)
@@ -77,8 +121,5 @@ func main() {
 		}
 	case "sync":
 		runSyncMode()
-	default:
-		fmt.Fprintf(os.Stderr, "unknown subcommand: %s\n", subcommand)
-		os.Exit(1)
 	}
 }
