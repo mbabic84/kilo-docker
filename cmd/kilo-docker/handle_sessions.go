@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // handleSessions lists, attaches to, or cleans up kilo-docker sessions.
@@ -32,6 +33,22 @@ func handleSessions(cfg config) {
 	}
 
 	if cleanupMode {
+		if cleanupYes && attachTarget == "" {
+			// Non-interactive: remove all exited sessions
+			exited := 0
+			for _, s := range sessions {
+				if strings.Contains(s.Status, "Exited") {
+					dockerRun("rm", "-f", s.Name)
+					fmt.Fprintf(os.Stderr, "Session '%s' removed.\n", s.Name)
+					exited++
+				}
+			}
+			if exited == 0 {
+				fmt.Fprintf(os.Stderr, "No exited sessions to clean up.\n")
+			}
+			return
+		}
+
 		containerToClean := ""
 		if attachTarget != "" {
 			containerToClean, err = resolveTarget(attachTarget)
