@@ -1,3 +1,9 @@
+## [1.30.0](https://github.com/mbabic84/kilo-docker/compare/v1.29.0...v1.30.0) (2026-03-31)
+
+### Features
+
+* add --yes/-y flag and auto-confirm for piped installs ([f63320b](https://github.com/mbabic84/kilo-docker/commit/f63320b239952bf9b8f70e1692d1af87abe7d4aa))
+
 ## [1.29.0](https://github.com/mbabic84/kilo-docker/compare/v1.28.1...v1.29.0) (2026-03-31)
 
 ### Features
