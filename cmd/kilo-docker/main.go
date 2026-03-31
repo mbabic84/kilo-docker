@@ -20,6 +20,7 @@
 //	--ssh             Enable SSH agent forwarding
 //	--zellij          Start with Zellij multiplexer
 //	--network <name>  Connect to a Docker network
+//	--yes, -y         Auto-confirm all prompts
 //
 // Commands:
 //
@@ -46,6 +47,7 @@ import (
 
 func main() {
 	cfg := parseFlags()
+	autoConfirm = cfg.yes || !isTerminal()
 
 	switch cfg.command {
 	case "help":

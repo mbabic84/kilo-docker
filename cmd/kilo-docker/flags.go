@@ -13,6 +13,7 @@ const (
 )
 
 var version = "dev"
+var autoConfirm bool
 
 // config holds parsed CLI flags for the host binary.
 type config struct {
@@ -24,6 +25,7 @@ type config struct {
 	zellij      bool
 	ssh         bool
 	mcp         bool
+	yes         bool
 	network     string
 	networkFlag bool
 	command     string
@@ -54,6 +56,8 @@ func parseFlags() config {
 			cfg.ssh = true
 		case "--mcp":
 			cfg.mcp = true
+		case "--yes", "-y":
+			cfg.yes = true
 		case "--network":
 			cfg.networkFlag = true
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {

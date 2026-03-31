@@ -128,7 +128,12 @@ func promptPassword() string {
 }
 
 // promptConfirm displays a yes/no prompt and returns true if the user enters "y".
+// Returns true automatically when --yes flag is set or stdin is not a TTY.
 func promptConfirm(message string) bool {
+	if autoConfirm {
+		fmt.Fprintf(os.Stderr, "%sy\n", message)
+		return true
+	}
 	fmt.Print(message)
 	var response string
 	fmt.Scanln(&response)
