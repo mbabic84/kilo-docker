@@ -1,3 +1,10 @@
+## [1.34.0](https://github.com/mbabic84/kilo-docker/compare/v1.33.0...v1.34.0) (2026-03-31)
+
+### Features
+
+* add Go 1.26.1 as optional service via --go flag ([196409a](https://github.com/mbabic84/kilo-docker/commit/196409ac8fba9e380f41440273bff055dac1a35f))
+* add Node.js LTS as optional service via --node flag ([faf1df1](https://github.com/mbabic84/kilo-docker/commit/faf1df1ea472dd81c3ee945f589182e026970787))
+
 ## [1.33.0](https://github.com/mbabic84/kilo-docker/compare/v1.32.0...v1.33.0) (2026-03-31)
 
 ### Features
