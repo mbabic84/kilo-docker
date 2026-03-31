@@ -3,14 +3,16 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
-// handleSessions lists, attaches to, or cleans up kilo-docker sessions.
+// handleSessions lists, attaches to, recreates, or cleans up kilo-docker sessions.
 func handleSessions(cfg config) {
 	args := cfg.args
 	cleanupMode := false
 	cleanupYes := false
 	cleanupAll := false
+	recreateMode := false
 	attachTarget := ""
 
 	if len(args) > 0 && args[0] == "cleanup" {
@@ -27,6 +29,11 @@ func handleSessions(cfg config) {
 		}
 	}
 
+	if len(args) > 0 && args[0] == "recreate" {
+		recreateMode = true
+		args = args[1:]
+	}
+
 	if len(args) > 0 {
 		attachTarget = args[0]
 	}
@@ -35,6 +42,67 @@ func handleSessions(cfg config) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
+	}
+
+	if recreateMode {
+		if attachTarget == "" {
+			fmt.Fprintf(os.Stderr, "Error: specify a session to recreate (name or index)\n")
+			os.Exit(1)
+		}
+		containerName, err := resolveTarget(attachTarget)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		var targetSession session
+		for _, s := range sessions {
+			if s.Name == containerName {
+				targetSession = s
+				break
+			}
+		}
+
+		if targetSession.Name == "" {
+			fmt.Fprintf(os.Stderr, "Error: session '%s' not found\n", containerName)
+			os.Exit(1)
+		}
+
+		// --once sessions have no volume to preserve
+		if strings.Contains(targetSession.Args, "--once") {
+			fmt.Fprintf(os.Stderr, "Error: Cannot recreate a --once session (no persistent volume)\n")
+			os.Exit(1)
+		}
+
+		// Parse stored args back into a config. The stored args contain
+		// "ssh-agent" as a placeholder token which we convert back to "--ssh".
+		storedArgs := targetSession.Args
+		storedArgs = strings.ReplaceAll(storedArgs, "ssh-agent", "--ssh")
+		parsedArgs := strings.Fields(storedArgs)
+
+		newCfg := parseArgs(parsedArgs)
+		newCfg.command = "" // ensure runContainer creates a new container
+		newCfg.yes = true  // skip prompts during recreate
+
+		// Change to the session's original workspace
+		if targetSession.Workspace != "" {
+			originalDir, _ := os.Getwd()
+			if err := os.Chdir(targetSession.Workspace); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: cannot change to workspace '%s': %v\n", targetSession.Workspace, err)
+				fmt.Fprintf(os.Stderr, "Current directory: %s\n", originalDir)
+				os.Exit(1)
+			}
+			fmt.Fprintf(os.Stderr, "Recreating session in workspace: %s\n", targetSession.Workspace)
+		}
+
+		// Remove the old container (volume persists)
+		fmt.Fprintf(os.Stderr, "Removing old container '%s'...\n", containerName)
+		dockerRun("rm", "-f", containerName)
+
+		// Run with the original flags — this creates a fresh container
+		// attached to the same volume (user data preserved).
+		runContainer(newCfg)
+		return
 	}
 
 	if cleanupMode {
@@ -108,11 +176,17 @@ func handleSessions(cfg config) {
 	switch state {
 	case "running":
 		fmt.Fprintf(os.Stderr, "Attaching to running session '%s' (detach: Ctrl+P Ctrl+Q)...\n", containerToAttach)
-		execDockerAttach("attach", containerToAttach)
+		if err := execDockerAttach("attach", containerToAttach); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 		resetTerminal()
 	case "exited", "created":
 		fmt.Fprintf(os.Stderr, "Starting session '%s'...\n", containerToAttach)
-		execDockerAttach("start", "-ai", containerToAttach)
+		if err := execDockerAttach("start", "-ai", containerToAttach); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 		resetTerminal()
 	default:
 		fmt.Fprintf(os.Stderr, "Error: Container '%s' is in state '%s'.\n", containerToAttach, state)
