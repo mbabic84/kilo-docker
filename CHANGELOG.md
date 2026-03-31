@@ -1,3 +1,9 @@
+## [1.30.1](https://github.com/mbabic84/kilo-docker/compare/v1.30.0...v1.30.1) (2026-03-31)
+
+### Bug Fixes
+
+* harden install.sh and handleInstall/handleUpdate error handling ([21c9dce](https://github.com/mbabic84/kilo-docker/commit/21c9dceb404f7848e3958f76a276e0dcecb2709a))
+
 ## [1.30.0](https://github.com/mbabic84/kilo-docker/compare/v1.29.0...v1.30.0) (2026-03-31)
 
 ### Features
