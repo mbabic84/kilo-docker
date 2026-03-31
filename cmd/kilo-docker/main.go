@@ -29,7 +29,7 @@
 //	backup            Create volume backup
 //	restore           Restore from backup
 //	install           Install as global command
-//	update            Pull latest image
+//	update            Pull latest Docker image
 //	init              Reset configuration
 //	cleanup           Remove all artifacts
 //	networks          List Docker networks

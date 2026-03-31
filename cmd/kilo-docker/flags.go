@@ -7,9 +7,8 @@ import (
 )
 
 const (
-	repoURL      = "ghcr.io/mbabic84/kilo-docker"
-	githubRawURL = "https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker"
-	kiloHome     = "/home/kilo-t8x3m7kp"
+	repoURL  = "ghcr.io/mbabic84/kilo-docker"
+	kiloHome = "/home/kilo-t8x3m7kp"
 )
 
 var version = "dev"
