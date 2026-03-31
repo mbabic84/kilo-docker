@@ -33,8 +33,13 @@ func handleUpdate() {
 		fmt.Fprintf(os.Stderr, "Run 'kilo-docker install' to install it first.\n")
 	}
 
-	fmt.Fprintf(os.Stderr, "\nPulling Docker image...\n")
-	dockerRun("pull", repoURL+":latest")
+	if !dockerDaemonRunning() {
+		fmt.Fprintf(os.Stderr, "\nWarning: Docker daemon is not running. Skipping image pull.\n")
+		fmt.Fprintf(os.Stderr, "Run 'docker pull %s:latest' after starting Docker.\n", repoURL)
+	} else {
+		fmt.Fprintf(os.Stderr, "\nPulling Docker image...\n")
+		dockerRun("pull", repoURL+":latest")
+	}
 	fmt.Fprintf(os.Stderr, "\nUpdate complete.\n")
 }
 
@@ -63,7 +68,10 @@ func handleInstall() {
 	}
 
 	if err := os.Symlink(sourceScript, target); err != nil {
-		copyFile(sourceScript, target)
+		if err := copyFile(sourceScript, target); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to install binary: %v\n", err)
+			os.Exit(1)
+		}
 	}
 	os.Chmod(target, 0755)
 
@@ -74,8 +82,22 @@ func handleInstall() {
 		fmt.Fprintf(os.Stderr, "  export PATH=\"$HOME/.local/bin:$PATH\"\n")
 	}
 
-	fmt.Fprintf(os.Stderr, "\nPulling Docker image...\n")
-	dockerRun("pull", repoURL+":latest")
+	// Verify the binary runs before reporting success.
+	if out, err := exec.Command(target, "--version").CombinedOutput(); err != nil {
+		fmt.Fprintf(os.Stderr, "\nWarning: installed binary failed --version check: %v\n", err)
+		if len(out) > 0 {
+			fmt.Fprintf(os.Stderr, "  %s\n", strings.TrimSpace(string(out)))
+		}
+	}
+
+	if !dockerDaemonRunning() {
+		fmt.Fprintf(os.Stderr, "\nWarning: Docker daemon is not running. Skipping image pull.\n")
+		fmt.Fprintf(os.Stderr, "Run 'docker pull %s:latest' after starting Docker.\n", repoURL)
+	} else {
+		fmt.Fprintf(os.Stderr, "\nPulling Docker image...\n")
+		dockerRun("pull", repoURL+":latest")
+	}
+
 	fmt.Fprintf(os.Stderr, "\nInstalled successfully: %s -> %s\n", target, sourceScript)
 	fmt.Fprintf(os.Stderr, "Run 'kilo-docker' from any directory.\n")
 }
