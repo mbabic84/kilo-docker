@@ -9,11 +9,15 @@ import (
 	"syscall"
 )
 
-func main() {
+// runSyncMode starts the ainstruct-sync background process. It pulls the
+// remote collection to sync local files, then starts an inotify-based file
+// watcher that uploads changes to the Ainstruct REST API. All output goes
+// to a log file (~/.config/kilo/ainstruct-sync.log) to avoid interfering
+// with the Kilo TUI on stdout.
+func runSyncMode() {
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("")
 
-	// Set up file-based logging (no stdout — would interfere with Kilo TUI)
 	home := os.Getenv("HOME")
 	logDir := filepath.Join(home, ".config", "kilo")
 	os.MkdirAll(logDir, 0o755)

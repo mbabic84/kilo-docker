@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -39,6 +43,40 @@ jobs:
       - name: Release
         id: release
         uses: cycjimmy/semantic-release-action@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        if: ${{ steps.release.outputs.new_release_published == 'true' }}
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Build host binaries
+        if: ${{ steps.release.outputs.new_release_published == 'true' }}
+        run: |
+          set -e
+          VERSION="${{ steps.release.outputs.new_release_version }}"
+          for OS_ARCH in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            OS="${OS_ARCH%%-*}"
+            ARCH="${OS_ARCH##*-}"
+            CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH go build \
+              -ldflags="-s -w -X main.version=${VERSION}" \
+              -o "kilo-docker-${OS_ARCH}" \
+              ./cmd/kilo-docker
+          done
+
+      - name: Upload binaries to release
+        if: ${{ steps.release.outputs.new_release_published == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.release.outputs.new_release_version }}
+          files: |
+            kilo-docker-linux-amd64
+            kilo-docker-linux-arm64
+            kilo-docker-darwin-amd64
+            kilo-docker-darwin-arm64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

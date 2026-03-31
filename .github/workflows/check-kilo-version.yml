@@ -19,7 +19,11 @@ jobs:
       - name: Get latest Kilo release
         id: latest
         run: |
-          LATEST=$(curl -s https://api.github.com/repos/Kilo-Org/kilocode/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          LATEST=$(curl -sf https://api.github.com/repos/Kilo-Org/kilocode/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          if [ -z "$LATEST" ]; then
+            echo "::error::Failed to fetch latest Kilo version"
+            exit 1
+          fi
           echo "version=$LATEST" >> "$GITHUB_OUTPUT"
 
       - name: Get current Kilo version from Dockerfile
@@ -41,8 +45,10 @@ jobs:
 
       - name: Update Dockerfile
         if: steps.compare.outputs.needs_update == 'true'
+        env:
+          NEW_VERSION: ${{ steps.latest.outputs.version }}
         run: |
-          sed -i "s/ARG KILO_VERSION=.*/ARG KILO_VERSION=${{ steps.latest.outputs.version }}/" Dockerfile
+          sed -i "s/ARG KILO_VERSION=.*/ARG KILO_VERSION=$NEW_VERSION/" Dockerfile
 
       - name: Create Pull Request
         if: steps.compare.outputs.needs_update == 'true'

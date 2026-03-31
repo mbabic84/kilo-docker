@@ -15,6 +15,8 @@ import (
 
 const collectionName = "kilo-docker"
 
+// documentType returns the ainstruct document type string for a given file
+// path based on its extension. Falls back to "text" for unknown extensions.
 func documentType(path string) string {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".md":
@@ -48,6 +50,9 @@ func documentType(path string) string {
 	}
 }
 
+// Syncer manages bidirectional sync between local config files and the
+// Ainstruct REST API. It tracks content hashes to avoid redundant uploads,
+// handles JWT token refresh, and manages the collection lifecycle.
 type Syncer struct {
 	apiURL       string
 	accessToken  string
@@ -61,6 +66,8 @@ type Syncer struct {
 	client       *http.Client
 }
 
+// NewSyncer creates a Syncer configured from environment variables.
+// Reads API URL, tokens, and token expiry from KD_AINSTRUCT_* env vars.
 func NewSyncer() *Syncer {
 	home := os.Getenv("HOME")
 	apiURL := os.Getenv("KD_AINSTRUCT_API_URL")
@@ -82,8 +89,6 @@ func NewSyncer() *Syncer {
 	}
 }
 
-// ── Collection management ──
-
 type collection struct {
 	CollectionID string `json:"collection_id"`
 	Name         string `json:"name"`
@@ -93,6 +98,9 @@ type collectionsResponse struct {
 	Collections []collection `json:"collections"`
 }
 
+// ensureCollection creates or retrieves the sync collection from the API.
+// On first run, it creates a new collection named "kilo-docker"; subsequent
+// runs reuse the existing one by ID.
 func (s *Syncer) ensureCollection() error {
 	if s.collectionID != "" {
 		return nil
@@ -134,8 +142,6 @@ func (s *Syncer) ensureCollection() error {
 	return nil
 }
 
-// ── Document operations ──
-
 type document struct {
 	DocumentID  string `json:"document_id"`
 	Content     string `json:"content"`
@@ -149,6 +155,8 @@ type documentsResponse struct {
 	Documents []document `json:"documents"`
 }
 
+// getDocumentByPath looks up a document in the sync collection by its
+// local file path metadata. Returns nil if not found.
 func (s *Syncer) getDocumentByPath(relPath string) (*document, error) {
 	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
 	if err != nil {
@@ -166,6 +174,9 @@ func (s *Syncer) getDocumentByPath(relPath string) (*document, error) {
 	return nil, nil
 }
 
+// syncFile uploads or updates a local file in the Ainstruct collection.
+// Creates a new document if it doesn't exist, patches the existing one
+// if it does. Updates the local hash cache on success.
 func (s *Syncer) syncFile(absPath string) error {
 	if _, err := os.Stat(absPath); os.IsNotExist(err) {
 		return nil
@@ -234,6 +245,8 @@ func (s *Syncer) syncFile(absPath string) error {
 	return nil
 }
 
+// deleteByPath removes a document from the Ainstruct collection by its
+// local file path metadata. Removes the hash cache entry on success.
 func (s *Syncer) deleteByPath(relPath string) error {
 	if err := s.ensureCollection(); err != nil {
 		return err
@@ -259,6 +272,9 @@ func (s *Syncer) deleteByPath(relPath string) error {
 	return nil
 }
 
+// pullCollection downloads all documents from the remote collection and
+// writes them to local paths, skipping files whose hash matches the remote.
+// On first run (no collection), it returns nil with no action.
 func (s *Syncer) pullCollection() error {
 	data, err := s.apiRequest("GET", "/collections", nil)
 	if err != nil {

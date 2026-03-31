@@ -10,10 +10,13 @@ import (
 	"time"
 )
 
+// apiError represents an error response from the Ainstruct API.
 type apiError struct {
 	Error string `json:"error"`
 }
 
+// refreshTokenIfNeeded refreshes the access token if it expires within 60
+// seconds. Updates the Syncer's token fields on success.
 func (s *Syncer) refreshTokenIfNeeded() error {
 	if s.tokenExpiry == 0 || s.refreshToken == "" {
 		return nil
@@ -50,6 +53,9 @@ func (s *Syncer) refreshTokenIfNeeded() error {
 	return nil
 }
 
+// apiRequest makes an authenticated request to the Ainstruct API. It handles
+// token refresh, retries on INVALID_TOKEN errors, and sets authExpired when
+// authentication cannot be recovered.
 func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 	if err := s.refreshTokenIfNeeded(); err != nil {
 		s.authExpired = true
@@ -104,6 +110,8 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 	return respBody, nil
 }
 
+// doAPIRequest sends an HTTP request with the Bearer token and returns the
+// raw response. Does not handle retries or token refresh.
 func (s *Syncer) doAPIRequest(method, path string, body any) (*http.Response, error) {
 	var reader io.Reader
 	if body != nil {

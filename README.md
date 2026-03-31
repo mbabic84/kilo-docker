@@ -6,7 +6,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 
 | Image | Base | Size | Description |
 |-------|------|------|-------------|
-| `ghcr.io/mbabic84/kilo-docker:latest` | Alpine | ~201 MB | Lightweight base with `git`, `openssh-client`, `ripgrep`, and `libstdc++` |
+| `ghcr.io/mbabic84/kilo-docker:latest` | Alpine | ~202 MB | Lightweight base with `git`, `openssh-client`, `ripgrep`, and `libstdc++` |
 
 ## Features
 
@@ -23,14 +23,22 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 
 ## Quick Start
 
-Install `kilo-docker` as a global command:
+Download the host binary from GitHub Releases:
 
 ```bash
-# curl
-bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker) install
+# Linux amd64
+curl -fsSL -o ~/.local/bin/kilo-docker https://github.com/mbabic84/kilo-docker/releases/latest/download/kilo-docker-linux-amd64
+chmod +x ~/.local/bin/kilo-docker
 
-# wget
-bash <(wget -qO- https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker) install
+# macOS arm64
+curl -fsSL -o ~/.local/bin/kilo-docker https://github.com/mbabic84/kilo-docker/releases/latest/download/kilo-docker-darwin-arm64
+chmod +x ~/.local/bin/kilo-docker
+```
+
+Or use the bootstrap installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/install.sh | sh
 ```
 
 Then run from any directory:
@@ -39,51 +47,23 @@ Then run from any directory:
 kilo-docker
 ```
 
-No need to clone the repository. Run directly with `curl` or `wget`:
-
-```bash
-# Interactive mode (base image)
-bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)
-
-# Autonomous mode
-bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker) run "your prompt here"
-
-# Show all commands
-bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker) help
-```
-
-> **Note:** Use `bash <(...)` instead of `curl | bash` to preserve stdin for interactive input. Piping consumes stdin, which breaks interactive prompts and `docker run -it`.
-
-Alternatively, download the script once and run it locally:
-
-```bash
-curl -fsSL -o kilo-docker https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker
-chmod +x kilo-docker
-./kilo-docker
-```
-
-Or install it as a global command (symlinked to `~/.local/bin/kilo-docker`):
-
-```bash
-bash kilo-docker install
-```
-
-After installing, `kilo-docker` is available from any directory. The install command also pulls the Docker image so it is ready to use immediately.
-
 On first run, the script prompts for MCP server tokens and saves them to a named Docker volume. Subsequent runs reuse the saved tokens.
 
-## Script Commands
+## Commands
 
 | Command | Description |
 |---------|-------------|
 | *(none)* | Start Kilo in interactive mode |
 | `run "prompt"` | Run Kilo in autonomous mode |
+| `sessions [name]` | List sessions or attach to one by name/index |
+| `sessions cleanup [-y] [name]` | Remove a session (interactive if no name given) |
 | `backup [-f]` | Create backup of volume to tar.gz |
-| `restore <file>` | Restore volume from backup |
+| `restore <file> [-f] [--volume <name>]` | Restore volume from backup |
 | `init` | Reset configuration (remove volume, re-enter tokens) |
 | `cleanup` | Remove volume, containers, image, and installed script |
 | `install` | Install as a global command (`~/.local/bin/kilo-docker`) |
-| `update` | Update the installed script and pull the latest Docker image |
+| `update` | Pull the latest Docker image and update the installed script |
+| `update-config` | Download latest opencode.json template and merge with existing config |
 | `help` | Show help message |
 
 ### Options
@@ -95,6 +75,7 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | `--ainstruct` | Authenticate with Ainstruct API (volume from user_id, tokens encrypted, file sync enabled) |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--docker` | Mount Docker socket for container management from within Kilo |
+| `--ssh` | Enable SSH agent forwarding into the container |
 | `--zellij` | Start a Zellij terminal multiplexer session |
 | `--network <name>` | Attach to a specific Docker network |
 
@@ -160,13 +141,13 @@ When `--ainstruct` is used, configuration files are automatically synced to and 
 - `~/.config/kilo/skills/*/SKILL.md` — Agent skills (per-skill directories with optional `scripts/`, `references/`, `assets/`)
 - `~/.config/kilo/tools/*.{js,ts}` — Custom tools (JavaScript/TypeScript tool definitions)
 
-**Push (local → API):** A Go-based file watcher (`ainstruct-sync`) detects local changes via inotify with a per-file 5-second debounce. Each file has an independent timer that resets on every change — the file is synced only after 5 seconds with no further modifications. Multiple files are synced independently without blocking each other.
+**Push (local → API):** A Go-based file watcher detects local changes via inotify with a per-file 5-second debounce. Each file has an independent timer that resets on every change — the file is synced only after 5 seconds with no further modifications. Multiple files are synced independently without blocking each other.
 
 **Pull (API → local):** On container startup, the sync state file (`~/.config/kilo/.ainstruct-hashes`) is compared against the API's `content_hash` values. Only changed or new files are downloaded. Unchanged files are skipped without any API calls.
 
 **Token refresh:** JWT access tokens (30 min lifetime) are refreshed automatically before API calls when within 60 seconds of expiry.
 
-The sync engine is a static Go binary — no `bash`, `inotify-tools`, or `jq` runtime dependencies. It uses native Linux inotify via `golang.org/x/sys/unix` and communicates with the Ainstruct API using Go's `net/http` stdlib.
+The sync engine runs as a subcommand of `kilo-entrypoint` inside the container — no `bash`, `inotify-tools`, `curl`, or `jq` runtime dependencies. It uses native Linux inotify via `golang.org/x/sys/unix` and communicates with the Ainstruct API using Go's `net/http` stdlib.
 
 ## Browser Automation
 
@@ -202,7 +183,7 @@ The Docker CLI and Compose plugin are installed at runtime inside the container.
 
 ## SSH Agent Forwarding
 
-Use the `--ssh` flag to enable SSH agent forwarding. The script detects whether an SSH agent is running on the host:
+Use the `--ssh` flag to enable SSH agent forwarding. The host binary detects whether an SSH agent is running on the host:
 
 - **Agent running** — Uses the existing agent via `$SSH_AUTH_SOCK`
 - **No agent** — Starts one automatically, loads all private keys from `~/.ssh/`, and cleans up on exit
@@ -237,7 +218,7 @@ Zellij configuration is stored in `configs/zellij.kdl` and copied to the contain
 
 ## Data Persistence
 
-The script uses a named Docker volume mounted at `/home/kilo-t8x3m7kp`. This stores:
+The host binary uses a named Docker volume mounted at `/home/kilo-t8x3m7kp`. This stores:
 
 - SQLite database, auth state, logs
 - Configuration (`opencode.json` — model selection, provider connections, MCP settings)
@@ -285,6 +266,26 @@ Backups are portable tar.gz archives containing all volume data. The restore com
 
 > **Note:** Encrypted volumes (`--password`) require the same password for backup and restore. Backups from encrypted volumes are standard tar.gz files (the encryption applies only to tokens at rest, not the backup archive itself).
 
+## Session Management
+
+Kilo-docker tracks sessions by directory. Each working directory gets its own container (named by SHA-256 hash of the path).
+
+```bash
+# List all sessions
+kilo-docker sessions
+
+# Attach to a session by name or index
+kilo-docker sessions <name-or-index>
+
+# Remove a session
+kilo-docker sessions cleanup <name-or-index>
+
+# Remove all stopped sessions
+kilo-docker sessions cleanup
+```
+
+When attaching to an existing session, `kilo-docker` automatically detects whether the container is running (attaches), stopped (starts it), or missing (creates a new one).
+
 ## MCP Servers
 
 ### Base Image
@@ -302,8 +303,8 @@ Backups are portable tar.gz archives containing all volume data. The restore com
 ## Usage on Remote Hosts
 
 ```bash
-# Run directly on a remote host (no clone needed)
-ssh remote-host 'bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)'
+# Run directly on a remote host (binary download)
+ssh remote-host 'curl -fsSL -o ~/.local/bin/kilo-docker https://github.com/mbabic84/kilo-docker/releases/latest/download/kilo-docker-linux-amd64 && chmod +x ~/.local/bin/kilo-docker && ~/.local/bin/kilo-docker'
 ```
 
 > Tokens are prompted interactively on first run via the TTY.
@@ -313,7 +314,7 @@ ssh remote-host 'bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/ki
 On shared hosts where other users have Docker access, use `--password` to protect your volume and tokens:
 
 ```bash
-ssh remote-host 'bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)' -- --password
+ssh remote-host 'kilo-docker --password'
 ```
 
 This ensures other users cannot discover your volume or read your API tokens.
@@ -327,7 +328,7 @@ Host remote
     HostName remote.example.com
     User username
     RequestTTY yes
-    RemoteCommand bash <(curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/kilo-docker)
+    RemoteCommand ~/.local/bin/kilo-docker
 ```
 
 ## Image Tags
@@ -341,7 +342,10 @@ Host remote
 ## Building Locally
 
 ```bash
-# Build image (includes Go binary compilation)
+# Build Go binaries
+bash scripts/build.sh build-all
+
+# Build Docker image
 docker build -t kilo-docker .
 
 # Test
@@ -351,28 +355,54 @@ docker run --rm kilo-docker --version
 docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-docker
 ```
 
-The build uses a multi-stage Dockerfile: a `golang:1.26-alpine` builder compiles the `ainstruct-sync` binary as a static binary, then the runtime stage copies it into the final Alpine image. No Go toolchain is needed on the host.
+The build uses a multi-stage Dockerfile: a `golang:1.26-alpine` builder compiles the `kilo-entrypoint` binary as a static binary, then the runtime stage copies it into the final Alpine image. No Go toolchain is needed on the host.
 
 ## Project Structure
 
 ```
-├── Dockerfile                  # Multi-stage build (Go builder + Alpine runtime)
-├── go.mod                      # Go module definition
-├── go.sum                      # Go dependency checksums
+├── Dockerfile                     # Multi-stage build (Go builder + Alpine runtime)
+├── go.mod                         # Go module definition
+├── go.sum                         # Go dependency checksums
 ├── cmd/
-│   └── ainstruct-sync/
-│       ├── main.go             # Entry point, signal handling
-│       ├── api.go              # HTTP client, JWT token management
-│       ├── hash.go             # Hash file read/write (mutex-guarded)
-│       ├── sync.go             # Syncer struct, collections, documents, pull
-│       └── watcher.go          # inotify watcher, per-file debounce
+│   ├── kilo-docker/               # Host-side CLI (19 files)
+│   │   ├── main.go                # CLI dispatch + container launch
+│   │   ├── flags.go               # Config struct, flag parsing
+│   │   ├── args.go                # Docker run argument builder
+│   │   ├── handlers.go            # install, update, cleanup, init, update-config
+│   │   ├── handle_sessions.go     # session list/attach/cleanup
+│   │   ├── handle_backup.go       # backup/restore handlers
+│   │   ├── setup.go               # resolveVolume, isTerminal, help
+│   │   ├── docker.go              # Docker CLI wrappers (run, exec, cp)
+│   │   ├── crypto.go              # AES-256-CBC with PBKDF2 (OpenSSL-compatible)
+│   │   ├── volume.go              # Volume name derivation, CRUD
+│   │   ├── tokens.go              # Token load/save (plaintext + encrypted)
+│   │   ├── ainstruct.go           # Login prompts, auth flow
+│   │   ├── playwright.go          # Playwright MCP sidecar management
+│   │   ├── ssh.go                 # SSH agent detection and forwarding
+│   │   ├── network.go             # Docker network selection
+│   │   ├── terminal.go            # Terminal reset after docker attach
+│   │   ├── session.go             # Session data model
+│   │   ├── install.go             # copyFile utility
+│   │   └── backup.go              # backup/restore via docker exec
+│   └── kilo-entrypoint/           # Container entrypoint (12 files)
+│       ├── main.go                # Subcommand dispatcher
+│       ├── init.go                # Container init (user setup, downloads, privilege drop)
+│       ├── config.go              # MCP server toggling from env vars
+│       ├── loadsave.go            # Token load/save subcommands
+│       ├── login.go               # Ainstruct HTTP login + profile fetch
+│       ├── updatecfg.go           # Config template download + JSON merge
+│       ├── backup.go              # tar.gz backup/restore subcommands
+│       ├── sync.go                # Ainstruct sync entry point
+│       ├── sync_content.go        # Collection/document sync, Syncer struct
+│       ├── api.go                 # REST client with JWT refresh
+│       ├── watcher.go             # inotify file watcher with 5s debounce
+│       └── hash.go                # Hash tracking for sync
 ├── configs/
-│   ├── opencode.json           # Kilo config for base image
-│   └── zellij.kdl              # Zellij config (keybinds, pane settings)
+│   ├── opencode.json              # Kilo config for base image
+│   └── zellij.kdl                 # Zellij config (keybinds, pane settings)
 └── scripts/
-    ├── kilo-docker             # CLI wrapper script
-    ├── entrypoint.sh           # Entrypoint for Alpine (base image)
-    └── setup-kilo-config.sh    # Shared config logic (sourced by entrypoint)
+    ├── build.sh                   # Go build helper (via Docker)
+    └── install.sh                 # Bootstrap installer (curl | sh)
 ```
 
 ## License

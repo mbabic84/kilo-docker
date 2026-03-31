@@ -15,11 +15,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// pendingEvent tracks a debounced file system event for sync processing.
 type pendingEvent struct {
 	eventType   string
 	lastEventAt time.Time
 }
 
+// inotifyEvent represents a raw inotify event parsed from the kernel buffer.
 type inotifyEvent struct {
 	wd      int32
 	mask    uint32
@@ -28,6 +30,8 @@ type inotifyEvent struct {
 	name    string
 }
 
+// parseInotifyEvents parses a raw inotify event buffer into a slice of
+// inotifyEvent structs, handling 4-byte alignment between events.
 func parseInotifyEvents(buf []byte, n int) []inotifyEvent {
 	var events []inotifyEvent
 	offset := 0
@@ -55,6 +59,10 @@ func parseInotifyEvents(buf []byte, n int) []inotifyEvent {
 
 const debounceInterval = 5 * time.Second
 
+// runWatcher starts an inotify-based file watcher on the Kilo config
+// directories. It detects CREATE, MODIFY, DELETE, and MOVED events,
+// debounces them for 5 seconds to avoid syncing intermediate states,
+// and triggers syncFile or deleteByPath on the Syncer.
 func runWatcher(ctx context.Context, s *Syncer) error {
 	fd, err := unix.InotifyInit1(unix.IN_CLOEXEC)
 	if err != nil {
@@ -86,12 +94,10 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 		wdToDir[int32(wd)] = dir
 	}
 
-	// Add watches on flat directories directly
-	for _, dir := range watchDirs[:4] { // rules, commands, agents, plugins
+	for _, dir := range watchDirs[:4] {
 		addWatch(dir)
 	}
 
-	// Skills uses nested directories (skills/<name>/SKILL.md) — watch recursively
 	skillsDir := watchDirs[4]
 	addWatch(skillsDir)
 	filepath.Walk(skillsDir, func(path string, info os.FileInfo, err error) error {
@@ -104,7 +110,6 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 		return nil
 	})
 
-	// Tools directory — watch directly
 	addWatch(watchDirs[5])
 	opencodePath := filepath.Join(s.homeDir, ".config", "kilo", "opencode.json")
 	if _, err := os.Stat(opencodePath); err == nil {
@@ -162,7 +167,6 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 				fullPath = filepath.Join(dir, ev.name)
 			}
 
-			// Dynamically watch new subdirectories under skills/
 			if ev.mask&unix.IN_ISDIR != 0 && ev.mask&unix.IN_CREATE != 0 && strings.HasPrefix(dir, skillsDir) {
 				addWatch(fullPath)
 			}
@@ -190,11 +194,9 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	}
 }
 
-// debounceLoop runs in a goroutine. Each iteration:
-// 1. Find the file with the earliest lastEventAt — its deadline is lastEventAt + 5s
-// 2. Sleep until that deadline (or until a wake signal arrives)
-// 3. Sync all files whose 5s window has elapsed
-// 4. Loop
+// debounceLoop runs in a background goroutine, processing pending events
+// after their debounce interval (5 seconds) has elapsed without new changes.
+// This prevents syncing intermediate file states during rapid saves.
 func debounceLoop(ctx context.Context, s *Syncer, pending map[string]*pendingEvent, mu *sync.Mutex, wake <-chan struct{}) {
 	for {
 		select {
@@ -235,7 +237,6 @@ func debounceLoop(ctx context.Context, s *Syncer, pending map[string]*pendingEve
 			continue
 		}
 
-		// Copy pending snapshot before sleeping (unlock early)
 		deadlineCopy := deadline
 		mu.Unlock()
 
@@ -253,6 +254,8 @@ func debounceLoop(ctx context.Context, s *Syncer, pending map[string]*pendingEve
 	}
 }
 
+// processFile handles a single debounced file event: syncs the file to the
+// remote collection if it was modified, or deletes it remotely if it was removed.
 func processFile(s *Syncer, fullPath, eventType string) {
 	relPath := strings.TrimPrefix(fullPath, s.homeDir+"/")
 	if eventType == "DELETE" {
