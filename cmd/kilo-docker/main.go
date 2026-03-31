@@ -214,16 +214,23 @@ func runContainer(cfg config) {
 		execDockerAttach("start", "-ai", containerName)
 		resetTerminal()
 	} else {
-		runArgs := append([]string{"run"}, dockerArgs...)
-		runArgs = append(runArgs, image)
-		if len(cfg.args) > 0 {
-			runArgs = append(runArgs, cfg.args...)
-		}
-		if isTerminal() {
-			runArgs = append([]string{"-it"}, runArgs...)
-		} else {
-			runArgs = append([]string{"-i"}, runArgs...)
-		}
+		runArgs := buildRunArgs(dockerArgs, image, cfg.args, isTerminal())
 		execDocker(runArgs...)
 	}
+}
+
+// buildRunArgs constructs the argument list for an interactive docker run
+// command. The returned slice starts with "run", followed by the interactive
+// flags (-it or -i), then the docker args, image, and any extra args.
+func buildRunArgs(dockerArgs []string, image string, extraArgs []string, terminal bool) []string {
+	args := []string{"run"}
+	if terminal {
+		args = append(args, "-it")
+	} else {
+		args = append(args, "-i")
+	}
+	args = append(args, dockerArgs...)
+	args = append(args, image)
+	args = append(args, extraArgs...)
+	return args
 }

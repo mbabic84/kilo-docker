@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
@@ -103,24 +104,21 @@ func runInit() error {
 			"/workspace",
 		}
 		for _, dir := range chownDirs {
-			if _, err := os.Stat(dir); err == nil {
-				os.Chown(dir, puid, pgid)
-			}
-		}
-
-		if os.Getenv("KD_AINSTRUCT_ENABLED") == "1" {
-			syscall.Setgid(pgid)
-			syscall.Setuid(puid)
-			cmd := exec.Command("kilo-entrypoint", "sync")
-			cmd.Stdout = io.Discard
-			cmd.Stderr = io.Discard
-			cmd.Start()
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Ainstruct sync started\n")
-			os.Exit(0)
+			chownRecursive(dir, puid, pgid)
 		}
 
 		syscall.Setgid(pgid)
 		syscall.Setuid(puid)
+	}
+
+	// Start ainstruct sync in background after privilege drop.
+	// Must run as kilo user (not root) and must not block init.
+	if os.Getenv("KD_AINSTRUCT_ENABLED") == "1" {
+		cmd := exec.Command("kilo-entrypoint", "sync")
+		cmd.Stdout = io.Discard
+		cmd.Stderr = io.Discard
+		cmd.Start()
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Ainstruct sync started\n")
 	}
 
 	if err := runConfig(); err != nil {
@@ -298,4 +296,41 @@ func setupKnownHosts() error {
 	cmd.Stderr = io.Discard
 	cmd.Run()
 	return nil
+}
+
+// chownRecursive changes ownership of path and its contents to uid:gid.
+// It skips files already owned by the target user and uses fs.SkipDir
+// to avoid recursing into directory trees that are fully owned by the
+// target user. This avoids repeated chown on persistent volume data
+// that was fixed on first run, while still catching Docker-build
+// artifacts (COPYed files owned by root).
+func chownRecursive(path string, uid, gid int) {
+	filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if d != nil && d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		// Never follow symlinks
+		if d.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+
+		info, serr := d.Info()
+		if serr != nil {
+			return nil
+		}
+		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+			if int(stat.Uid) == uid && int(stat.Gid) == gid {
+				// Already correct — skip file, or skip entire subtree for dirs
+				if d.IsDir() {
+					return fs.SkipDir
+				}
+				return nil
+			}
+			os.Chown(p, uid, gid)
+		}
+		return nil
+	})
 }
