@@ -1,3 +1,9 @@
+## [1.33.0](https://github.com/mbabic84/kilo-docker/compare/v1.32.0...v1.33.0) (2026-03-31)
+
+### Features
+
+* **services:** add data-driven service architecture ([d81c5d9](https://github.com/mbabic84/kilo-docker/commit/d81c5d9cb7f76904a9832f526717a145a118e361))
+
 ## [1.32.0](https://github.com/mbabic84/kilo-docker/compare/v1.31.3...v1.32.0) (2026-03-31)
 
 ### Features
