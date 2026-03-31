@@ -7,10 +7,11 @@ import (
 	"strings"
 )
 
-// buildDockerArgs constructs the full docker run argument list from the
+// buildContainerArgs constructs the full docker run argument list from the
 // parsed config, SSH agent state, environment tokens, and container state.
-func buildDockerArgs(cfg config, volume, pwd, containerName, containerState,
-	sshAuthSock, dockerGID, kdContext7Token, kdAinstructToken,
+func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
+	sshAuthSock string, hostEnvVars map[string]string,
+	kdContext7Token, kdAinstructToken string,
 	ainstructSyncToken, ainstructSyncRefreshToken string, ainstructSyncTokenExpiry int64) []string {
 
 	args := []string{
@@ -36,14 +37,14 @@ func buildDockerArgs(cfg config, volume, pwd, containerName, containerState,
 	if cfg.once {
 		sessionArgs += "--once "
 	}
-	if cfg.zellij {
-		sessionArgs += "--zellij "
+	for _, svcName := range cfg.enabledServices {
+		svc := getService(svcName)
+		if svc != nil && svc.Flag != "" {
+			sessionArgs += svc.Flag + " "
+		}
 	}
 	if cfg.playwright {
 		sessionArgs += "--playwright "
-	}
-	if cfg.docker {
-		sessionArgs += "--docker "
 	}
 	if sshAuthSock != "" {
 		sessionArgs += "ssh-agent "
@@ -74,13 +75,27 @@ func buildDockerArgs(cfg config, volume, pwd, containerName, containerState,
 	if cfg.playwright {
 		args = append(args, "-e", "PLAYWRIGHT_ENABLED=1")
 	}
-	if cfg.docker {
-		args = append(args, "-v", "/var/run/docker.sock:/var/run/docker.sock")
-		args = append(args, "-e", "DOCKER_ENABLED=1")
-		args = append(args, "-e", "DOCKER_GID="+dockerGID)
+	for _, svcName := range cfg.enabledServices {
+		svc := getService(svcName)
+		if svc == nil {
+			continue
+		}
+		for key, value := range svc.EnvVars {
+			if value != "" {
+				args = append(args, "-e", key+"="+value)
+			}
+		}
+		for key := range svc.HostEnvVars {
+			if val, ok := hostEnvVars[key]; ok {
+				args = append(args, "-e", key+"="+val)
+			}
+		}
+		for _, vol := range svc.Volumes {
+			args = append(args, "-v", vol)
+		}
 	}
-	if cfg.zellij {
-		args = append(args, "-e", "ZELLIJ_ENABLED=1")
+	if len(cfg.enabledServices) > 0 {
+		args = append(args, "-e", "KD_SERVICES="+strings.Join(cfg.enabledServices, ","))
 	}
 	if sshAuthSock != "" {
 		args = append(args, "-v", sshAuthSock+":/ssh-agent.sock")
@@ -88,6 +103,7 @@ func buildDockerArgs(cfg config, volume, pwd, containerName, containerState,
 	}
 
 	args = append(args, "--name", containerName)
+	args = append(args, "--hostname", containerName)
 
 	if cfg.ainstruct {
 		args = append(args, "-e", "KD_AINSTRUCT_ENABLED=1")

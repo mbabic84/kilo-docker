@@ -5,9 +5,9 @@ import (
 	"io"
 	"io/fs"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,8 +18,7 @@ import (
 //
 // If running as root (UID 0), it:
 //   - Creates/updates the kilo user with PUID/PGID from environment
-//   - Downloads Docker client, Compose, and Zellij if enabled
-//   - Sets up Docker group membership
+//   - Installs enabled services from KD_SERVICES env var
 //   - Fixes SSH agent socket ownership
 //   - Pre-populates known_hosts for GitHub, GitLab, Bitbucket
 //   - Creates config directories under ~/.config/kilo/
@@ -52,25 +51,13 @@ func runInit() error {
 			}
 		}
 
-		if os.Getenv("DOCKER_ENABLED") == "1" {
-			if err := downloadDockerClient(); err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to download Docker client: %v\n", err)
-			}
-			if err := downloadDockerCompose(); err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to download Docker Compose: %v\n", err)
-			}
+		if err := installServices(); err != nil {
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: service installation error: %v\n", err)
 		}
 
-		if os.Getenv("ZELLIJ_ENABLED") == "1" {
-			if err := downloadZellij(); err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to download Zellij: %v\n", err)
-			}
-		}
-
-		if dockerGID := os.Getenv("DOCKER_GID"); dockerGID != "" {
-			if err := setupDockerGroup(dockerGID); err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to setup docker group: %v\n", err)
-			}
+		// Setup groups for services that require socket access
+		if err := setupServiceGroups(); err != nil {
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: group setup error: %v\n", err)
 		}
 
 		os.MkdirAll("/home/kilo-t8x3m7kp/.local", 0755)
@@ -147,149 +134,132 @@ func runInit() error {
 		home = "/home/kilo-t8x3m7kp"
 	}
 
-	if os.Getenv("ZELLIJ_ENABLED") == "1" {
-		zellijConfigDir := filepath.Join(home, ".config", "zellij")
-		os.MkdirAll(zellijConfigDir, 0755)
-		zellijConfigPath := filepath.Join(zellijConfigDir, "config.kdl")
-		if _, err := os.Stat(zellijConfigPath); os.IsNotExist(err) {
-			src, err := os.Open("/etc/zellij/config.kdl")
-			if err == nil {
-				defer src.Close()
-				dst, err := os.Create(zellijConfigPath)
-				if err == nil {
-					defer dst.Close()
-					io.Copy(dst, src)
-				}
-			}
-		}
+	if err := copyServiceConfigs(home); err != nil {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to copy service configs: %v\n", err)
 	}
 
 	binaryPath, _ := os.Executable()
 
 	if len(os.Args) <= 1 {
+		// Use sudo -u to start shell as kilo user, which reads /etc/group and sets supplementary groups
+		// Only use sudo if the kilo user exists (works in Docker container, not in test env)
+		if _, err := user.Lookup("kilo-t8x3m7kp"); err == nil {
+			return syscall.Exec("/usr/bin/sudo", []string{"sudo", "-u", "kilo-t8x3m7kp", "-i"}, os.Environ())
+		}
 		return syscall.Exec("/bin/sh", []string{"sh"}, os.Environ())
 	}
 
 	return syscall.Exec(binaryPath, os.Args[1:], os.Environ())
 }
 
-// downloadDockerClient fetches the latest Docker static binary from
-// download.docker.com and installs it to /usr/local/bin/docker. Skips
-// if docker is already on PATH.
-func downloadDockerClient() error {
-	if _, err := exec.LookPath("docker"); err == nil {
+// installServices reads KD_SERVICES env var and runs install commands for each enabled service.
+func installServices() error {
+	servicesEnv := os.Getenv("KD_SERVICES")
+	if servicesEnv == "" {
 		return nil
 	}
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Downloading latest Docker client...\n")
-	resp, err := http.Get("https://download.docker.com/linux/static/stable/x86_64/")
-	if err != nil {
-		return err
+
+	for _, svcName := range strings.Split(servicesEnv, ",") {
+		svc := getService(svcName)
+		if svc == nil {
+			continue
+		}
+		for _, installCmd := range svc.Install {
+			if installCmd == "" {
+				continue
+			}
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Installing %s...\n", svc.Name)
+			cmd := exec.Command("sh", "-c", installCmd)
+			cmd.Stdout = os.Stderr
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to install %s: %v\n", svc.Name, err)
+			}
+		}
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	content := string(body)
-	idx := strings.LastIndex(content, "docker-")
-	if idx == -1 {
-		return fmt.Errorf("could not find docker version")
-	}
-	rest := content[idx:]
-	end := strings.Index(rest, ".tgz")
-	if end == -1 {
-		return fmt.Errorf("could not parse docker version")
-	}
-	version := strings.TrimPrefix(rest[:end], "docker-")
-
-	url := fmt.Sprintf("https://download.docker.com/linux/static/stable/x86_64/docker-%s.tgz", version)
-	resp2, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp2.Body.Close()
-
-	tmpDir, _ := os.MkdirTemp("", "docker-download")
-	defer os.RemoveAll(tmpDir)
-
-	tarPath := filepath.Join(tmpDir, "docker.tgz")
-	f, _ := os.Create(tarPath)
-	io.Copy(f, resp2.Body)
-	f.Close()
-
-	cmd := exec.Command("tar", "xzf", tarPath, "-C", tmpDir, "docker/docker")
-	cmd.Run()
-
-	src, _ := os.Open(filepath.Join(tmpDir, "docker/docker"))
-	defer src.Close()
-	dst, _ := os.Create("/usr/local/bin/docker")
-	defer dst.Close()
-	io.Copy(dst, src)
-	os.Chmod("/usr/local/bin/docker", 0755)
 	return nil
 }
 
-// downloadDockerCompose fetches the latest Docker Compose binary from GitHub
-// and installs it to /usr/local/bin/docker-compose and the CLI plugins directory.
-func downloadDockerCompose() error {
-	if _, err := exec.LookPath("docker-compose"); err == nil {
+// copyServiceConfigs copies configured files from the container filesystem
+// to the user's home directory for each enabled service.
+func copyServiceConfigs(home string) error {
+	servicesEnv := os.Getenv("KD_SERVICES")
+	if servicesEnv == "" {
 		return nil
 	}
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Downloading latest Docker Compose...\n")
-	resp, err := http.Get("https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64")
-	if err != nil {
-		return err
+
+	for _, svcName := range strings.Split(servicesEnv, ",") {
+		svc := getService(svcName)
+		if svc == nil {
+			continue
+		}
+		for _, cfg := range svc.CopyConfigs {
+			dst := expandHome(cfg.Dst, home)
+			if dst == "" {
+				continue
+			}
+			if _, err := os.Stat(dst); err == nil {
+				continue
+			}
+			if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+				continue
+			}
+			src, err := os.Open(cfg.Src)
+			if err != nil {
+				continue
+			}
+			defer src.Close()
+			f, err := os.Create(dst)
+			if err != nil {
+				continue
+			}
+			defer f.Close()
+			io.Copy(f, src)
+		}
 	}
-	defer resp.Body.Close()
-
-	f, _ := os.Create("/usr/local/bin/docker-compose")
-	defer f.Close()
-	io.Copy(f, resp.Body)
-	os.Chmod("/usr/local/bin/docker-compose", 0755)
-
-	os.MkdirAll("/usr/libexec/docker/cli-plugins", 0755)
-	os.Symlink("/usr/local/bin/docker-compose", "/usr/libexec/docker/cli-plugins/docker-compose")
 	return nil
 }
 
-// downloadZellij fetches the latest Zellij binary from GitHub and extracts
-// it to /usr/local/bin.
-func downloadZellij() error {
-	if _, err := exec.LookPath("zellij"); err == nil {
-		return nil
+// expandHome replaces "~" in path with the given home directory.
+func expandHome(path, home string) string {
+	if len(path) >= 2 && path[0] == '~' && path[1] == '/' {
+		return filepath.Join(home, path[2:])
 	}
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Downloading latest Zellij...\n")
-	resp, err := http.Get("https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz")
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	tmpDir, _ := os.MkdirTemp("", "zellij-download")
-	defer os.RemoveAll(tmpDir)
-
-	tarPath := filepath.Join(tmpDir, "zellij.tar.gz")
-	f, _ := os.Create(tarPath)
-	io.Copy(f, resp.Body)
-	f.Close()
-
-	cmd := exec.Command("tar", "xzf", tarPath, "-C", "/usr/local/bin")
-	return cmd.Run()
+	return path
 }
 
-// setupDockerGroup creates or joins the Docker group with the specified GID
-// and adds the kilo user to it, enabling container-level Docker socket access.
-func setupDockerGroup(gid string) error {
-	cmd := exec.Command("addgroup", "-g", gid, "docker")
-	if err := cmd.Run(); err == nil {
-		exec.Command("addgroup", "kilo-t8x3m7kp", "docker").Run()
+// setupServiceGroups reads KD_SERVICES and DOCKER_GID env vars, then sets up
+// group membership for services that require socket access. This must run as
+// root before privilege drop so that addgroup can modify /etc/group.
+func setupServiceGroups() error {
+	servicesEnv := os.Getenv("KD_SERVICES")
+	if servicesEnv == "" {
 		return nil
 	}
-	cmd2 := exec.Command("getent", "group", gid)
-	out, err := cmd2.Output()
-	if err != nil {
-		return nil
-	}
-	parts := strings.SplitN(string(out), ":", 2)
-	if len(parts) > 0 && parts[0] != "" {
-		exec.Command("addgroup", "kilo-t8x3m7kp", parts[0]).Run()
+
+	for _, svcName := range strings.Split(servicesEnv, ",") {
+		svc := getService(svcName)
+		if svc == nil || svc.RequiresSocket == "" {
+			continue
+		}
+		gid := os.Getenv(svc.GIDEnvVar)
+		if gid == "" {
+			continue
+		}
+		cmd := exec.Command("addgroup", "-g", gid, svc.Name)
+		if err := cmd.Run(); err == nil {
+			exec.Command("addgroup", "kilo-t8x3m7kp", svc.Name).Run()
+			continue
+		}
+		cmd2 := exec.Command("getent", "group", gid)
+		out, err := cmd2.Output()
+		if err != nil {
+			continue
+		}
+		parts := strings.SplitN(string(out), ":", 2)
+		if len(parts) > 0 && parts[0] != "" {
+			exec.Command("addgroup", "kilo-t8x3m7kp", parts[0]).Run()
+		}
 	}
 	return nil
 }
