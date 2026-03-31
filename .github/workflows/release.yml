@@ -69,16 +69,14 @@ jobs:
 
       - name: Upload binaries to release
         if: ${{ steps.release.outputs.new_release_published == 'true' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.release.outputs.new_release_version }}
-          files: |
-            kilo-docker-linux-amd64
-            kilo-docker-linux-arm64
-            kilo-docker-darwin-amd64
+        run: |
+          gh release upload "v${{ steps.release.outputs.new_release_version }}" \
+            kilo-docker-linux-amd64 \
+            kilo-docker-linux-arm64 \
+            kilo-docker-darwin-amd64 \
             kilo-docker-darwin-arm64
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         if: ${{ steps.release.outputs.new_release_published == 'true' }}
