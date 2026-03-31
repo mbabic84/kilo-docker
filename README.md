@@ -41,6 +41,10 @@ Or use the bootstrap installer:
 curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/install.sh | sh
 ```
 
+```bash
+curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/install.sh | bash
+```
+
 Then run from any directory:
 
 ```bash
@@ -78,6 +82,7 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | `--ssh` | Enable SSH agent forwarding into the container |
 | `--zellij` | Start a Zellij terminal multiplexer session |
 | `--network <name>` | Attach to a specific Docker network |
+| `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
 
 ## One-Time Sessions
 

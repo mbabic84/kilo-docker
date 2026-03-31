@@ -88,6 +88,7 @@ Options:
   --ssh             Enable SSH agent forwarding into the container
   --zellij          Start with Zellij multiplexer (detach: Ctrl+P Ctrl+Q, reattach: kilo-docker sessions)
   --network <name>  Connect the container to a Docker network
+  --yes, -y         Auto-confirm all prompts (useful for piped/non-interactive installs)
 
 Examples:
   kilo-docker                                    # interactive mode
