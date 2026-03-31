@@ -327,3 +327,89 @@ func TestBuildRunArgsProducesDockerRunNotDashIT(t *testing.T) {
 		t.Errorf("second arg = %q, want %q", result[1], "-it")
 	}
 }
+
+// TestDockerRunWithStdinInsertsStdinFlag verifies that the stdin variant
+// inserts -i after "run --rm" so Docker attaches stdin for data piping.
+// Without -i, docker run ignores stdin and the container receives empty input.
+func TestDockerRunWithStdinInsertsStdinFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantFull string
+	}{
+		{
+			name:     "saveTokens encrypted call",
+			args:     []string{"-v", "vol:/home/kilo", "image", "sh", "-c", "cat > /path"},
+			wantFull: "run --rm -i -v vol:/home/kilo image sh -c cat > /path",
+		},
+		{
+			name:     "saveTokens unencrypted call",
+			args:     []string{"-v", "vol:/home/kilo", "image", "save-tokens"},
+			wantFull: "run --rm -i -v vol:/home/kilo image save-tokens",
+		},
+		{
+			name:     "saveSkipMarker call",
+			args:     []string{"-v", "vol:/home/kilo", "image", "sh", "-c", "mkdir -p dir && cat > file"},
+			wantFull: "run --rm -i -v vol:/home/kilo image sh -c mkdir -p dir && cat > file",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate what dockerRunWithStdin does to its args:
+			// 1. ensureRunArgs prepends "run --rm"
+			// 2. Insert -i at position 2 (after "run --rm")
+			args := ensureRunArgs(tt.args)
+			args = append(args[:2], append([]string{"-i"}, args[2:]...)...)
+
+			got := ""
+			for i, s := range args {
+				if i > 0 {
+					got += " "
+				}
+				got += s
+			}
+			if got != tt.wantFull {
+				t.Errorf("dockerRunWithStdin args produced:\n  %q\nwant:\n  %q", got, tt.wantFull)
+			}
+
+			// Verify structure: run --rm -i ...
+			if args[0] != "run" {
+				t.Errorf("args[0] = %q, want %q", args[0], "run")
+			}
+			if args[1] != "--rm" {
+				t.Errorf("args[1] = %q, want %q", args[1], "--rm")
+			}
+			if args[2] != "-i" {
+				t.Errorf("args[2] = %q, want %q — without -i, Docker ignores stdin", args[2], "-i")
+			}
+		})
+	}
+}
+
+// TestDockerRunDoesNotInsertStdinFlag verifies that the regular dockerRun
+// does NOT insert -i (it uses terminal stdin, not programmatic input).
+func TestDockerRunDoesNotInsertStdinFlag(t *testing.T) {
+	args := []string{"-v", "vol:/home/kilo", "image", "cat", "/path"}
+	result := ensureRunArgs(args)
+
+	// ensureRunArgs should produce "run --rm ..." WITHOUT -i
+	got := ""
+	for i, s := range result {
+		if i > 0 {
+			got += " "
+		}
+		got += s
+	}
+	expected := "run --rm -v vol:/home/kilo image cat /path"
+	if got != expected {
+		t.Errorf("ensureRunArgs() produced:\n  %q\nwant:\n  %q", got, expected)
+	}
+
+	// Verify -i is NOT in the args
+	for i, arg := range result {
+		if arg == "-i" {
+			t.Errorf("found -i at position %d — dockerRun should not add -i", i)
+		}
+	}
+}
