@@ -1,3 +1,18 @@
+## [1.29.0](https://github.com/mbabic84/kilo-docker/compare/v1.28.1...v1.29.0) (2026-03-31)
+
+### Features
+
+* add sessions cleanup -a flag to auto-remove exited sessions ([2c0d41c](https://github.com/mbabic84/kilo-docker/commit/2c0d41c8fff5b700e2067c3b8f6621d032d18c89))
+* migrate from bash to Go ([ce3dbd0](https://github.com/mbabic84/kilo-docker/commit/ce3dbd01d05b5274887caa602c8959035c0d3b57))
+
+### Bug Fixes
+
+* docker argument construction and container init ([d9c7b66](https://github.com/mbabic84/kilo-docker/commit/d9c7b669bb432880498296b8f6903a31646c3d54))
+* pass through unknown commands to exec instead of erroring ([198d711](https://github.com/mbabic84/kilo-docker/commit/198d711f72411b4ce85d8577dd483d104de71a6d))
+* prompt for MCP tokens after ainstruct login completes ([7b1898c](https://github.com/mbabic84/kilo-docker/commit/7b1898c74dba1761c7734947b51c8e78d91d2a41))
+* refresh MCP token variables after prompting user ([b0be148](https://github.com/mbabic84/kilo-docker/commit/b0be148ec8bc9b520fd9c26261f4180ea6269fe5))
+* skip interactive prompts in sessions cleanup -y ([e10baf0](https://github.com/mbabic84/kilo-docker/commit/e10baf080daa59342e31e91dafeb42d6c2d26baa))
+
 ## [1.28.1](https://github.com/mbabic84/kilo-docker/compare/v1.28.0...v1.28.1) (2026-03-30)
 
 ### Bug Fixes
