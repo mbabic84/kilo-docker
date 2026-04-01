@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kilo-org/kilo-docker/pkg/constants"
 )
 
 const collectionName = "kilo-docker"
@@ -83,7 +85,7 @@ type Syncer struct {
 // NewSyncer creates a Syncer configured from environment variables.
 // Reads API URL, tokens, and token expiry from KD_AINSTRUCT_* env vars.
 func NewSyncer() *Syncer {
-	home := os.Getenv("HOME")
+	home := constants.GetHomeDir()
 	apiURL := os.Getenv("KD_AINSTRUCT_API_URL")
 	if apiURL == "" {
 		apiURL = "https://ainstruct-dev.kralicinora.cz/api/v1"

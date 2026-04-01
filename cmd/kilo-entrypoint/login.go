@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 )
 
 // runAinstructLogin authenticates with the Ainstruct API using credentials
@@ -114,26 +113,4 @@ func runAinstructLogin() error {
 		}
 		return fmt.Errorf("login failed with status %d: %s", resp.StatusCode, msg)
 	}
-}
-
-// parseLoginOutput parses KEY=VALUE formatted lines from the ainstruct-login
-// subcommand into a map for structured access.
-func parseLoginOutput(output string) map[string]string {
-	result := make(map[string]string)
-	for _, line := range bytes.Split([]byte(output), []byte{'\n'}) {
-		if len(line) == 0 {
-			continue
-		}
-		parts := bytes.SplitN(line, []byte{'='}, 2)
-		if len(parts) == 2 {
-			result[string(parts[0])] = string(parts[1])
-		}
-	}
-	return result
-}
-
-// parseInt64 parses a string as a 64-bit integer, returning 0 on error.
-func parseInt64(s string) int64 {
-	v, _ := strconv.ParseInt(s, 10, 64)
-	return v
 }
