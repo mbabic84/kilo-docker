@@ -183,6 +183,22 @@ func handleSessions(cfg config) {
 		resetTerminal()
 	case "exited", "created":
 		fmt.Fprintf(os.Stderr, "Starting session '%s'...\n", containerToAttach)
+		// If the session uses ssh-agent, ensure the socket is valid
+		// before restarting. Docker may have created a directory at
+		// the socket path if it didn't exist at container creation.
+		needsSSH := false
+		for _, s := range sessions {
+			if s.Name == containerToAttach && strings.Contains(s.Args, "ssh-agent") {
+				needsSSH = true
+				break
+			}
+		}
+		if needsSSH {
+			_, _, sshStarted := setupSSH()
+			if sshStarted {
+				defer cleanupSSH(os.Getenv("SSH_AGENT_PID"))
+			}
+		}
 		if err := execDockerAttach("start", "-ai", containerToAttach); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
