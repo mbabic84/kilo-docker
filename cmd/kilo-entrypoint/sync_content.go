@@ -50,6 +50,19 @@ func documentType(path string) string {
 	}
 }
 
+// defaultSyncPaths lists paths (relative to the kilo config dir) that are
+// whitelisted for sync. Only files matching these paths are watched, pulled,
+// and pushed. Directories are synced recursively. Everything else is ignored.
+var defaultSyncPaths = []string{
+	"opencode.json",
+	"rules",
+	"commands",
+	"agents",
+	"plugins",
+	"skills",
+	"tools",
+}
+
 // Syncer manages bidirectional sync between local config files and the
 // Ainstruct REST API. It tracks content hashes to avoid redundant uploads,
 // handles JWT token refresh, and manages the collection lifecycle.
@@ -64,6 +77,7 @@ type Syncer struct {
 	collectionID string
 	authExpired  bool
 	client       *http.Client
+	syncPaths    []string // whitelist of paths (relative to kilo config dir) to sync
 }
 
 // NewSyncer creates a Syncer configured from environment variables.
@@ -86,7 +100,36 @@ func NewSyncer() *Syncer {
 		homeDir:      home,
 		hashFile:     filepath.Join(home, ".config", "kilo", ".ainstruct-hashes"),
 		client:       &http.Client{Timeout: 30 * time.Second},
+		syncPaths:    defaultSyncPaths,
 	}
+}
+
+// isSyncedPath checks whether a relative path (relative to the kilo config
+// directory, e.g. "rules/bash.md") is whitelisted for sync.
+func (s *Syncer) isSyncedPath(relPath string) bool {
+	for _, sp := range s.syncPaths {
+		if relPath == sp {
+			return true
+		}
+		if strings.HasPrefix(relPath, sp+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// syncedAbsDirs returns the absolute paths of all whitelisted sync directories
+// that exist on disk. Used by the watcher to know which directories to monitor.
+func (s *Syncer) syncedAbsDirs() []string {
+	kiloDir := filepath.Join(s.homeDir, ".config", "kilo")
+	dirs := []string{kiloDir}
+	for _, sp := range s.syncPaths {
+		abs := filepath.Join(kiloDir, sp)
+		if info, err := os.Stat(abs); err == nil && info.IsDir() {
+			dirs = append(dirs, abs)
+		}
+	}
+	return dirs
 }
 
 type collection struct {
@@ -328,6 +371,9 @@ func (s *Syncer) pullCollection() error {
 	for _, doc := range dr.Documents {
 		relPath := doc.Metadata.LocalPath
 		if relPath == "" {
+			continue
+		}
+		if !s.isSyncedPath(relPath) {
 			continue
 		}
 		apiHash := doc.ContentHash

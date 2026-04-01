@@ -202,3 +202,58 @@ func TestEnsureCollectionNoIDInResponse(t *testing.T) {
 		t.Fatal("expected error when response has no collection_id")
 	}
 }
+
+func TestIsSyncedPath(t *testing.T) {
+	s := newTestSyncer("http://localhost")
+
+	tests := []struct {
+		path string
+		want bool
+	}{
+		// Whitelisted files
+		{"opencode.json", true},
+		// Whitelisted directories (root)
+		{"rules", true},
+		{"commands", true},
+		{"agents", true},
+		{"plugins", true},
+		{"skills", true},
+		{"tools", true},
+		// Whitelisted files within directories
+		{"rules/bash.md", true},
+		{"rules/subdir/file.md", true},
+		{"commands/foo.js", true},
+		{"agents/bar.ts", true},
+		{"plugins/myplugin/index.js", true},
+		{"skills/deep/nested/file.md", true},
+		// NOT whitelisted
+		{".ainstruct-hashes", false},
+		{"some-random-file.txt", false},
+		{"node_modules/package/index.js", false},
+		{"some-dir/file.md", false},
+		// Partial prefix matches should NOT sync
+		{"rules_extra", false},
+		{"rules_extra/file.md", false},
+	}
+	for _, tt := range tests {
+		got := s.isSyncedPath(tt.path)
+		if got != tt.want {
+			t.Errorf("isSyncedPath(%q) = %v, want %v", tt.path, got, tt.want)
+		}
+	}
+}
+
+func TestIsSyncedPathCustom(t *testing.T) {
+	s := newTestSyncer("http://localhost")
+	s.syncPaths = []string{"rules", "my-custom-dir"}
+
+	if !s.isSyncedPath("rules/bash.md") {
+		t.Error("expected rules/bash.md to be synced")
+	}
+	if !s.isSyncedPath("my-custom-dir/file.txt") {
+		t.Error("expected my-custom-dir/file.txt to be synced")
+	}
+	if s.isSyncedPath("commands/foo.js") {
+		t.Error("expected commands/foo.js to NOT be synced with custom paths")
+	}
+}
