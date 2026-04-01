@@ -1,3 +1,9 @@
+## [1.39.1](https://github.com/mbabic84/kilo-docker/compare/v1.39.0...v1.39.1) (2026-04-01)
+
+### Bug Fixes
+
+* remove incorrect KILO_VERSION build arg from docker build ([b93f292](https://github.com/mbabic84/kilo-docker/commit/b93f292d3fef7db2e69a16ed1e481d1bf82d29ad))
+
 ## [1.39.0](https://github.com/mbabic84/kilo-docker/compare/v1.38.0...v1.39.0) (2026-04-01)
 
 ### Features
