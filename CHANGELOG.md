@@ -1,3 +1,9 @@
+## [1.40.1](https://github.com/mbabic84/kilo-docker/compare/v1.40.0...v1.40.1) (2026-04-01)
+
+### Bug Fixes
+
+* skip service installation on subsequent container starts ([2beae36](https://github.com/mbabic84/kilo-docker/commit/2beae36be9c07c1945130978c64943abe11bf1fe))
+
 ## [1.40.0](https://github.com/mbabic84/kilo-docker/compare/v1.39.3...v1.40.0) (2026-04-01)
 
 ### Features
