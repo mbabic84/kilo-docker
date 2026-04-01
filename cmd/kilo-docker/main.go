@@ -52,6 +52,8 @@ func main() {
 	switch cfg.command {
 	case "help":
 		printHelp()
+	case "version":
+		printVersion()
 	case "networks":
 		listNetworks()
 	case "sessions":
