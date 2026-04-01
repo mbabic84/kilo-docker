@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -8,13 +8,13 @@ usage() {
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  build-entrypoint   Build kilo-entrypoint binary"
-    echo "  build-host         Build kilo-docker host binary"
-    echo "  build-all          Build both binaries and Docker image"
-    echo "  test               Run Go tests"
-    echo "  tidy               Run go mod tidy"
-    echo "  docker-build       Build Docker image"
-    echo "  clean              Remove built binaries"
+    echo "  entrypoint   Build kilo-entrypoint binary"
+    echo "  host         Build kilo-docker host binary"
+    echo "  all          Build both binaries and Docker image"
+    echo "  test         Run Go tests"
+    echo "  tidy         Run go mod tidy"
+    echo "  docker       Build Docker image"
+    echo "  clean        Remove built binaries"
     exit 1
 }
 
@@ -48,17 +48,17 @@ run_go_env() {
 }
 
 case "$COMMAND" in
-    build-entrypoint)
+    entrypoint)
         echo "Building kilo-entrypoint..."
         run_go_env go build -ldflags="-s -w" -o /build/bin/kilo-entrypoint ./cmd/kilo-entrypoint
         echo "Binary: bin/kilo-entrypoint"
         ;;
-    build-host)
+    host)
         echo "Building kilo-docker host binary..."
         run_go_env go build -ldflags="-s -w" -o /build/bin/kilo-docker ./cmd/kilo-docker
         echo "Binary: bin/kilo-docker"
         ;;
-    build-all)
+    all)
         echo "Building all binaries..."
         mkdir -p "${PROJECT_DIR}/bin"
         run_go_env go build -ldflags="-s -w" -o /build/bin/kilo-entrypoint ./cmd/kilo-entrypoint
@@ -77,7 +77,7 @@ case "$COMMAND" in
         echo "Running go mod tidy..."
         run_go go mod tidy
         ;;
-    docker-build)
+    docker)
         echo "Building Docker image..."
         docker build -t ghcr.io/mbabic84/kilo-docker:latest "${PROJECT_DIR}"
         echo "Image: ghcr.io/mbabic84/kilo-docker:latest"

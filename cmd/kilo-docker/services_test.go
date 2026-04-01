@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/kilo-org/kilo-docker/pkg/services"
+	"github.com/mbabic84/kilo-docker/pkg/services"
 )
 
 func TestGetServiceDocker(t *testing.T) {

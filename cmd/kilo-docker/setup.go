@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
+	"github.com/mbabic84/kilo-docker/pkg/services"
 	"golang.org/x/term"
 )
 
@@ -116,52 +118,69 @@ func printVersion() {
 
 // printHelp displays usage, commands, options, and examples to stderr.
 func printHelp() {
-	help := `Usage: kilo-docker [--once] [--password] [--ainstruct] [--mcp] [--playwright] [--docker] [--ssh] [--zellij] [--network <name>] [command] [args...]
+	const w = 43 // column width for commands/options
 
-Commands:
-  (no command)      Start Kilo in interactive mode
-  run "prompt"      Run Kilo in autonomous mode with a prompt
-  sessions [name]       List sessions or attach to one by name/index
-  sessions cleanup [-y|-a] [name]  Remove a session (-y: skip confirm, -a: all exited)
-  sessions recreate <name|index>  Recreate a session with the same flags (preserves volume)
-  networks          List available Docker networks
-  backup [-f]       Create backup of volume to tar.gz (auto-names with timestamp)
-  restore <file> [-f] [--volume <name>]  Restore volume from backup
-  init              Reset configuration (remove volume)
-  cleanup           Remove volume, containers, images, and installed script
-  install           Install kilo-docker as a global command (~/.local/bin)
-  update            Pull the latest Docker image and update the installed script
-  update-config     Download latest opencode.json template and merge with existing config
-  version           Show kilo-docker and kilo versions
-  help              Show this help message (wrapper)
+	var svcLines []string
+	for _, svc := range services.BuiltInServices {
+		svcLines = append(svcLines, fmt.Sprintf("  %-*s %s", w-2, svc.Flag, svc.Description))
+	}
 
-Options:
-  --once            Run a one-time session without persisting data (no volume)
-  --password, -p    Protect volume with a password (encrypts tokens, derives volume name from password)
-  --ainstruct       Encrypt tokens using Ainstruct user_id for volume naming
-  --mcp             Enable MCP servers (prompts for Context7 and Ainstruct API tokens)
-  --playwright      Start a Playwright MCP sidecar container for browser automation
-  --docker          Mount Docker socket for container management from within Kilo
-  --ssh             Enable SSH agent forwarding into the container
-  --zellij          Start with Zellij multiplexer (detach: Ctrl+P Ctrl+Q, reattach: kilo-docker sessions)
-  --network <name>  Connect the container to a Docker network
-  --yes, -y         Auto-confirm all prompts (useful for piped/non-interactive installs)
+	var cmdLines []string
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions [name|index]", "List sessions or attach to one"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions cleanup [-y]", "Remove a session (interactive selection)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions cleanup [-y] <name|index>", "Remove a session by name or index"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions cleanup -y -a", "Remove all exited sessions"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions recreate <name|index>", "Recreate a session (preserves volume, same flags)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "networks", "List available Docker networks"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "backup [-f]", "Create backup of volume to tar.gz (auto-names with timestamp)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "restore <file> [-f] [-v|--volume <name>]", "Restore volume from backup"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "init", "Reset configuration (remove volume)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "cleanup", "Remove volume, containers, images, and installed binary"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "update", "Pull the latest Docker image and update the binary"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "update-config", "Download latest opencode.json template and merge with existing config"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "version", "Show kilo-docker and kilo versions"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "help", "Show this help message"))
 
-Examples:
-  kilo-docker                                    # interactive mode
-  kilo-docker run "fix build errors"             # autonomous mode
-  kilo-docker --password                         # interactive mode with encryption
-  kilo-docker --ainstruct                        # interactive mode with Ainstruct encryption
-  kilo-docker --once                             # one-time interactive session
-  kilo-docker --mcp                              # with Context7 and Ainstruct MCP servers
-  kilo-docker --playwright                       # with Playwright browser automation
-  kilo-docker --docker                           # with Docker socket access
-  kilo-docker --ssh                              # with SSH agent forwarding
-  kilo-docker --zellij                           # start/reattach Zellij container
-  kilo-docker sessions                           # list all sessions
-  kilo-docker sessions recreate 1                # recreate session with same flags
-  kilo-docker backup                             # create backup
-  kilo-docker restore backup.tar.gz              # restore from backup
-`
+	var optLines []string
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--once", "Run a one-time session without persisting data (no volume)"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--password, -p", "Protect volume with a password (encrypts tokens, derives volume name from password)"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--ainstruct", "Authenticate with Ainstruct API, encrypt tokens, and enable file sync"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--mcp", "Enable MCP servers (prompts for Context7 and Ainstruct API tokens)"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--playwright", "Start a Playwright MCP sidecar container for browser automation"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--ssh", "Enable SSH agent forwarding into the container"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--network <name>", "Connect the container to a Docker network"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--yes, -y", "Auto-confirm all prompts (useful for piped/non-interactive installs)"))
+
+	var exLines []string
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker", "# start a shell in the container"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --password", "# with encrypted tokens"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --ainstruct", "# with Ainstruct authentication"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --once", "# one-time session"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --mcp", "# with Context7 and Ainstruct MCP servers"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --playwright", "# with Playwright browser automation"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --ssh", "# with SSH agent forwarding"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --docker --zellij --go", "# with multiple services enabled"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions", "# list all sessions"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions recreate 1", "# recreate session with same flags"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker backup", "# create backup"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker restore backup.tar.gz", "# restore from backup"))
+
+	help := strings.Join([]string{
+		"Usage: kilo-docker [options] [services] [command] [args...]",
+		"",
+		"Commands:",
+		strings.Join(cmdLines, "\n"),
+		"",
+		"Options:",
+		strings.Join(optLines, "\n"),
+		"",
+		"Services:",
+		strings.Join(svcLines, "\n"),
+		"",
+		"Examples:",
+		strings.Join(exLines, "\n"),
+		"",
+	}, "\n")
+
 	fmt.Fprintf(os.Stderr, "%s", help)
 }

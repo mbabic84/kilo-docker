@@ -13,7 +13,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/kilo-org/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/constants"
 )
 
 // runInit performs container initialization when invoked with no subcommand.

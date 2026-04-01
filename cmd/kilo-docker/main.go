@@ -13,27 +13,24 @@
 //
 //	--once            One-time session (no volume)
 //	--password, -p    Encrypt tokens, derive volume name from password
-//	--ainstruct       Authenticate with Ainstruct API for encryption
+//	--ainstruct       Authenticate with Ainstruct API for encryption and sync
 //	--mcp             Enable MCP servers (Context7, Ainstruct)
 //	--playwright      Start Playwright MCP sidecar
-//	--docker          Mount Docker socket
 //	--ssh             Enable SSH agent forwarding
-//	--zellij          Start with Zellij multiplexer
 //	--network <name>  Connect to a Docker network
 //	--yes, -y         Auto-confirm all prompts
 //
 // Commands:
 //
-//	(no command)      Start Kilo interactively
 //	sessions          List/attach to sessions
+//	networks          List Docker networks
 //	backup            Create volume backup
 //	restore           Restore from backup
-//	install           Install as global command
-//	update            Pull latest Docker image
 //	init              Reset configuration
 //	cleanup           Remove all artifacts
-//	networks          List Docker networks
+//	update            Pull latest Docker image and update binary
 //	update-config     Merge config template
+//	version           Show versions
 //	help              Show help
 package main
 

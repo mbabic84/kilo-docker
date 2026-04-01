@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/kilo-org/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/constants"
 )
 
 // runConfig toggles MCP server enabled/disabled state in the user's

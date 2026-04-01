@@ -1,4 +1,4 @@
-module github.com/kilo-org/kilo-docker
+module github.com/mbabic84/kilo-docker
 
 go 1.26
 

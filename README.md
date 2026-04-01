@@ -18,7 +18,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **Ainstruct file sync** - `--ainstruct` flag enables automatic push/pull sync of config files, commands, agents, and instructions via the Ainstruct API
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
-- **Built-in services** - Extensible service system with `--docker`, `--zellij` and more (see [Built-in Services](#built-in-services))
+- **Built-in services** - Extensible service system with `--docker`, `--zellij` and more (see [Services](#services))
 
 ## Quick Start
 
@@ -40,33 +40,30 @@ Or use the bootstrap installer:
 curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/install.sh | sh
 ```
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/install.sh | bash
-```
-
 Then run from any directory:
 
 ```bash
 kilo-docker
 ```
 
-On first run, the script prompts for MCP server tokens and saves them to a named Docker volume. Subsequent runs reuse the saved tokens.
+On first run, the binary prompts for MCP server tokens and saves them to a named Docker volume. Subsequent runs reuse the saved tokens.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| *(none)* | Start Kilo in interactive mode |
-| `run "prompt"` | Run Kilo in autonomous mode |
-| `sessions [name]` | List sessions or attach to one by name/index |
-| `sessions cleanup [-y] [name]` | Remove a session (interactive if no name given) |
+| `sessions [name\|index]` | List sessions or attach to one by name or index |
+| `sessions cleanup [-y] [name\|index]` | Remove a session (interactive if no name given) |
+| `sessions cleanup -y -a` | Remove all exited sessions |
+| `sessions recreate <name\|index>` | Recreate a session with the same flags (preserves volume) |
+| `networks` | List available Docker networks |
 | `backup [-f]` | Create backup of volume to tar.gz |
-| `restore <file> [-f] [--volume <name>]` | Restore volume from backup |
+| `restore <file> [-f] [-v\|--volume <name>]` | Restore volume from backup |
 | `init` | Reset configuration (remove volume, re-enter tokens) |
-| `cleanup` | Remove volume, containers, image, and installed script |
-| `install` | Install as a global command (`~/.local/bin/kilo-docker`) |
-| `update` | Pull the latest Docker image and update the installed script |
+| `cleanup` | Remove volume, containers, image, and installed binary |
+| `update` | Pull the latest Docker image and update the binary |
 | `update-config` | Download latest opencode.json template and merge with existing config |
+| `version` | Show kilo-docker and kilo versions |
 | `help` | Show help message |
 
 ### Options
@@ -76,12 +73,22 @@ On first run, the script prompts for MCP server tokens and saves them to a named
 | `--once` | Run a one-time session without persistence (no volume) |
 | `--password`, `-p` | Protect volume with a password (encrypts tokens, derives volume name from password) |
 | `--ainstruct` | Authenticate with Ainstruct API (volume from user_id, tokens encrypted, file sync enabled) |
+| `--mcp` | Enable MCP servers (prompts for Context7 and Ainstruct API tokens) |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
-| `--docker` | Mount Docker socket for container management from within Kilo |
 | `--ssh` | Enable SSH agent forwarding into the container |
-| `--zellij` | Start a Zellij terminal multiplexer session |
 | `--network <name>` | Attach to a specific Docker network |
 | `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
+
+### Services
+
+| Service | Description |
+|---------|-------------|
+| `--docker` | Mount Docker socket for container management from within Kilo |
+| `--zellij` | Start with Zellij multiplexer (detach: Ctrl+P Ctrl+Q, reattach: kilo-docker sessions) |
+| `--go` | Install Go 1.26.1 (latest stable) for development |
+| `--node` | Install Node.js LTS for development |
+| `--gh` | Install GitHub CLI for interacting with GitHub |
+| `--uv` | Install uv for fast Python package management |
 
 ## One-Time Sessions
 
@@ -89,9 +96,6 @@ Use `--once` to run without creating or mounting a named volume. No data persist
 
 ```bash
 kilo-docker --once
-
-# Autonomous one-shot
-kilo-docker --once run "fix build errors"
 ```
 
 This is useful for CI pipelines, ephemeral environments, or when you don't want to leave any state on the host.
@@ -130,7 +134,7 @@ The username and password are used to obtain the user's `user_id`, which is then
 kilo-docker --ainstruct
 ```
 
-On first run, you are prompted for your Ainstruct username and password. The script authenticates via the API, obtains the `user_id`, and derives a non-discoverable volume name and encryption key from it. MCP server tokens are then prompted and stored encrypted in the volume.
+On first run, you are prompted for your Ainstruct username and password. The binary authenticates via the API, obtains the `user_id`, and derives a non-discoverable volume name and encryption key from it. MCP server tokens are then prompted and stored encrypted in the volume.
 
 ### File sync
 
@@ -158,11 +162,7 @@ The sync engine runs as a subcommand of `kilo-entrypoint` inside the container �
 The `--playwright` flag starts a [Playwright MCP](https://github.com/microsoft/playwright-mcp) sidecar container alongside Kilo, enabling browser automation (screenshots, navigation, form filling, etc.):
 
 ```bash
-# Interactive with browser
 kilo-docker --playwright
-
-# Autonomous with browser
-kilo-docker --once --playwright run "take a screenshot of example.com"
 ```
 
 The sidecar runs headless Chromium in HTTP mode on port 8931 inside a dedicated Docker network (`kilo-playwright-<username>`). Both the sidecar container and network are automatically cleaned up when Kilo exits.
@@ -223,7 +223,7 @@ The host binary uses a named Docker volume mounted at `/home/kilo-t8x3m7kp`. Thi
 
 **Ainstruct mode** (`--ainstruct`) — Volume name: `kilo-<hash>` (derived from Ainstruct user_id). Tokens stored as AES-256-CBC ciphertext.
 
-The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, image, and installed script).
+The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, image, and installed binary).
 
 ### Updating config from template
 
@@ -244,7 +244,7 @@ Create a backup of your volume to transfer data between hosts or protect against
 kilo-docker backup
 
 # Create backup with custom filename
-kilo-docker backup -f ~/my-kilo-backup.tar.gz
+kilo-docker backup ~/my-kilo-backup.tar.gz
 
 # Restore from backup
 kilo-docker restore ~/my-kilo-backup.tar.gz
@@ -265,11 +265,17 @@ kilo-docker sessions
 # Attach to a session by name or index
 kilo-docker sessions <name-or-index>
 
-# Remove a session
+# Remove a session (interactive selection)
+kilo-docker sessions cleanup
+
+# Remove a specific session
 kilo-docker sessions cleanup <name-or-index>
 
-# Remove all stopped sessions
-kilo-docker sessions cleanup
+# Remove all exited sessions
+kilo-docker sessions cleanup -a
+
+# Recreate a session with the same flags (preserves volume)
+kilo-docker sessions recreate <name-or-index>
 ```
 
 When attaching to an existing session, `kilo-docker` automatically detects whether the container is running (attaches), stopped (starts it), or missing (creates a new one).
@@ -330,11 +336,11 @@ Host remote
 ## Building Locally
 
 ```bash
-# Build Go binaries
-bash scripts/build.sh build-all
+# Build Go binaries and Docker image
+scripts/build.sh all
 
-# Build Docker image
-docker build -t kilo-docker .
+# Build Docker image only
+scripts/build.sh docker
 
 # Test
 docker run --rm kilo-docker --version
@@ -352,13 +358,13 @@ The build uses a multi-stage Dockerfile: a `golang:1.26-alpine` builder compiles
 ├── go.mod                         # Go module definition
 ├── go.sum                         # Go dependency checksums
 ├── cmd/
-│   ├── kilo-docker/               # Host-side CLI (21 files)
+│   ├── kilo-docker/               # Host-side CLI (19 source files)
 │   │   ├── main.go                # CLI dispatch + container launch
 │   │   ├── flags.go               # Config struct, flag parsing
 │   │   ├── args.go                # Docker run argument builder
-│   │   ├── services.go             # Service definitions (docker, zellij, ...)
-│   │   ├── handlers.go            # install, update, cleanup, init, update-config
-│   │   ├── handle_sessions.go     # session list/attach/cleanup
+│   │   ├── services.go            # Service helper wrappers
+│   │   ├── handlers.go            # update, cleanup, init, update-config
+│   │   ├── handle_sessions.go     # session list/attach/cleanup/recreate
 │   │   ├── handle_backup.go       # backup/restore handlers
 │   │   ├── setup.go               # resolveVolume, isTerminal, help
 │   │   ├── docker.go              # Docker CLI wrappers (run, exec, cp)
@@ -371,56 +377,11 @@ The build uses a multi-stage Dockerfile: a `golang:1.26-alpine` builder compiles
 │   │   ├── network.go             # Docker network selection
 │   │   ├── terminal.go            # Terminal reset after docker attach
 │   │   ├── session.go             # Session data model
-│   │   ├── install.go             # copyFile utility
-│   │   └── backup.go              # backup/restore via docker exec
-│   └── kilo-entrypoint/           # Container entrypoint (13 files)
-│       ├── main.go                 # Subcommand dispatcher
-│       ├── init.go                 # Container init (user setup, service installation, privilege drop)
-│       ├── services.go             # Service definitions (matches kilo-docker)
-│       ├── config.go               # MCP server toggling from env vars
-│       ├── loadsave.go             # Token load/save subcommands
-│       ├── login.go                # Ainstruct HTTP login + profile fetch
-│       ├── updatecfg.go            # Config template download + JSON merge
-│       ├── backup.go               # tar.gz backup/restore subcommands
-│       ├── sync.go                 # Ainstruct sync entry point
-│       ├── sync_content.go         # Collection/document sync, Syncer struct
-│       ├── api.go                  # REST client with JWT refresh
-│       ├── watcher.go              # inotify file watcher with 5s debounce
-│       └── hash.go                 # Hash tracking for sync
-├── configs/
-│   ├── opencode.json              # Kilo config for base image
-│   └── zellij.kdl                 # Zellij config (keybinds, pane settings)
-└── scripts/
-    ├── build.sh                   # Go build helper (via Docker)
-    └── install.sh                  # Bootstrap installer (curl | sh)
-```
-├── Dockerfile                     # Multi-stage build (Go builder + Alpine runtime)
-├── go.mod                         # Go module definition
-├── go.sum                         # Go dependency checksums
-├── cmd/
-│   ├── kilo-docker/               # Host-side CLI (19 files)
-│   │   ├── main.go                # CLI dispatch + container launch
-│   │   ├── flags.go               # Config struct, flag parsing
-│   │   ├── args.go                # Docker run argument builder
-│   │   ├── handlers.go            # install, update, cleanup, init, update-config
-│   │   ├── handle_sessions.go     # session list/attach/cleanup
-│   │   ├── handle_backup.go       # backup/restore handlers
-│   │   ├── setup.go               # resolveVolume, isTerminal, help
-│   │   ├── docker.go              # Docker CLI wrappers (run, exec, cp)
-│   │   ├── crypto.go              # AES-256-CBC with PBKDF2 (OpenSSL-compatible)
-│   │   ├── volume.go              # Volume name derivation, CRUD
-│   │   ├── tokens.go              # Token load/save (plaintext + encrypted)
-│   │   ├── ainstruct.go           # Login prompts, auth flow
-│   │   ├── playwright.go          # Playwright MCP sidecar management
-│   │   ├── ssh.go                 # SSH agent detection and forwarding
-│   │   ├── network.go             # Docker network selection
-│   │   ├── terminal.go            # Terminal reset after docker attach
-│   │   ├── session.go             # Session data model
-│   │   ├── install.go             # copyFile utility
-│   │   └── backup.go              # backup/restore via docker exec
-│   └── kilo-entrypoint/           # Container entrypoint (12 files)
+│   │   └── backup.go              # Backup/restore via docker exec
+│   └── kilo-entrypoint/           # Container entrypoint (14 source files)
 │       ├── main.go                # Subcommand dispatcher
-│       ├── init.go                # Container init (user setup, downloads, privilege drop)
+│       ├── init.go                # Container init (user setup, service installation, privilege drop)
+│       ├── services.go            # Service installation inside container
 │       ├── config.go              # MCP server toggling from env vars
 │       ├── loadsave.go            # Token load/save subcommands
 │       ├── login.go               # Ainstruct HTTP login + profile fetch
@@ -431,11 +392,15 @@ The build uses a multi-stage Dockerfile: a `golang:1.26-alpine` builder compiles
 │       ├── api.go                 # REST client with JWT refresh
 │       ├── watcher.go             # inotify file watcher with 5s debounce
 │       └── hash.go                # Hash tracking for sync
+├── pkg/
+│   ├── constants/home.go          # Shared constants
+│   ├── services/services.go       # Service definitions (BuiltInServices)
+│   └── utils/parse.go             # Parsing utilities
 ├── configs/
 │   ├── opencode.json              # Kilo config for base image
 │   └── zellij.kdl                 # Zellij config (keybinds, pane settings)
 └── scripts/
-    ├── build.sh                   # Go build helper (via Docker)
+    ├── build.sh                   # Build helper (via Docker)
     └── install.sh                 # Bootstrap installer (curl | sh)
 ```
 
