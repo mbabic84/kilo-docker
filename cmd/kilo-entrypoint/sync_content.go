@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kilo-org/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/constants"
 )
 
 const collectionName = "kilo-docker"

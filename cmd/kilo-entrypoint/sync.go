@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/kilo-org/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/constants"
 )
 
 // runSyncMode starts the ainstruct-sync background process. It pulls the
