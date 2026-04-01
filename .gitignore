@@ -5,6 +5,9 @@ bin/
 # Go modules (downloaded in CI)
 vendor/
 
+# Node modules (downloaded in CI)
+node_modules/
+
 # IDE
 .idea/
 .vscode/
