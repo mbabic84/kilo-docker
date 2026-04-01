@@ -40,11 +40,28 @@ func setupSSH() (string, bool, bool) {
 		return "", false, false
 	}
 
+	// Remove any stale socket file that may be left behind from a previous
+	// ssh-agent that died without cleaning up. ssh-agent will fail with
+	// "Address already in use" if we try to bind to a leftover socket.
+	if info, err := os.Stat(socketPath); err == nil {
+		if info.Mode()&os.ModeSocket != 0 {
+			// Check if there's actually a listener. If ssh-add fails,
+			// the socket is stale and we should remove it.
+			if _, err := exec.Command("ssh-add", "-l").CombinedOutput(); err != nil {
+				fmt.Fprintf(os.Stderr, "[kilo-docker] Removing stale SSH socket: %s\n", socketPath)
+				os.Remove(socketPath)
+			}
+		}
+	}
+
 	// Start ssh-agent with a fixed socket path so the bind mount source
 	// path is always valid, even after the container is restarted.
 	output, err := exec.Command("ssh-agent", "-a", socketPath).CombinedOutput()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to start ssh-agent: %v\n", err)
+		if len(output) > 0 {
+			fmt.Fprintf(os.Stderr, "[kilo-docker] ssh-agent output: %s\n", strings.TrimSpace(string(output)))
+		}
 		return "", false, false
 	}
 
