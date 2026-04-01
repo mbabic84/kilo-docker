@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/kilo-org/kilo-docker/pkg/services"
 )
 
 const (
@@ -62,7 +64,7 @@ func parseArgs(args []string) config {
 			os.Exit(0)
 		default:
 			matched := false
-			for _, svc := range builtInServices {
+			for _, svc := range services.BuiltInServices {
 				if args[i] == svc.Flag {
 					cfg.enabledServices = append(cfg.enabledServices, svc.Name)
 					matched = true
