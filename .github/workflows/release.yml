@@ -58,11 +58,12 @@ jobs:
         run: |
           set -e
           VERSION="${{ steps.release.outputs.new_release_version }}"
+          KILO_VERSION=$(grep -oP 'ARG KILO_VERSION=\K[0-9.]+' Dockerfile)
           for OS_ARCH in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
             OS="${OS_ARCH%%-*}"
             ARCH="${OS_ARCH##*-}"
             CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH go build \
-              -ldflags="-s -w -X main.version=${VERSION} -X main.kiloVersion=${VERSION}" \
+              -ldflags="-s -w -X main.version=${VERSION} -X main.kiloVersion=${KILO_VERSION}" \
               -o "kilo-docker-${OS_ARCH}" \
               ./cmd/kilo-docker
           done
