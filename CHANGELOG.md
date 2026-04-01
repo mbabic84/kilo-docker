@@ -1,3 +1,9 @@
+## [1.40.2](https://github.com/mbabic84/kilo-docker/compare/v1.40.1...v1.40.2) (2026-04-01)
+
+### Bug Fixes
+
+* handle non-zero exit code on docker session detach ([c616e9e](https://github.com/mbabic84/kilo-docker/commit/c616e9e01d6ae5faa4194ba7273270cd94e0ee80))
+
 ## [1.40.1](https://github.com/mbabic84/kilo-docker/compare/v1.40.0...v1.40.1) (2026-04-01)
 
 ### Bug Fixes
