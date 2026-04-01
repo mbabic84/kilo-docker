@@ -1,3 +1,9 @@
+## [1.39.0](https://github.com/mbabic84/kilo-docker/compare/v1.38.0...v1.39.0) (2026-04-01)
+
+### Features
+
+* add version command to print kilo-docker and kilo versions ([de4857f](https://github.com/mbabic84/kilo-docker/commit/de4857f270bf27d3d1e5a72310d22059918c197d))
+
 ## [1.38.0](https://github.com/mbabic84/kilo-docker/compare/v1.37.0...v1.38.0) (2026-04-01)
 
 ### Features
