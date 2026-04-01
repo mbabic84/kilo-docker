@@ -32,8 +32,19 @@ func TestGetServiceUnknown(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(builtInServices) != 4 {
-		t.Errorf("expected 4 built-in services, got %d", len(builtInServices))
+	if len(builtInServices) != 5 {
+		t.Errorf("expected 5 built-in services, got %d", len(builtInServices))
+	}
+}
+
+func TestGhServiceHasInstallCommands(t *testing.T) {
+	svc := getService("gh")
+	if svc == nil {
+		t.Fatal("gh service not found")
+	}
+
+	if len(svc.Install) == 0 {
+		t.Error("expected Install to have commands")
 	}
 }
 

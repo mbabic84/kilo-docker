@@ -62,8 +62,8 @@ func TestIsServiceEnabledEmpty(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(builtInServices) != 4 {
-		t.Errorf("expected 4 built-in services, got %d", len(builtInServices))
+	if len(builtInServices) != 5 {
+		t.Errorf("expected 5 built-in services, got %d", len(builtInServices))
 	}
 }
 
@@ -116,6 +116,26 @@ func TestZellijServiceHasRequiredFields(t *testing.T) {
 	}
 	if len(svc.CopyConfigs) == 0 {
 		t.Error("expected CopyConfigs to be set for zellij")
+	}
+}
+
+func TestGhServiceHasRequiredFields(t *testing.T) {
+	svc := getService("gh")
+	if svc == nil {
+		t.Fatal("gh service not found")
+	}
+
+	if svc.Name != "gh" {
+		t.Errorf("expected Name 'gh', got %q", svc.Name)
+	}
+	if svc.Flag != "--gh" {
+		t.Errorf("expected Flag '--gh', got %q", svc.Flag)
+	}
+	if len(svc.Install) == 0 {
+		t.Error("expected Install to have commands")
+	}
+	if svc.RequiresSocket != "" {
+		t.Errorf("expected RequiresSocket to be empty for gh, got %q", svc.RequiresSocket)
 	}
 }
 
