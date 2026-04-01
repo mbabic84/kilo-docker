@@ -108,6 +108,12 @@ func savePlainSkipMarker(image, volume string) {
 	)
 }
 
+// printVersion prints kilo-docker and kilo versions.
+func printVersion() {
+	fmt.Printf("kilo-docker: %s\n", version)
+	fmt.Printf("kilo: %s\n", kiloVersion)
+}
+
 // printHelp displays usage, commands, options, and examples to stderr.
 func printHelp() {
 	help := `Usage: kilo-docker [--once] [--password] [--ainstruct] [--mcp] [--playwright] [--docker] [--ssh] [--zellij] [--network <name>] [command] [args...]
@@ -126,6 +132,7 @@ Commands:
   install           Install kilo-docker as a global command (~/.local/bin)
   update            Pull the latest Docker image and update the installed script
   update-config     Download latest opencode.json template and merge with existing config
+  version           Show kilo-docker and kilo versions
   help              Show this help message (wrapper)
 
 Options:

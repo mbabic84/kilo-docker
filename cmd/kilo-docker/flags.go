@@ -14,6 +14,7 @@ const (
 )
 
 var version = "dev"
+var kiloVersion = "unknown"
 var autoConfirm bool
 
 // config holds parsed CLI flags for the host binary.
