@@ -109,6 +109,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: KILO_VERSION=${{ steps.release.outputs.new_release_version }}
           cache-from: type=gha,scope=base
           cache-to: type=gha,scope=base,mode=max
