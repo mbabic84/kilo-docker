@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,18 +44,15 @@ func setupSSH() (string, bool, bool) {
 		return "", false, false
 	}
 
-	// Remove any stale socket file that may be left behind from a previous
-	// ssh-agent that died without cleaning up. ssh-agent will fail with
-	// "Address already in use" if we try to bind to a leftover socket.
-	if info, err := os.Stat(socketPath); err == nil {
-		if info.Mode()&os.ModeSocket != 0 {
-			// Check if there's actually a listener. If ssh-add fails,
-			// the socket is stale and we should remove it.
-			if _, err := exec.Command("ssh-add", "-l").CombinedOutput(); err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Removing stale SSH socket: %s\n", socketPath)
-				os.Remove(socketPath)
-			}
-		}
+	// Clean up any stale socket artifacts before starting a new agent.
+	cleanupStaleSocketPath(socketPath)
+
+	// If the socket still exists after cleanup, it's an active agent — reuse it.
+	if info, err := os.Stat(socketPath); err == nil && info.Mode()&os.ModeSocket != 0 {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Reusing existing SSH agent socket: %s\n", socketPath)
+		os.Setenv("SSH_AUTH_SOCK", socketPath)
+		loadSSHKeys(sshDir)
+		return socketPath, true, false
 	}
 
 	// Start ssh-agent with a fixed socket path so the bind mount source
@@ -85,6 +83,35 @@ func setupSSH() (string, bool, bool) {
 	fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent started (pid=%s, socket=%s)\n", newPid, socketPath)
 	loadSSHKeys(sshDir)
 	return socketPath, true, true
+}
+
+// cleanupStaleSocketPath removes any stale socket file or directory at the
+// given path. Docker may have created a directory when the socket didn't exist
+// at container creation time (default behavior for bind mounts). A stale Unix
+// socket without a listener is also removed, since ssh-agent will fail with
+// "Address already in use" if we try to bind to a leftover socket.
+func cleanupStaleSocketPath(socketPath string) {
+	info, err := os.Stat(socketPath)
+	if err != nil {
+		return
+	}
+	if info.IsDir() {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Removing stale socket directory: %s\n", socketPath)
+		os.RemoveAll(socketPath)
+		return
+	}
+	if info.Mode()&os.ModeSocket != 0 {
+		// Try to connect to check if the socket has an active listener.
+		// A connection attempt to a stale socket will fail, indicating
+		// it's safe to remove.
+		conn, err := net.Dial("unix", socketPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Removing stale SSH socket: %s\n", socketPath)
+			os.Remove(socketPath)
+		} else {
+			conn.Close()
+		}
+	}
 }
 
 // loadSSHKeys reads private keys from the given ssh directory and adds them
