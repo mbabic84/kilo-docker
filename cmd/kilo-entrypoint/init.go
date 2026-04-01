@@ -170,16 +170,18 @@ func installServices() error {
 		return nil
 	}
 
+	fmt.Fprintf(os.Stderr, "[kilo-docker] KD_SERVICES=%s\n", servicesEnv)
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil {
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Service %q not found in builtInServices\n", svcName)
 			continue
 		}
 		for _, installCmd := range svc.Install {
 			if installCmd == "" {
 				continue
 			}
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Installing %s...\n", svc.Name)
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Installing %s: %s\n", svc.Name, installCmd)
 			cmd := exec.Command("sh", "-c", installCmd)
 			cmd.Stdout = os.Stderr
 			cmd.Stderr = os.Stderr

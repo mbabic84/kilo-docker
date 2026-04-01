@@ -56,6 +56,12 @@ var builtInServices = []Service{
 			"command -v node >/dev/null || apk add --no-cache nodejs npm",
 		},
 	},
+	{
+		Name: "gh",
+		Install: []string{
+			"command -v gh >/dev/null || apk add --no-cache github-cli",
+		},
+	},
 }
 
 // getService returns the service with the given name, or nil if not found.

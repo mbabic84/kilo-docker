@@ -86,6 +86,16 @@ var builtInServices = []Service{
 		Volumes:        []string{},
 		RequiresSocket: "",
 	},
+	{
+		Name:        "gh",
+		Flag:        "--gh",
+		Description: "Install GitHub CLI for interacting with GitHub",
+		Install: []string{
+			"command -v gh >/dev/null || apk add --no-cache github-cli",
+		},
+		Volumes:        []string{},
+		RequiresSocket: "",
+	},
 }
 
 // getService returns the service with the given name, or nil if not found.
