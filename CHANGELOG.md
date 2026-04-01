@@ -1,3 +1,14 @@
+## [1.35.0](https://github.com/mbabic84/kilo-docker/compare/v1.34.0...v1.35.0) (2026-04-01)
+
+### Features
+
+* add sync paths whitelist for file watching ([10a2e4f](https://github.com/mbabic84/kilo-docker/commit/10a2e4ff8fa5d82475b5075762cc368fcecb8ce4))
+
+### Bug Fixes
+
+* handle stale SSH agent socket on startup ([d8f6b8d](https://github.com/mbabic84/kilo-docker/commit/d8f6b8dfd76468ea919f13b4b8c3cf5833b2406c))
+* preserve workspace and env vars after sudo user switch ([222cf1a](https://github.com/mbabic84/kilo-docker/commit/222cf1ae7a0987e3db0e80a7232c3289c1d1bdb0))
+
 ## [1.34.0](https://github.com/mbabic84/kilo-docker/compare/v1.33.0...v1.34.0) (2026-03-31)
 
 ### Features
