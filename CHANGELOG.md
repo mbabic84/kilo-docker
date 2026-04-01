@@ -1,3 +1,9 @@
+## [1.40.3](https://github.com/mbabic84/kilo-docker/compare/v1.40.2...v1.40.3) (2026-04-01)
+
+### Bug Fixes
+
+* use real GitHub path in Go module declaration ([be32db6](https://github.com/mbabic84/kilo-docker/commit/be32db63a6967dcb86956e2e27d32e4ba8ec02ab))
+
 ## [1.40.2](https://github.com/mbabic84/kilo-docker/compare/v1.40.1...v1.40.2) (2026-04-01)
 
 ### Bug Fixes
