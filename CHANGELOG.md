@@ -1,3 +1,9 @@
+## [1.39.2](https://github.com/mbabic84/kilo-docker/compare/v1.39.1...v1.39.2) (2026-04-01)
+
+### Bug Fixes
+
+* read kilo version from Dockerfile instead of using kilo-docker version ([f2e5095](https://github.com/mbabic84/kilo-docker/commit/f2e5095074ed14a59117631e823ad09e694b7fcb))
+
 ## [1.39.1](https://github.com/mbabic84/kilo-docker/compare/v1.39.0...v1.39.1) (2026-04-01)
 
 ### Bug Fixes
