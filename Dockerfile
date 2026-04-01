@@ -5,6 +5,7 @@ WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd/ cmd/
+COPY pkg/ pkg/
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/kilo-entrypoint ./cmd/kilo-entrypoint
 
 # ── Builder: download Kilo binary ──
