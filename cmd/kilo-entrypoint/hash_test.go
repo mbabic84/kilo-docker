@@ -10,8 +10,9 @@ func newTestSyncerWithHashDir(t *testing.T) *Syncer {
 	t.Helper()
 	dir := t.TempDir()
 	return &Syncer{
-		homeDir:  dir,
-		hashFile: filepath.Join(dir, ".config", "kilo", ".ainstruct-hashes"),
+		homeDir:   dir,
+		hashFile:  filepath.Join(dir, ".config", "kilo", ".ainstruct-hashes"),
+		syncPaths: defaultSyncPaths,
 	}
 }
 

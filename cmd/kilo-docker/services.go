@@ -66,10 +66,9 @@ var builtInServices = []Service{
 		Description: "Install Go 1.26.1 (latest stable) for development",
 		Install: []string{
 			"command -v go >/dev/null || (curl -fsSL https://go.dev/dl/go1.26.1.linux-amd64.tar.gz -o /tmp/go.tar.gz && tar -C /usr/local -xzf /tmp/go.tar.gz && rm -rf /tmp/go.tar.gz)",
-			"echo 'export PATH=/usr/local/go/bin:$PATH' > /etc/profile.d/go.sh",
-		},
-		EnvVars: map[string]string{
-			"GOPATH": "/root/go",
+			"cat > /usr/local/bin/go-wrapper << 'SCRIPT'\n#!/bin/sh\nGOPATH=${GOPATH:-$HOME/go}\nWS=\"$PWD\"\nwhile [ \"$WS\" != / ] && [ ! -f \"$WS/go.mod\" ]; do WS=$(dirname \"$WS\"); done\nif [ -f \"$WS/go.mod\" ]; then\n  export GOCACHE=\"$WS/.cache/go-build\"\n  export GOMODCACHE=\"$WS/.cache/mod\"\nelse\n  export GOCACHE=\"${GOCACHE:-$HOME/.cache/go-build}\"\n  export GOMODCACHE=\"${GOMODCACHE:-$GOPATH/pkg/mod}\"\nfi\nexport GOPATH\nexec /usr/local/go/bin/go \"$@\"\nSCRIPT",
+			"chmod +x /usr/local/bin/go-wrapper",
+			"ln -sf /usr/local/bin/go-wrapper /usr/local/bin/go",
 		},
 		Volumes:        []string{},
 		RequiresSocket: "",

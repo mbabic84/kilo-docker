@@ -15,6 +15,7 @@ func newTestSyncer(serverURL string) *Syncer {
 		refreshToken: "test-refresh",
 		tokenExpiry:  time.Now().Add(1 * time.Hour).Unix(),
 		client:       &http.Client{Timeout: 5 * time.Second},
+		syncPaths:    defaultSyncPaths,
 	}
 }
 

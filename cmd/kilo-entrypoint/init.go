@@ -113,6 +113,15 @@ func runInit() error {
 
 		syscall.Setgid(pgid)
 		syscall.Setuid(puid)
+
+		// Set correct user identity environment variables after privilege drop.
+		// These must be set before any os.Environ() call so they appear in the
+		// environment passed to child processes (sudo, exec).
+		kiloHome := "/home/kilo-t8x3m7kp"
+		os.Setenv("HOME", kiloHome)
+		os.Setenv("USER", "kilo-t8x3m7kp")
+		os.Setenv("LOGNAME", "kilo-t8x3m7kp")
+		os.Setenv("SHELL", "/bin/sh")
 	}
 
 	// Start ainstruct sync in background after privilege drop.
@@ -141,10 +150,12 @@ func runInit() error {
 	binaryPath, _ := os.Executable()
 
 	if len(os.Args) <= 1 {
-		// Use sudo -u to start shell as kilo user, which reads /etc/group and sets supplementary groups
-		// Only use sudo if the kilo user exists (works in Docker container, not in test env)
+		// Use sudo -u to start shell as kilo user, which reads /etc/group and sets supplementary groups.
+		// -s: shell mode (not login) preserves the working directory (Docker -w).
+		// -E: preserve environment (sudo's env_reset would strip KD_* and other vars).
+		// Only use sudo if the kilo user exists (works in Docker container, not in test env).
 		if _, err := user.Lookup("kilo-t8x3m7kp"); err == nil {
-			return syscall.Exec("/usr/bin/sudo", []string{"sudo", "-u", "kilo-t8x3m7kp", "-i"}, os.Environ())
+			return syscall.Exec("/usr/bin/sudo", []string{"sudo", "-E", "-u", "kilo-t8x3m7kp", "-s"}, os.Environ())
 		}
 		return syscall.Exec("/bin/sh", []string{"sh"}, os.Environ())
 	}
