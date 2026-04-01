@@ -162,10 +162,34 @@ func runInit() error {
 	return syscall.Exec(binaryPath, os.Args[1:], os.Environ())
 }
 
+// servicesMarkerPath is the file used to track which services have been
+// installed. It is stored in /tmp (container filesystem, not the persistent
+// volume) so that it survives container restarts but is lost on container
+// recreation — at which point the ephemeral /usr/local/bin/ binaries are
+// also gone and services must be reinstalled.
+// Exported as a variable so tests can override it with a temporary path.
+var servicesMarkerPath = "/tmp/.kilo-services-installed"
+
+// runInstallCmd executes a shell command for service installation.
+// Exported as a variable so tests can stub it out.
+var runInstallCmd = func(cmd string) error {
+	c := exec.Command("sh", "-c", cmd)
+	c.Stdout = os.Stderr
+	c.Stderr = os.Stderr
+	return c.Run()
+}
+
 // installServices reads KD_SERVICES env var and runs install commands for each enabled service.
+// On subsequent starts with the same set of services, installation is skipped entirely.
 func installServices() error {
 	servicesEnv := os.Getenv("KD_SERVICES")
 	if servicesEnv == "" {
+		return nil
+	}
+
+	// Check marker file — if the same services were already installed, skip.
+	if existing, err := os.ReadFile(servicesMarkerPath); err == nil && strings.TrimSpace(string(existing)) == servicesEnv {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] KD_SERVICES=%s (already installed)\n", servicesEnv)
 		return nil
 	}
 
@@ -181,14 +205,17 @@ func installServices() error {
 				continue
 			}
 			fmt.Fprintf(os.Stderr, "[kilo-docker] Installing %s: %s\n", svc.Name, installCmd)
-			cmd := exec.Command("sh", "-c", installCmd)
-			cmd.Stdout = os.Stderr
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
+			if err := runInstallCmd(installCmd); err != nil {
 				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to install %s: %v\n", svc.Name, err)
 			}
 		}
 	}
+
+	// Write marker file so next start skips installation.
+	if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0644); err != nil {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to write services marker: %v\n", err)
+	}
+
 	return nil
 }
 

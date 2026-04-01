@@ -3,8 +3,18 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+// stubInstallCmd replaces the real command runner with a no-op for tests,
+// preventing actual package downloads and binary installations.
+// Returns a cleanup function that restores the original.
+func stubInstallCmd() func() {
+	orig := runInstallCmd
+	runInstallCmd = func(cmd string) error { return nil }
+	return func() { runInstallCmd = orig }
+}
 
 func TestExpandHome(t *testing.T) {
 	tests := []struct {
@@ -36,6 +46,13 @@ func TestInstallServicesNoEnvVar(t *testing.T) {
 }
 
 func TestInstallServicesUnknownService(t *testing.T) {
+	defer stubInstallCmd()()
+
+	tmpDir := t.TempDir()
+	orig := servicesMarkerPath
+	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
+	defer func() { servicesMarkerPath = orig }()
+
 	os.Setenv("KD_SERVICES", "nonexistent")
 	defer os.Unsetenv("KD_SERVICES")
 
@@ -46,6 +63,13 @@ func TestInstallServicesUnknownService(t *testing.T) {
 }
 
 func TestInstallServicesDockerService(t *testing.T) {
+	defer stubInstallCmd()()
+
+	tmpDir := t.TempDir()
+	orig := servicesMarkerPath
+	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
+	defer func() { servicesMarkerPath = orig }()
+
 	os.Setenv("KD_SERVICES", "docker")
 	defer os.Unsetenv("KD_SERVICES")
 
@@ -56,12 +80,80 @@ func TestInstallServicesDockerService(t *testing.T) {
 }
 
 func TestInstallServicesMultipleServices(t *testing.T) {
+	defer stubInstallCmd()()
+
+	tmpDir := t.TempDir()
+	orig := servicesMarkerPath
+	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
+	defer func() { servicesMarkerPath = orig }()
+
 	os.Setenv("KD_SERVICES", "docker,zellij")
 	defer os.Unsetenv("KD_SERVICES")
 
 	err := installServices()
 	if err != nil {
 		t.Errorf("installServices() error = %v", err)
+	}
+}
+
+func TestInstallServicesMarkerSkipsReinstall(t *testing.T) {
+	defer stubInstallCmd()()
+
+	tmpDir := t.TempDir()
+	orig := servicesMarkerPath
+	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
+	defer func() { servicesMarkerPath = orig }()
+
+	os.Setenv("KD_SERVICES", "zellij")
+	defer os.Unsetenv("KD_SERVICES")
+
+	// First call should install and write marker.
+	if err := installServices(); err != nil {
+		t.Fatalf("first installServices() error = %v", err)
+	}
+
+	data, err := os.ReadFile(servicesMarkerPath)
+	if err != nil {
+		t.Fatalf("marker file not created: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "zellij" {
+		t.Errorf("marker content = %q, want %q", strings.TrimSpace(string(data)), "zellij")
+	}
+
+	// Second call should detect the marker and skip installation.
+	if err := installServices(); err != nil {
+		t.Fatalf("second installServices() error = %v", err)
+	}
+}
+
+func TestInstallServicesChangedServicesReinstalls(t *testing.T) {
+	defer stubInstallCmd()()
+
+	tmpDir := t.TempDir()
+	orig := servicesMarkerPath
+	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
+	defer func() { servicesMarkerPath = orig }()
+
+	// Install with "zellij".
+	os.Setenv("KD_SERVICES", "zellij")
+	if err := installServices(); err != nil {
+		t.Fatalf("first installServices() error = %v", err)
+	}
+
+	// Change to "zellij,gh" — should reinstall.
+	os.Setenv("KD_SERVICES", "zellij,gh")
+	defer os.Unsetenv("KD_SERVICES")
+
+	if err := installServices(); err != nil {
+		t.Fatalf("second installServices() error = %v", err)
+	}
+
+	data, err := os.ReadFile(servicesMarkerPath)
+	if err != nil {
+		t.Fatalf("marker file not readable: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "zellij,gh" {
+		t.Errorf("marker content = %q, want %q", strings.TrimSpace(string(data)), "zellij,gh")
 	}
 }
 
