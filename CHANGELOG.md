@@ -1,3 +1,9 @@
+## [1.40.4](https://github.com/mbabic84/kilo-docker/compare/v1.40.3...v1.40.4) (2026-04-01)
+
+### Bug Fixes
+
+* resolve Dependabot security alerts (14 of 16) ([423ca8a](https://github.com/mbabic84/kilo-docker/commit/423ca8a893ad513d93ad52a946b9d30088e6bccb))
+
 ## [1.40.3](https://github.com/mbabic84/kilo-docker/compare/v1.40.2...v1.40.3) (2026-04-01)
 
 ### Bug Fixes
