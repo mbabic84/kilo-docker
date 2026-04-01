@@ -1,3 +1,9 @@
+## [1.37.0](https://github.com/mbabic84/kilo-docker/compare/v1.36.0...v1.37.0) (2026-04-01)
+
+### Features
+
+* add gh service for GitHub CLI ([643eae2](https://github.com/mbabic84/kilo-docker/commit/643eae2c2b9ab88eedd56ea0afa36a21842981c1))
+
 ## [1.36.0](https://github.com/mbabic84/kilo-docker/compare/v1.35.0...v1.36.0) (2026-04-01)
 
 ### Features
