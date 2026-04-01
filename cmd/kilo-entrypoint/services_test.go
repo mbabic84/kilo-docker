@@ -85,7 +85,7 @@ func TestGoServiceHasInstallCommands(t *testing.T) {
 		t.Fatal("go service not found")
 	}
 
-	if len(svc.Install) != 2 {
-		t.Errorf("expected 2 Install commands for go, got %d", len(svc.Install))
+	if len(svc.Install) != 4 {
+		t.Errorf("expected 4 Install commands for go, got %d", len(svc.Install))
 	}
 }

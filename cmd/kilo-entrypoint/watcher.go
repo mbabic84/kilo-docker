@@ -71,15 +71,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	defer syscall.Close(fd)
 
 	kiloConfigDir := filepath.Join(s.homeDir, ".config", "kilo")
-	watchDirs := []string{
-		kiloConfigDir,
-		filepath.Join(kiloConfigDir, "rules"),
-		filepath.Join(kiloConfigDir, "commands"),
-		filepath.Join(kiloConfigDir, "agents"),
-		filepath.Join(kiloConfigDir, "plugins"),
-		filepath.Join(kiloConfigDir, "skills"),
-		filepath.Join(kiloConfigDir, "tools"),
-	}
+	watchDirs := s.syncedAbsDirs()
 	for _, dir := range watchDirs {
 		os.MkdirAll(dir, 0o755)
 	}
@@ -149,9 +141,9 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 			}
 			fullPath := filepath.Join(dir, ev.name)
 
-			// Only sync opencode.json from the parent kilo config dir;
-			// skip other files like .ainstruct-hashes.
-			if dir == kiloConfigDir && ev.name != "opencode.json" {
+			// Only sync files that are whitelisted via syncPaths.
+			relPath := strings.TrimPrefix(fullPath, kiloConfigDir+"/")
+			if !s.isSyncedPath(relPath) {
 				continue
 			}
 

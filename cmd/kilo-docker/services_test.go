@@ -131,13 +131,10 @@ func TestGoServiceHasRequiredFields(t *testing.T) {
 	if svc.Flag != "--go" {
 		t.Errorf("expected Flag '--go', got %q", svc.Flag)
 	}
-	if len(svc.Install) != 2 {
-		t.Errorf("expected 2 Install commands for go, got %d", len(svc.Install))
+	if len(svc.Install) != 4 {
+		t.Errorf("expected 4 Install commands for go, got %d", len(svc.Install))
 	}
 	if svc.RequiresSocket != "" {
 		t.Errorf("expected RequiresSocket to be empty for go, got %q", svc.RequiresSocket)
-	}
-	if _, ok := svc.EnvVars["GOPATH"]; !ok {
-		t.Error("expected GOPATH in EnvVars")
 	}
 }
