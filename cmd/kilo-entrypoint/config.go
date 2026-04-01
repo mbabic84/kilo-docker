@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/kilo-org/kilo-docker/pkg/constants"
 )
 
 // runConfig toggles MCP server enabled/disabled state in the user's
@@ -17,7 +19,7 @@ func runConfig() error {
 
 	playwrightEnabled := os.Getenv("PLAYWRIGHT_ENABLED") == "1"
 
-	configPath := filepath.Join(os.Getenv("HOME"), ".config", "kilo", "opencode.json")
+	configPath := filepath.Join(constants.GetHomeDir(), ".config", "kilo", "opencode.json")
 	if err := applyConfigFilter(configPath, mapping, playwrightEnabled); err != nil {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: config error for %s: %v\n", configPath, err)
 	}

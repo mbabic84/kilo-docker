@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+
+	"github.com/kilo-org/kilo-docker/pkg/constants"
 )
 
 // runSyncMode starts the ainstruct-sync background process. It pulls the
@@ -18,7 +20,7 @@ func runSyncMode() {
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("")
 
-	home := os.Getenv("HOME")
+	home := constants.GetHomeDir()
 	logDir := filepath.Join(home, ".config", "kilo")
 	os.MkdirAll(logDir, 0o755)
 	logPath := filepath.Join(logDir, "ainstruct-sync.log")

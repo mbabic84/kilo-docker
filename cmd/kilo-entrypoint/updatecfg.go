@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/kilo-org/kilo-docker/pkg/constants"
 )
 
 // runUpdateConfig downloads the latest opencode.json template from the
@@ -14,10 +16,7 @@ import (
 // are preserved for new keys; existing customizations override template values.
 // This replicates the behavior of `jq -s ".[0] * .[1]"` from the original bash.
 func runUpdateConfig() error {
-	home := os.Getenv("HOME")
-	if home == "" {
-		home = "/home/kilo-t8x3m7kp"
-	}
+	home := constants.GetHomeDir()
 	configPath := filepath.Join(home, ".config", "kilo", "opencode.json")
 
 	templateURL := "https://raw.githubusercontent.com/mbabic84/kilo-docker/main/configs/opencode.json"

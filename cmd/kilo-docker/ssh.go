@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+
+	"github.com/kilo-org/kilo-docker/pkg/constants"
 )
 
 // setupSSH detects or starts an SSH agent for key forwarding. Returns
@@ -16,7 +19,7 @@ import (
 // than a temp directory so that bind mounts in the container survive across
 // SSH agent restarts.
 func setupSSH() (string, bool, bool) {
-	sshDir := os.Getenv("HOME") + "/.ssh"
+	sshDir := filepath.Join(constants.GetHomeDir(), ".ssh")
 	// Persistent socket path — the parent directory must exist before
 	// ssh-agent -a is called, and must be creatable by us.
 	socketDir := sshDir + "/kilo"

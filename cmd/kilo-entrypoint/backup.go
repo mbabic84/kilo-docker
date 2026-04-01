@@ -8,16 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/kilo-org/kilo-docker/pkg/constants"
 )
 
 // runBackup creates a gzipped tar archive of the user's home directory
 // (KILO_HOME) and writes it to outputPath. Used by the host binary via
 // `docker exec` for volume backups.
 func runBackup(outputPath string) error {
-	home := os.Getenv("HOME")
-	if home == "" {
-		home = "/home/kilo-t8x3m7kp"
-	}
+	home := constants.GetHomeDir()
 
 	f, err := os.Create(outputPath)
 	if err != nil {
@@ -69,10 +68,7 @@ func runBackup(outputPath string) error {
 // setting file ownership to the current UID/GID. Used by the host binary
 // via `docker exec` for volume restores.
 func runRestore(archivePath string) error {
-	home := os.Getenv("HOME")
-	if home == "" {
-		home = "/home/kilo-t8x3m7kp"
-	}
+	home := constants.GetHomeDir()
 
 	f, err := os.Open(archivePath)
 	if err != nil {

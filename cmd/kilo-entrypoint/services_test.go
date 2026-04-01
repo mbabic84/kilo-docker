@@ -2,6 +2,8 @@ package main
 
 import (
 	"testing"
+
+	"github.com/kilo-org/kilo-docker/pkg/services"
 )
 
 func TestGetServiceDocker(t *testing.T) {
@@ -32,8 +34,8 @@ func TestGetServiceUnknown(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(builtInServices) != 5 {
-		t.Errorf("expected 5 built-in services, got %d", len(builtInServices))
+	if len(services.BuiltInServices) != 6 {
+		t.Errorf("expected 6 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 

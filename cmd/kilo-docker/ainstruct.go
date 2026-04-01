@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"golang.org/x/term"
+	"github.com/kilo-org/kilo-docker/pkg/utils"
 )
 
 // loginResult holds the authentication tokens returned by Ainstruct login.
@@ -15,28 +15,6 @@ type loginResult struct {
 	AccessToken  string
 	RefreshToken string
 	ExpiresIn    int64
-}
-
-// parseLoginOutput parses KEY=VALUE formatted lines from the ainstruct-login
-// container subcommand into a map.
-func parseLoginOutput(output string) map[string]string {
-	result := make(map[string]string)
-	for _, line := range strings.Split(output, "\n") {
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			result[parts[0]] = parts[1]
-		}
-	}
-	return result
-}
-
-// parseInt64 parses a string as a 64-bit integer, returning 0 on error.
-func parseInt64(s string) int64 {
-	v, _ := strconv.ParseInt(s, 10, 64)
-	return v
 }
 
 // ainstructLogin runs the full Ainstruct authentication flow on the host side.
@@ -68,7 +46,7 @@ func ainstructLogin(image string) (loginResult, error) {
 		return result, err
 	}
 
-	parsed := parseLoginOutput(output)
+	parsed := utils.ParseKeyValueOutput(output)
 
 	if parsed["STATUS"] != "success" {
 		errMsg := parsed["ERROR"]
@@ -82,7 +60,7 @@ func ainstructLogin(image string) (loginResult, error) {
 	result.AccessToken = parsed["ACCESS_TOKEN"]
 	result.RefreshToken = parsed["REFRESH_TOKEN"]
 	if v := parsed["EXPIRES_IN"]; v != "" {
-		result.ExpiresIn = parseInt64(v)
+		result.ExpiresIn = utils.ParseInt64(v)
 	}
 
 	fmt.Fprintf(os.Stderr, "\nSigned in successfully.\n")

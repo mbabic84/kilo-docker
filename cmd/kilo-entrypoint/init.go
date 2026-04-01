@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/kilo-org/kilo-docker/pkg/constants"
 )
 
 // runInit performs container initialization when invoked with no subcommand.
@@ -138,10 +140,7 @@ func runInit() error {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: config error: %v\n", err)
 	}
 
-	home := os.Getenv("HOME")
-	if home == "" {
-		home = "/home/kilo-t8x3m7kp"
-	}
+	home := constants.GetHomeDir()
 
 	if err := copyServiceConfigs(home); err != nil {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to copy service configs: %v\n", err)
