@@ -1,3 +1,9 @@
+## [1.39.3](https://github.com/mbabic84/kilo-docker/compare/v1.39.2...v1.39.3) (2026-04-01)
+
+### Bug Fixes
+
+* handle stale ssh-agent socket directory before container restart ([097fced](https://github.com/mbabic84/kilo-docker/commit/097fced5519d50082bbad5e74ab85924dfe357fa))
+
 ## [1.39.2](https://github.com/mbabic84/kilo-docker/compare/v1.39.1...v1.39.2) (2026-04-01)
 
 ### Bug Fixes
