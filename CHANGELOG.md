@@ -1,3 +1,15 @@
+## [1.38.0](https://github.com/mbabic84/kilo-docker/compare/v1.37.0...v1.38.0) (2026-04-01)
+
+### Features
+
+* bump Kilo CLI to v7.1.14 ([cdd773b](https://github.com/mbabic84/kilo-docker/commit/cdd773b8d79da7f5684bdb1b25a3236b3813cd2f))
+* extract shared constants and utils packages ([b76b99d](https://github.com/mbabic84/kilo-docker/commit/b76b99dc010fe642d4cba16848a1a5075d13c28d))
+* **services:** add shared pkg/services package with uv support ([a5aa384](https://github.com/mbabic84/kilo-docker/commit/a5aa3844ba86bc9bc5c8c49f9b6cbf83be66b071))
+
+### Bug Fixes
+
+* copy pkg/ directory in Dockerfile for shared packages ([2105101](https://github.com/mbabic84/kilo-docker/commit/2105101006162bc87e6decaacfb3a61553e7d45c))
+
 ## [1.37.0](https://github.com/mbabic84/kilo-docker/compare/v1.36.0...v1.37.0) (2026-04-01)
 
 ### Features
