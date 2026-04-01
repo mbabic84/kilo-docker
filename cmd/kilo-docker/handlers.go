@@ -49,7 +49,7 @@ func handleUpdate() {
 	// Check if installed
 	if _, err := os.Stat(target); err != nil {
 		fmt.Fprintf(os.Stderr, "kilo-docker is not installed locally.\n")
-		fmt.Fprintf(os.Stderr, "Run 'kilo-docker install' to install it first.\n")
+		fmt.Fprintf(os.Stderr, "Run the install script first: curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/install.sh | sh\n")
 	} else {
 		// Download latest binary from GitHub releases
 		osName, arch := getOSArch()
