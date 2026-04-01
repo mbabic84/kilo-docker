@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -177,8 +179,16 @@ func handleSessions(cfg config) {
 	case "running":
 		fmt.Fprintf(os.Stderr, "Attaching to running session '%s' (detach: Ctrl+P Ctrl+Q)...\n", containerToAttach)
 		if err := execDockerAttach("attach", containerToAttach); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			// An *exec.ExitError means docker ran but exited with a non-zero
+			// code.  This is expected on Ctrl+P Ctrl+Q detach (Docker may
+			// propagate a non-zero status) or when the container exits while
+			// attached.  Only report errors that are not simple exit-status
+			// mismatches — e.g. "docker binary not found".
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
 		}
 		resetTerminal()
 	case "exited", "created":
@@ -200,8 +210,14 @@ func handleSessions(cfg config) {
 			}
 		}
 		if err := execDockerAttach("start", "-ai", containerToAttach); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			// Same handling as the attach case above: an *exec.ExitError
+			// is expected when the container process exits (normal end of
+			// session) and should not be reported as a fatal error.
+			var exitErr *exec.ExitError
+			if !errors.As(err, &exitErr) {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
 		}
 		resetTerminal()
 	default:
