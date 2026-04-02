@@ -1,3 +1,9 @@
+## [1.45.0](https://github.com/mbabic84/kilo-docker/compare/v1.44.1...v1.45.0) (2026-04-02)
+
+### Features
+
+* **entrypoint:** add resync subcommand and refactor config path handling ([810e54c](https://github.com/mbabic84/kilo-docker/commit/810e54c6659bd1e8d6d5783c1778a7daef0f01cb))
+
 ## [1.44.1](https://github.com/mbabic84/kilo-docker/compare/v1.44.0...v1.44.1) (2026-04-02)
 
 ### Bug Fixes
