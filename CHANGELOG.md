@@ -1,3 +1,9 @@
+## [1.44.1](https://github.com/mbabic84/kilo-docker/compare/v1.44.0...v1.44.1) (2026-04-02)
+
+### Bug Fixes
+
+* **--docker:** install latest stable docker version dynamically ([55cf479](https://github.com/mbabic84/kilo-docker/commit/55cf479d8eeafd9313b193a95ce7126d9f6df1ef))
+
 ## [1.44.0](https://github.com/mbabic84/kilo-docker/compare/v1.43.0...v1.44.0) (2026-04-02)
 
 ### Features
