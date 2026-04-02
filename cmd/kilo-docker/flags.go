@@ -28,6 +28,7 @@ type config struct {
 	yes             bool
 	network         string
 	networkFlag     bool
+	ports           []string // Port mappings in host_port:container_port format
 	command         string
 	args            []string
 	enabledServices []string // Names of enabled services from builtInServices
@@ -41,8 +42,13 @@ func parseArgs(args []string) config {
 		switch args[i] {
 		case "--once":
 			cfg.once = true
-		case "--password", "-p":
+		case "--password":
 			cfg.encrypted = true
+		case "--port", "-p":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
+				cfg.ports = append(cfg.ports, args[i+1])
+				i++
+			}
 		case "--ainstruct":
 			cfg.ainstruct = true
 			cfg.encrypted = true

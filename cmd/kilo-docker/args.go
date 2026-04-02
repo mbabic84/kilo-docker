@@ -61,6 +61,9 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 	if cfg.network != "" {
 		sessionArgs += "--network " + cfg.network + " "
 	}
+	for _, port := range cfg.ports {
+		sessionArgs += "--port " + port + " "
+	}
 	if len(cfg.args) > 0 {
 		sessionArgs += strings.Join(cfg.args, " ") + " "
 	}
@@ -121,6 +124,10 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 
 	if cfg.network != "" {
 		args = append(args, "--network", cfg.network)
+	}
+
+	for _, port := range cfg.ports {
+		args = append(args, "-p", port)
 	}
 
 	for _, envVar := range []string{"TERM", "COLORTERM", "LANG", "LC_ALL"} {
