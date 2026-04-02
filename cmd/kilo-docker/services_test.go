@@ -64,8 +64,8 @@ func TestIsServiceEnabledEmpty(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 7 {
-		t.Errorf("expected 7 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 8 {
+		t.Errorf("expected 8 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
@@ -181,5 +181,28 @@ func TestNvmServiceHasRequiredFields(t *testing.T) {
 	}
 	if _, ok := svc.EnvVars["NVM_DIR"]; !ok {
 		t.Error("expected NVM_DIR in EnvVars")
+	}
+}
+
+func TestPythonServiceHasRequiredFields(t *testing.T) {
+	svc := getService("python")
+	if svc == nil {
+		t.Fatal("python service not found")
+	}
+
+	if svc.Name != "python" {
+		t.Errorf("expected Name 'python', got %q", svc.Name)
+	}
+	if svc.Flag != "--python" {
+		t.Errorf("expected Flag '--python', got %q", svc.Flag)
+	}
+	if len(svc.Install) != 2 {
+		t.Errorf("expected 2 Install commands for python, got %d", len(svc.Install))
+	}
+	if svc.RequiresSocket != "" {
+		t.Errorf("expected RequiresSocket to be empty for python, got %q", svc.RequiresSocket)
+	}
+	if _, ok := svc.EnvVars["PYTHON_ENABLED"]; !ok {
+		t.Error("expected PYTHON_ENABLED in EnvVars")
 	}
 }
