@@ -136,3 +136,46 @@ func TestBuildContainerArgsOnceMode(t *testing.T) {
 		t.Error("expected --once in session args")
 	}
 }
+
+func TestBuildContainerArgsWithPorts(t *testing.T) {
+	cfg := config{
+		once:  false,
+		ports: []string{"8080:80", "3000:3000"},
+	}
+
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found",
+		"", nil, "", "", "", "", 0)
+
+	argsStr := strings.Join(args, " ")
+
+	if !strings.Contains(argsStr, "-p 8080:80") {
+		t.Error("expected -p 8080:80 in docker args")
+	}
+	if !strings.Contains(argsStr, "-p 3000:3000") {
+		t.Error("expected -p 3000:3000 in docker args")
+	}
+	if !strings.Contains(argsStr, "--port 8080:80") {
+		t.Error("expected --port 8080:80 in session args label")
+	}
+	if !strings.Contains(argsStr, "--port 3000:3000") {
+		t.Error("expected --port 3000:3000 in session args label")
+	}
+}
+
+func TestBuildContainerArgsNoPorts(t *testing.T) {
+	cfg := config{
+		once: false,
+	}
+
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found",
+		"", nil, "", "", "", "", 0)
+
+	argsStr := strings.Join(args, " ")
+
+	if strings.Contains(argsStr, "-p ") {
+		t.Error("expected no -p flag when no ports configured")
+	}
+	if strings.Contains(argsStr, "--port") {
+		t.Error("expected no --port in session args when no ports configured")
+	}
+}

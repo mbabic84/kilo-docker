@@ -12,7 +12,8 @@
 // Flags:
 //
 //	--once            One-time session (no volume)
-//	--password, -p    Encrypt tokens, derive volume name from password
+//	--password        Encrypt tokens, derive volume name from password
+//	--port, -p        Map a port (host_port:container_port), repeatable
 //	--ainstruct       Authenticate with Ainstruct API for encryption and sync
 //	--mcp             Enable MCP servers (Context7, Ainstruct)
 //	--playwright      Start Playwright MCP sidecar

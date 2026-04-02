@@ -143,7 +143,8 @@ func printHelp() {
 
 	var optLines []string
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--once", "Run a one-time session without persisting data (no volume)"))
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--password, -p", "Protect volume with a password (encrypts tokens, derives volume name from password)"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--password", "Protect volume with a password (encrypts tokens, derives volume name from password)"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--port, -p <host:container>", "Map a port (host_port:container_port). Can be specified multiple times"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--ainstruct", "Authenticate with Ainstruct API, encrypt tokens, and enable file sync"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--mcp", "Enable MCP servers (prompts for Context7 and Ainstruct API tokens)"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--playwright", "Start a Playwright MCP sidecar container for browser automation"))
@@ -159,6 +160,7 @@ func printHelp() {
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --mcp", "# with Context7 and Ainstruct MCP servers"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --playwright", "# with Playwright browser automation"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --ssh", "# with SSH agent forwarding"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker -p 8080:8080 -p 3000:3000", "# with port mappings"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --docker --zellij --go", "# with multiple services enabled"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions", "# list all sessions"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions recreate 1", "# recreate session with same flags"))
