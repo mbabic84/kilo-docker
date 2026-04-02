@@ -102,6 +102,21 @@ var BuiltInServices = []Service{
 		Volumes:        []string{},
 		RequiresSocket: "",
 	},
+	{
+		Name:        "nvm",
+		Flag:        "--nvm",
+		Description: "Install NVM (Node Version Manager) for managing Node.js versions",
+		Install: []string{
+			"[ -d /home/kilo-t8x3m7kp/.nvm ] || (export HOME=/home/kilo-t8x3m7kp && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash)",
+			"chown -R ${PUID:-1000}:${PGID:-1000} /home/kilo-t8x3m7kp/.nvm",
+			"grep -q 'nvm.sh' /home/kilo-t8x3m7kp/.bashrc 2>/dev/null || printf '\\nexport NVM_DIR=\"$HOME/.nvm\"\\n[ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\"\\n[ -s \"$NVM_DIR/bash_completion\" ] && . \"$NVM_DIR/bash_completion\"\\n' >> /home/kilo-t8x3m7kp/.bashrc",
+		},
+		EnvVars: map[string]string{
+			"NVM_DIR": "/home/kilo-t8x3m7kp/.nvm",
+		},
+		Volumes:        []string{},
+		RequiresSocket: "",
+	},
 }
 
 func GetService(name string) *Service {
