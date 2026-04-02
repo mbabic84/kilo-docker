@@ -1,3 +1,9 @@
+## [1.43.0](https://github.com/mbabic84/kilo-docker/compare/v1.42.0...v1.43.0) (2026-04-02)
+
+### Features
+
+* **nvm:** use unofficial builds mirror for musl Node.js binaries ([cf9fbdb](https://github.com/mbabic84/kilo-docker/commit/cf9fbdbe07c0fbe30898c47483d9719824a57f39))
+
 ## [1.42.0](https://github.com/mbabic84/kilo-docker/compare/v1.41.1...v1.42.0) (2026-04-02)
 
 ### Features
