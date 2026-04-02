@@ -1,3 +1,9 @@
+## [1.42.0](https://github.com/mbabic84/kilo-docker/compare/v1.41.1...v1.42.0) (2026-04-02)
+
+### Features
+
+* add NVM service and make bash default shell ([665a200](https://github.com/mbabic84/kilo-docker/commit/665a200b859d26d6a56d95b928557c81766b6317))
+
 ## [1.41.1](https://github.com/mbabic84/kilo-docker/compare/v1.41.0...v1.41.1) (2026-04-02)
 
 ### Bug Fixes
