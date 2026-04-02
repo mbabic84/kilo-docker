@@ -62,9 +62,6 @@ func runInit() error {
 			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: group setup error: %v\n", err)
 		}
 
-		os.MkdirAll("/home/kilo-t8x3m7kp/.local", 0755)
-		os.MkdirAll("/workspace", 0755)
-
 		if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
 			if info, err := os.Stat(sshAuthSock); err == nil && info.Mode()&os.ModeSocket != 0 {
 				if err := os.Chown(sshAuthSock, puid, pgid); err != nil {
@@ -103,15 +100,7 @@ func runInit() error {
 			os.MkdirAll(dir, 0755)
 		}
 
-		chownDirs := []string{
-			"/home/kilo-t8x3m7kp/.ssh",
-			"/home/kilo-t8x3m7kp/.config",
-			"/home/kilo-t8x3m7kp/.local",
-			"/workspace",
-		}
-		for _, dir := range chownDirs {
-			chownRecursive(dir, puid, pgid)
-		}
+		chownRecursive("/home/kilo-t8x3m7kp", puid, pgid)
 
 		syscall.Setgid(pgid)
 		syscall.Setuid(puid)
@@ -329,17 +318,13 @@ func setupKnownHosts() error {
 }
 
 // chownRecursive changes ownership of path and its contents to uid:gid.
-// It skips files already owned by the target user and uses fs.SkipDir
-// to avoid recursing into directory trees that are fully owned by the
-// target user. This avoids repeated chown on persistent volume data
-// that was fixed on first run, while still catching Docker-build
-// artifacts (COPYed files owned by root).
+// It skips individual files and directories already owned by the target
+// user, but continues walking into directories so that any root-owned
+// subdirectories created later (e.g. by Docker volume mounts or external
+// processes) are still fixed.
 func chownRecursive(path string, uid, gid int) {
 	filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if d != nil && d.IsDir() {
-				return fs.SkipDir
-			}
 			return nil
 		}
 		// Never follow symlinks
@@ -353,10 +338,8 @@ func chownRecursive(path string, uid, gid int) {
 		}
 		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
 			if int(stat.Uid) == uid && int(stat.Gid) == gid {
-				// Already correct — skip file, or skip entire subtree for dirs
-				if d.IsDir() {
-					return fs.SkipDir
-				}
+				// Already correct ownership — skip this entry, but continue
+				// walking into subdirectories in case they contain root-owned files.
 				return nil
 			}
 			os.Chown(p, uid, gid)

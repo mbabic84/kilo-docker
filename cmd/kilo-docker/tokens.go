@@ -91,10 +91,11 @@ func saveTokens(image, volume string, token1, token2 string, encrypted bool, pas
 		gid := os.Getgid()
 		_, err = dockerRunWithStdin(string(encData),
 			"-v", volumeMount,
+			"--user", fmt.Sprintf("%d:%d", uid, gid),
 			image,
 			"sh", "-c", fmt.Sprintf(
-				"mkdir -p \"$(dirname '%s')\" && cat > '%s' && chmod 600 '%s' && chown %d:%d '%s'",
-				encPath, encPath, encPath, uid, gid, encPath),
+				"mkdir -p \"$(dirname '%s')\" && cat > '%s' && chmod 600 '%s'",
+				encPath, encPath, encPath),
 		)
 		// Remove skip marker if tokens were saved successfully
 		if err == nil {
@@ -106,6 +107,7 @@ func saveTokens(image, volume string, token1, token2 string, encrypted bool, pas
 
 	_, err := dockerRunWithStdin(tokenData,
 		"-v", volumeMount,
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		image,
 		"save-tokens",
 	)

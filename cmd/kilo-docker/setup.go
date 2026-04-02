@@ -87,10 +87,11 @@ func saveSkipMarker(image, volume, password string) {
 	encPath := kiloHome + "/.local/share/kilo/.tokens.skip"
 	dockerRunWithStdin(string(encData),
 		"-v", volumeMount,
+		"--user", fmt.Sprintf("%d:%d", uid, gid),
 		image,
 		"sh", "-c", fmt.Sprintf(
-			"mkdir -p \"$(dirname '%s')\" && cat > '%s' && chmod 600 '%s' && chown %d:%d '%s'",
-			encPath, encPath, encPath, uid, gid, encPath),
+			"mkdir -p \"$(dirname '%s')\" && cat > '%s' && chmod 600 '%s'",
+			encPath, encPath, encPath),
 	)
 }
 
@@ -103,10 +104,11 @@ func savePlainSkipMarker(image, volume string) {
 	markerPath := kiloHome + "/.local/share/kilo/.tokens.skip"
 	dockerRunWithStdin("KD_TOKENS_SKIPPED=1\n",
 		"-v", volume+":"+kiloHome,
+		"--user", fmt.Sprintf("%d:%d", uid, gid),
 		image,
 		"sh", "-c", fmt.Sprintf(
-			"mkdir -p \"$(dirname '%s')\" && cat > '%s' && chmod 600 '%s' && chown %d:%d '%s'",
-			markerPath, markerPath, markerPath, uid, gid, markerPath),
+			"mkdir -p \"$(dirname '%s')\" && cat > '%s' && chmod 600 '%s'",
+			markerPath, markerPath, markerPath),
 	)
 }
 
