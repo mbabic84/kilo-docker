@@ -155,7 +155,7 @@ keybinds clear-defaults=true {
         bind "Alt o" { MoveTab "right"; }
         bind "Alt p" { TogglePaneInGroup; }
         bind "Alt Shift p" { ToggleGroupMarking; }
-        bind "Ctrl q" { Quit; }
+        // Ctrl+q removed to allow Ctrl+p Ctrl+q to propagate to Docker for container detach
     }
     shared_except "locked" {
         bind "Ctrl t" { SwitchToMode "tab"; }
