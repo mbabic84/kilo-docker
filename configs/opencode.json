@@ -1,6 +1,6 @@
 {
   "$schema": "https://app.kilo.ai/config.json",
-  "autoupdate": "false",
+  "autoupdate": false,
   "mcp": {
     "ainstruct": {
       "type": "remote",
