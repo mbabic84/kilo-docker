@@ -23,6 +23,7 @@ func TestSubcommandsContainsAllInternal(t *testing.T) {
 		"restore",
 		"config",
 		"sync",
+		"resync",
 	}
 
 	for _, name := range expected {
@@ -87,6 +88,7 @@ func TestResolveCommandInternalSubcommands(t *testing.T) {
 		"restore",
 		"config",
 		"sync",
+		"resync",
 	}
 
 	for _, name := range internal {

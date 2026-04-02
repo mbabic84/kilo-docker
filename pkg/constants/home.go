@@ -1,6 +1,9 @@
 package constants
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+)
 
 const KiloHome = "/home/kilo-t8x3m7kp"
 
@@ -10,4 +13,8 @@ func GetHomeDir() string {
 		return KiloHome
 	}
 	return home
+}
+
+func GetKiloConfigDir() string {
+	return filepath.Join(GetHomeDir(), ".config", "kilo")
 }

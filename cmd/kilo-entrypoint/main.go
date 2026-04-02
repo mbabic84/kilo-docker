@@ -14,6 +14,7 @@
 //	restore         Extract tar.gz into KILO_HOME with ownership fix
 //	config          Toggle MCP servers based on environment variables
 //	sync            Start ainstruct file watcher + REST sync
+//	resync          Delete all remote documents and re-push local files
 package main
 
 import (
@@ -35,6 +36,7 @@ var subcommands = map[string]bool{
 	"restore":         true,
 	"config":          true,
 	"sync":            true,
+	"resync":          true,
 }
 
 // resolveCommand checks if name is a known internal subcommand.
@@ -121,5 +123,13 @@ func main() {
 		}
 	case "sync":
 		runSyncMode()
+	case "resync":
+		s := NewSyncer()
+		if err := s.deleteAllDocuments(); err != nil {
+			fmt.Fprintf(os.Stderr, "resync error: %v\n", err)
+			os.Exit(1)
+		}
+		s.pushAll()
+		fmt.Println("Resync complete.")
 	}
 }

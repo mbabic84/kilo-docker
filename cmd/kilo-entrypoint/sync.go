@@ -20,8 +20,7 @@ func runSyncMode() {
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 	log.SetPrefix("")
 
-	home := constants.GetHomeDir()
-	logDir := filepath.Join(home, ".config", "kilo")
+	logDir := constants.GetKiloConfigDir()
 	os.MkdirAll(logDir, 0o755)
 	logPath := filepath.Join(logDir, "ainstruct-sync.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
