@@ -1,3 +1,9 @@
+## [1.41.0](https://github.com/mbabic84/kilo-docker/compare/v1.40.4...v1.41.0) (2026-04-02)
+
+### Features
+
+* add --port/-p option for Docker port mapping ([cca98b5](https://github.com/mbabic84/kilo-docker/commit/cca98b567180a7ca98b1bc3e24b437f725b785bb))
+
 ## [1.40.4](https://github.com/mbabic84/kilo-docker/compare/v1.40.3...v1.40.4) (2026-04-01)
 
 ### Bug Fixes
