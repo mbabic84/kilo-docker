@@ -41,6 +41,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -156,7 +157,7 @@ func runContainer(cfg config) {
 		dataVolume = deriveVolumeName(result.UserID)
 		ainstructSyncToken = result.AccessToken
 		ainstructSyncRefreshToken = result.RefreshToken
-		ainstructSyncTokenExpiry = result.ExpiresIn
+		ainstructSyncTokenExpiry = time.Now().Unix() + result.ExpiresIn
 		os.Setenv("VOLUME_PASSWORD", result.UserID)
 
 		// MCP token loading/prompting after volume is available

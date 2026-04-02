@@ -19,7 +19,7 @@ func runConfig() error {
 
 	playwrightEnabled := os.Getenv("PLAYWRIGHT_ENABLED") == "1"
 
-	configPath := filepath.Join(constants.GetHomeDir(), ".config", "kilo", "opencode.json")
+	configPath := filepath.Join(constants.GetKiloConfigDir(), "opencode.json")
 	if err := applyConfigFilter(configPath, mapping, playwrightEnabled); err != nil {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: config error for %s: %v\n", configPath, err)
 	}

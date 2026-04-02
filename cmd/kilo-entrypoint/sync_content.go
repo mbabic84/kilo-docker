@@ -69,23 +69,25 @@ var defaultSyncPaths = []string{
 // Ainstruct REST API. It tracks content hashes to avoid redundant uploads,
 // handles JWT token refresh, and manages the collection lifecycle.
 type Syncer struct {
-	apiURL       string
-	accessToken  string
-	refreshToken string
-	tokenExpiry  int64
-	homeDir      string
-	hashFile     string
-	hashMu       sync.Mutex
-	collectionID string
-	authExpired  bool
-	client       *http.Client
-	syncPaths    []string // whitelist of paths (relative to kilo config dir) to sync
+	apiURL         string
+	accessToken    string
+	refreshToken   string
+	tokenExpiry    int64
+	homeDir        string
+	kiloConfigDir  string
+	hashFile       string
+	hashMu         sync.Mutex
+	collectionID   string
+	authExpired    bool
+	client         *http.Client
+	syncPaths      []string // whitelist of paths (relative to kilo config dir) to sync
 }
 
 // NewSyncer creates a Syncer configured from environment variables.
 // Reads API URL, tokens, and token expiry from KD_AINSTRUCT_* env vars.
 func NewSyncer() *Syncer {
 	home := constants.GetHomeDir()
+	kiloConfigDir := constants.GetKiloConfigDir()
 	apiURL := os.Getenv("KD_AINSTRUCT_API_URL")
 	if apiURL == "" {
 		apiURL = "https://ainstruct-dev.kralicinora.cz/api/v1"
@@ -95,14 +97,15 @@ func NewSyncer() *Syncer {
 		expiry, _ = strconv.ParseInt(v, 10, 64)
 	}
 	return &Syncer{
-		apiURL:       apiURL,
-		accessToken:  os.Getenv("KD_AINSTRUCT_SYNC_TOKEN"),
-		refreshToken: os.Getenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN"),
-		tokenExpiry:  expiry,
-		homeDir:      home,
-		hashFile:     filepath.Join(home, ".config", "kilo", ".ainstruct-hashes"),
-		client:       &http.Client{Timeout: 30 * time.Second},
-		syncPaths:    defaultSyncPaths,
+		apiURL:        apiURL,
+		accessToken:   os.Getenv("KD_AINSTRUCT_SYNC_TOKEN"),
+		refreshToken:  os.Getenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN"),
+		tokenExpiry:   expiry,
+		homeDir:       home,
+		kiloConfigDir: kiloConfigDir,
+		hashFile:      filepath.Join(kiloConfigDir, ".ainstruct-hashes"),
+		client:        &http.Client{Timeout: 30 * time.Second},
+		syncPaths:     defaultSyncPaths,
 	}
 }
 
@@ -123,15 +126,47 @@ func (s *Syncer) isSyncedPath(relPath string) bool {
 // syncedAbsDirs returns the absolute paths of all whitelisted sync directories
 // that exist on disk. Used by the watcher to know which directories to monitor.
 func (s *Syncer) syncedAbsDirs() []string {
-	kiloDir := filepath.Join(s.homeDir, ".config", "kilo")
-	dirs := []string{kiloDir}
+	dirs := []string{s.kiloConfigDir}
 	for _, sp := range s.syncPaths {
-		abs := filepath.Join(kiloDir, sp)
+		abs := filepath.Join(s.kiloConfigDir, sp)
 		if info, err := os.Stat(abs); err == nil && info.IsDir() {
 			dirs = append(dirs, abs)
 		}
 	}
 	return dirs
+}
+
+// pushAll walks whitelisted directories and pushes every existing file
+// to the API. Called once at startup to ensure local files are present
+// in the remote collection (the watcher only reacts to changes).
+func (s *Syncer) pushAll() {
+	for _, sp := range s.syncPaths {
+		abs := filepath.Join(s.kiloConfigDir, sp)
+		info, err := os.Stat(abs)
+		if err != nil {
+			continue
+		}
+		if !info.IsDir() {
+			// Single file (e.g. opencode.json)
+			if err := s.syncFile(abs); err != nil && !s.authExpired {
+				log.Printf("[ainstruct-sync] Initial push error for %s: %v", sp, err)
+			}
+			continue
+		}
+		// Directory — walk recursively
+		filepath.Walk(abs, func(path string, fi os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if fi.IsDir() {
+				return nil
+			}
+			if err := s.syncFile(path); err != nil && !s.authExpired {
+				log.Printf("[ainstruct-sync] Initial push error for %s: %v", path, err)
+			}
+			return nil
+		})
+	}
 }
 
 type collection struct {
@@ -250,7 +285,7 @@ func (s *Syncer) syncFile(absPath string) error {
 	if err := s.ensureCollection(); err != nil {
 		return err
 	}
-	relPath := strings.TrimPrefix(absPath, s.homeDir+"/")
+	relPath := strings.TrimPrefix(absPath, s.kiloConfigDir+"/")
 	title := filepath.Base(absPath)
 	content, err := os.ReadFile(absPath)
 	if err != nil {
@@ -370,19 +405,25 @@ func (s *Syncer) pullCollection() error {
 		log.Println("[ainstruct-sync] Collection is empty — nothing to pull")
 		return nil
 	}
-	for _, doc := range dr.Documents {
+	log.Printf("[ainstruct-sync] Pull: processing %d documents", len(dr.Documents))
+	for i, doc := range dr.Documents {
 		relPath := doc.Metadata.LocalPath
+		log.Printf("[ainstruct-sync] Pull: doc[%d] id=%s relPath=%q contentHash=%s", i, doc.DocumentID, relPath, doc.ContentHash)
 		if relPath == "" {
+			log.Printf("[ainstruct-sync] Pull: doc[%d] skipped — empty relPath", i)
 			continue
 		}
 		if !s.isSyncedPath(relPath) {
+			log.Printf("[ainstruct-sync] Pull: doc[%d] %s skipped — not a synced path", i, relPath)
 			continue
 		}
 		apiHash := doc.ContentHash
 		storedHash := s.hashGet(relPath)
 		if storedHash == apiHash {
+			log.Printf("[ainstruct-sync] Pull: doc[%d] %s skipped — hash match (local=%q api=%q)", i, relPath, storedHash, apiHash)
 			continue
 		}
+		log.Printf("[ainstruct-sync] Pull: doc[%d] %s fetching (localHash=%q apiHash=%q authExpired=%v)", i, relPath, storedHash, apiHash, s.authExpired)
 		docData, err := s.apiRequest("GET", "/documents/"+doc.DocumentID, nil)
 		if err != nil {
 			log.Printf("[ainstruct-sync] Failed to pull %s: %v", relPath, err)
@@ -396,9 +437,10 @@ func (s *Syncer) pullCollection() error {
 			continue
 		}
 		if fullDoc.Content == "" {
+			log.Printf("[ainstruct-sync] Pull: doc[%d] %s skipped — empty content after fetch", i, relPath)
 			continue
 		}
-		absPath := filepath.Join(s.homeDir, relPath)
+		absPath := filepath.Join(s.kiloConfigDir, relPath)
 		os.MkdirAll(filepath.Dir(absPath), 0o755)
 		if err := os.WriteFile(absPath, []byte(fullDoc.Content), 0o644); err != nil {
 			log.Printf("[ainstruct-sync] Failed to write %s: %v", relPath, err)
@@ -409,5 +451,40 @@ func (s *Syncer) pullCollection() error {
 		}
 		log.Printf("[ainstruct-sync] Pulled: %s", relPath)
 	}
+	return nil
+}
+
+// deleteAllDocuments removes every document in the collection.
+// Used by the reset-sync subcommand to clear stale paths.
+func (s *Syncer) deleteAllDocuments() error {
+	found, err := s.findCollection()
+	if err != nil {
+		return err
+	}
+	if !found {
+		fmt.Println("No collection found — nothing to delete")
+		return nil
+	}
+	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
+	if err != nil {
+		return fmt.Errorf("listing documents: %w", err)
+	}
+	var dr documentsResponse
+	if err := json.Unmarshal(data, &dr); err != nil {
+		return fmt.Errorf("parsing documents response: %w", err)
+	}
+	if len(dr.Documents) == 0 {
+		fmt.Println("Collection is empty — nothing to delete")
+		return nil
+	}
+	fmt.Printf("Deleting %d documents from collection %s...\n", len(dr.Documents), s.collectionID)
+	for _, doc := range dr.Documents {
+		if _, err := s.apiRequest("DELETE", "/documents/"+doc.DocumentID, nil); err != nil {
+			fmt.Fprintf(os.Stderr, "  Failed to delete %s (%s): %v\n", doc.Metadata.LocalPath, doc.DocumentID, err)
+			continue
+		}
+		fmt.Printf("  Deleted: %s\n", doc.Metadata.LocalPath)
+	}
+	fmt.Println("Done. Restart the container to re-sync with correct paths.")
 	return nil
 }

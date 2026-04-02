@@ -70,7 +70,6 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	}
 	defer syscall.Close(fd)
 
-	kiloConfigDir := filepath.Join(s.homeDir, ".config", "kilo")
 	watchDirs := s.syncedAbsDirs()
 	for _, dir := range watchDirs {
 		os.MkdirAll(dir, 0o755)
@@ -142,7 +141,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 			fullPath := filepath.Join(dir, ev.name)
 
 			// Only sync files that are whitelisted via syncPaths.
-			relPath := strings.TrimPrefix(fullPath, kiloConfigDir+"/")
+			relPath := strings.TrimPrefix(fullPath, s.kiloConfigDir+"/")
 			if !s.isSyncedPath(relPath) {
 				continue
 			}
@@ -243,7 +242,7 @@ func debounceLoop(ctx context.Context, s *Syncer, pending map[string]*pendingEve
 // processFile handles a single debounced file event: syncs the file to the
 // remote collection if it was modified, or deletes it remotely if it was removed.
 func processFile(s *Syncer, fullPath, eventType string) {
-	relPath := strings.TrimPrefix(fullPath, s.homeDir+"/")
+	relPath := strings.TrimPrefix(fullPath, s.kiloConfigDir+"/")
 	if eventType == "DELETE" {
 		if err := s.deleteByPath(relPath); err != nil && !s.authExpired {
 			log.Printf("[ainstruct-sync] Delete error for %s: %v", relPath, err)

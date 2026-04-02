@@ -16,8 +16,7 @@ import (
 // are preserved for new keys; existing customizations override template values.
 // This replicates the behavior of `jq -s ".[0] * .[1]"` from the original bash.
 func runUpdateConfig() error {
-	home := constants.GetHomeDir()
-	configPath := filepath.Join(home, ".config", "kilo", "opencode.json")
+	configPath := filepath.Join(constants.GetKiloConfigDir(), "opencode.json")
 
 	templateURL := "https://raw.githubusercontent.com/mbabic84/kilo-docker/main/configs/opencode.json"
 	resp, err := http.Get(templateURL)
