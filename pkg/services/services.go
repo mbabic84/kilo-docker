@@ -121,7 +121,7 @@ var BuiltInServices = []Service{
 	{
 		Name:        "python",
 		Flag:        "--python",
-		Description: "Install Python 3 with symlink for building Node.js and other tools",
+		Description: "Install Python 3 with symlink for general purpose use",
 		Install: []string{
 			"command -v python3 >/dev/null || apk add --no-cache python3",
 			"[ -f /usr/local/bin/python ] || ln -sf $(command -v python3) /usr/local/bin/python",
