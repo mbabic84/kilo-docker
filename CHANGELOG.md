@@ -1,3 +1,9 @@
+## [1.45.1](https://github.com/mbabic84/kilo-docker/compare/v1.45.0...v1.45.1) (2026-04-02)
+
+### Bug Fixes
+
+* resolve permission issues with volume directories ([3d9b6ff](https://github.com/mbabic84/kilo-docker/commit/3d9b6ff40d122134d28b31aef86c3f107d442165))
+
 ## [1.45.0](https://github.com/mbabic84/kilo-docker/compare/v1.44.1...v1.45.0) (2026-04-02)
 
 ### Features
