@@ -1,3 +1,9 @@
+## [1.41.1](https://github.com/mbabic84/kilo-docker/compare/v1.41.0...v1.41.1) (2026-04-02)
+
+### Bug Fixes
+
+* show --ssh flag instead of ssh-agent in session args ([07950d7](https://github.com/mbabic84/kilo-docker/commit/07950d736d273b079697c13dcc866eac3b3827a3))
+
 ## [1.41.0](https://github.com/mbabic84/kilo-docker/compare/v1.40.4...v1.41.0) (2026-04-02)
 
 ### Features
