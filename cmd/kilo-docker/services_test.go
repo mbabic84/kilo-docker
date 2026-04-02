@@ -64,8 +64,8 @@ func TestIsServiceEnabledEmpty(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 6 {
-		t.Errorf("expected 6 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 7 {
+		t.Errorf("expected 7 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
@@ -158,5 +158,28 @@ func TestGoServiceHasRequiredFields(t *testing.T) {
 	}
 	if svc.RequiresSocket != "" {
 		t.Errorf("expected RequiresSocket to be empty for go, got %q", svc.RequiresSocket)
+	}
+}
+
+func TestNvmServiceHasRequiredFields(t *testing.T) {
+	svc := getService("nvm")
+	if svc == nil {
+		t.Fatal("nvm service not found")
+	}
+
+	if svc.Name != "nvm" {
+		t.Errorf("expected Name 'nvm', got %q", svc.Name)
+	}
+	if svc.Flag != "--nvm" {
+		t.Errorf("expected Flag '--nvm', got %q", svc.Flag)
+	}
+	if len(svc.Install) != 3 {
+		t.Errorf("expected 3 Install commands for nvm, got %d", len(svc.Install))
+	}
+	if svc.RequiresSocket != "" {
+		t.Errorf("expected RequiresSocket to be empty for nvm, got %q", svc.RequiresSocket)
+	}
+	if _, ok := svc.EnvVars["NVM_DIR"]; !ok {
+		t.Error("expected NVM_DIR in EnvVars")
 	}
 }

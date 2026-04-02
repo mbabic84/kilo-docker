@@ -34,8 +34,8 @@ func TestGetServiceUnknown(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 6 {
-		t.Errorf("expected 6 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 7 {
+		t.Errorf("expected 7 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
@@ -100,5 +100,22 @@ func TestGoServiceHasInstallCommands(t *testing.T) {
 
 	if len(svc.Install) != 4 {
 		t.Errorf("expected 4 Install commands for go, got %d", len(svc.Install))
+	}
+}
+
+func TestNvmServiceHasRequiredFields(t *testing.T) {
+	svc := getService("nvm")
+	if svc == nil {
+		t.Fatal("nvm service not found")
+	}
+
+	if svc.Name != "nvm" {
+		t.Errorf("expected Name 'nvm', got %q", svc.Name)
+	}
+	if len(svc.Install) != 3 {
+		t.Errorf("expected 3 Install commands for nvm, got %d", len(svc.Install))
+	}
+	if svc.RequiresSocket != "" {
+		t.Errorf("expected RequiresSocket to be empty for nvm, got %q", svc.RequiresSocket)
 	}
 }

@@ -123,7 +123,11 @@ func runInit() error {
 		os.Setenv("HOME", kiloHome)
 		os.Setenv("USER", "kilo-t8x3m7kp")
 		os.Setenv("LOGNAME", "kilo-t8x3m7kp")
-		os.Setenv("SHELL", "/bin/sh")
+		if _, err := os.Stat("/bin/bash"); err == nil {
+			os.Setenv("SHELL", "/bin/bash")
+		} else {
+			os.Setenv("SHELL", "/bin/sh")
+		}
 	}
 
 	// Start ainstruct sync in background after privilege drop.
