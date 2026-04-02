@@ -76,10 +76,8 @@ func handleSessions(cfg config) {
 			os.Exit(1)
 		}
 
-		// Parse stored args back into a config. The stored args contain
-		// "ssh-agent" as a placeholder token which we convert back to "--ssh".
+		// Parse stored args back into a config.
 		storedArgs := targetSession.Args
-		storedArgs = strings.ReplaceAll(storedArgs, "ssh-agent", "--ssh")
 		parsedArgs := strings.Fields(storedArgs)
 
 		newCfg := parseArgs(parsedArgs)
@@ -198,7 +196,7 @@ func handleSessions(cfg config) {
 		// the socket path if it didn't exist at container creation.
 		needsSSH := false
 		for _, s := range sessions {
-			if s.Name == containerToAttach && strings.Contains(s.Args, "ssh-agent") {
+			if s.Name == containerToAttach && strings.Contains(s.Args, "--ssh") {
 				needsSSH = true
 				break
 			}

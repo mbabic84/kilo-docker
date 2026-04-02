@@ -47,7 +47,7 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 		sessionArgs += "--playwright "
 	}
 	if sshAuthSock != "" {
-		sessionArgs += "ssh-agent "
+		sessionArgs += "--ssh "
 	}
 	if cfg.encrypted && !cfg.ainstruct {
 		sessionArgs += "-p "
