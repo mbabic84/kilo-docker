@@ -159,6 +159,7 @@ func handleUpdateConfig(cfg config) {
 
 	_, err := dockerRun(
 		"-v", dataVolume+":"+kiloHome,
+		"--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		repoURL+":latest",
 		"update-config",
 	)

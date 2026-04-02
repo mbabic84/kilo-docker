@@ -133,7 +133,7 @@ func handleRestore(cfg config) {
 		fmt.Fprintf(os.Stderr, "Warning: restore had issues: %v\n", err)
 	}
 
-	dockerRun("run", "--rm", "-v", targetVolume+":/dest", "alpine", "chown", "-R", "1000:1000", "/dest")
+	dockerRun("run", "--rm", "-v", targetVolume+":/dest", "alpine", "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "/dest")
 
 	fmt.Fprintf(os.Stderr, "Restore complete.\n")
 }

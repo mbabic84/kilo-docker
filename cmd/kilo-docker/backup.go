@@ -32,7 +32,8 @@ func backupVolume(image, volume, home, outputFile string) error {
 }
 
 // restoreVolume extracts a tar.gz backup into the volume by running docker
-// exec on a detached tail -f container. File ownership is set to 1000:1000.
+// exec on a detached tail -f container. File ownership is set to the host
+// user's UID:GID.
 func restoreVolume(image, volume, home, backupFile string) error {
 	container := fmt.Sprintf("kilo-restore-temp-%d", os.Getpid())
 
@@ -55,6 +56,6 @@ func restoreVolume(image, volume, home, backupFile string) error {
 		return err
 	}
 
-	_, _ = dockerExec(container, "chown", "-R", "1000:1000", home)
+	_, _ = dockerExec(container, "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), home)
 	return nil
 }
