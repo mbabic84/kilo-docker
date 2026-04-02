@@ -109,10 +109,25 @@ var BuiltInServices = []Service{
 		Install: []string{
 			"[ -d /home/kilo-t8x3m7kp/.nvm ] || (export HOME=/home/kilo-t8x3m7kp && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash)",
 			"chown -R ${PUID:-1000}:${PGID:-1000} /home/kilo-t8x3m7kp/.nvm",
-			"grep -q 'nvm.sh' /home/kilo-t8x3m7kp/.bashrc 2>/dev/null || printf '\\nexport NVM_DIR=\"$HOME/.nvm\"\\n[ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\"\\n[ -s \"$NVM_DIR/bash_completion\" ] && . \"$NVM_DIR/bash_completion\"\\n' >> /home/kilo-t8x3m7kp/.bashrc",
+			"grep -q 'nvm.sh' /home/kilo-t8x3m7kp/.bashrc 2>/dev/null || printf '\\nexport NVM_DIR=\"$HOME/.nvm\"\\nexport NVM_NODEJS_ORG_MIRROR=\"https://unofficial-builds.nodejs.org/download/release\"\\n[ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\"\\n[ -s \"$NVM_DIR/bash_completion\" ] && . \"$NVM_DIR/bash_completion\"\\n' >> /home/kilo-t8x3m7kp/.bashrc",
 		},
 		EnvVars: map[string]string{
-			"NVM_DIR": "/home/kilo-t8x3m7kp/.nvm",
+			"NVM_DIR":           "/home/kilo-t8x3m7kp/.nvm",
+			"NVM_NODEJS_ORG_MIRROR": "https://unofficial-builds.nodejs.org/download/release",
+		},
+		Volumes:        []string{},
+		RequiresSocket: "",
+	},
+	{
+		Name:        "python",
+		Flag:        "--python",
+		Description: "Install Python 3 with symlink for general purpose use",
+		Install: []string{
+			"command -v python3 >/dev/null || apk add --no-cache python3",
+			"[ -f /usr/local/bin/python ] || ln -sf $(command -v python3) /usr/local/bin/python",
+		},
+		EnvVars: map[string]string{
+			"PYTHON_ENABLED": "1",
 		},
 		Volumes:        []string{},
 		RequiresSocket: "",
