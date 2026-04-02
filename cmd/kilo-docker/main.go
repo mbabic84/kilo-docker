@@ -246,20 +246,19 @@ func runContainer(cfg config) {
 	// Run
 	image := repoURL + ":latest"
 	if containerState == "running" {
-		if err := execDockerAttach("attach", containerName); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-		resetTerminal()
+		// When detaching via Ctrl+P Ctrl+Q, docker attach exits SUCCESSFULLY (no error)
+		// because the container keeps running. When container exits, we get an error.
+		// So: nil error = detach, non-nil error = container exited.
+		execDockerAttach("attach", containerName)
+		handleSessionEnd(containerName, cfg.once)
 	} else if containerState == "exited" || containerState == "created" {
-		if err := execDockerAttach("start", "-ai", containerName); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-		resetTerminal()
+		execDockerAttach("start", "-ai", containerName)
+		handleSessionEnd(containerName, cfg.once)
 	} else {
 		runArgs := buildRunArgs(containerArgs, image, cfg.args, isTerminal())
 		execDocker(runArgs...)
+		// Check container state after docker run returns and handle session end
+		handleSessionEnd(containerName, cfg.once)
 	}
 }
 
@@ -277,4 +276,25 @@ func buildRunArgs(containerArgs []string, image string, extraArgs []string, term
 	args = append(args, image)
 	args = append(args, extraArgs...)
 	return args
+}
+
+// handleSessionEnd prints appropriate message after a session ends.
+// It resets the terminal first, then checks container state to determine
+// whether it was a detach (container still running) or exit (container stopped).
+func handleSessionEnd(containerName string, onceMode bool) {
+	resetTerminal()
+	state := dockerState(containerName)
+	if state == "running" {
+		fmt.Fprintf(os.Stderr, "\nDetached from session '%s'.\n", containerName)
+		if onceMode {
+			fmt.Fprintf(os.Stderr, "To re-attach, run: kilo-docker sessions %s\n\n", containerName)
+		} else {
+			fmt.Fprintln(os.Stderr, "To restart, run: kilo-docker\n")
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "\nSession '%s' ended.\n", containerName)
+		if !onceMode {
+			fmt.Fprintln(os.Stderr, "To restart, run: kilo-docker\n")
+		}
+	}
 }

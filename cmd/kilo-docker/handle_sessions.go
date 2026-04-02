@@ -1,10 +1,8 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 )
 
@@ -175,22 +173,12 @@ func handleSessions(cfg config) {
 	state := dockerState(containerToAttach)
 	switch state {
 	case "running":
-		fmt.Fprintf(os.Stderr, "Attaching to running session '%s' (detach: Ctrl+P Ctrl+Q)...\n", containerToAttach)
-		if err := execDockerAttach("attach", containerToAttach); err != nil {
-			// An *exec.ExitError means docker ran but exited with a non-zero
-			// code.  This is expected on Ctrl+P Ctrl+Q detach (Docker may
-			// propagate a non-zero status) or when the container exits while
-			// attached.  Only report errors that are not simple exit-status
-			// mismatches — e.g. "docker binary not found".
-			var exitErr *exec.ExitError
-			if !errors.As(err, &exitErr) {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
-			}
-		}
-		resetTerminal()
+		// When detaching via Ctrl+P Ctrl+Q, docker attach exits SUCCESSFULLY (no error)
+		// because the container keeps running. When container exits, we get an error.
+		// So: nil error = detach, non-nil error = container exited.
+		execDockerAttach("attach", containerToAttach)
+		handleSessionEnd(containerToAttach, false)
 	case "exited", "created":
-		fmt.Fprintf(os.Stderr, "Starting session '%s'...\n", containerToAttach)
 		// If the session uses ssh-agent, ensure the socket is valid
 		// before restarting. Docker may have created a directory at
 		// the socket path if it didn't exist at container creation.
@@ -207,17 +195,8 @@ func handleSessions(cfg config) {
 				defer cleanupSSH(os.Getenv("SSH_AGENT_PID"))
 			}
 		}
-		if err := execDockerAttach("start", "-ai", containerToAttach); err != nil {
-			// Same handling as the attach case above: an *exec.ExitError
-			// is expected when the container process exits (normal end of
-			// session) and should not be reported as a fatal error.
-			var exitErr *exec.ExitError
-			if !errors.As(err, &exitErr) {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				os.Exit(1)
-			}
-		}
-		resetTerminal()
+		execDockerAttach("start", "-ai", containerToAttach)
+		handleSessionEnd(containerToAttach, false)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: Container '%s' is in state '%s'.\n", containerToAttach, state)
 		os.Exit(1)
