@@ -173,15 +173,9 @@ func handleSessions(cfg config) {
 	state := dockerState(containerToAttach)
 	switch state {
 	case "running":
-		// When detaching via Ctrl+P Ctrl+Q, docker attach exits SUCCESSFULLY (no error)
-		// because the container keeps running. When container exits, we get an error.
-		// So: nil error = detach, non-nil error = container exited.
-		execDockerAttach("attach", containerToAttach)
+		execDockerInteractive(containerToAttach, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
 		handleSessionEnd(containerToAttach, false)
 	case "exited", "created":
-		// If the session uses ssh-agent, ensure the socket is valid
-		// before restarting. Docker may have created a directory at
-		// the socket path if it didn't exist at container creation.
 		needsSSH := false
 		for _, s := range sessions {
 			if s.Name == containerToAttach && strings.Contains(s.Args, "--ssh") {
@@ -195,7 +189,8 @@ func handleSessions(cfg config) {
 				defer cleanupSSH(os.Getenv("SSH_AGENT_PID"))
 			}
 		}
-		execDockerAttach("start", "-ai", containerToAttach)
+		dockerRun("start", "-d", containerToAttach)
+		execDockerInteractive(containerToAttach, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
 		handleSessionEnd(containerToAttach, false)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: Container '%s' is in state '%s'.\n", containerToAttach, state)

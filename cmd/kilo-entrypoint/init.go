@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -139,16 +138,19 @@ func runInit() error {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to copy service configs: %v\n", err)
 	}
 
-	binaryPath, _ := os.Executable()
+	// Use known absolute path instead of os.Executable() which can fail
+	// in containers (especially with --init / tini as PID 1) when /proc/self/exe
+	// doesn't resolve correctly.
+	binaryPath := "/usr/local/bin/kilo-entrypoint"
+
+	// Validate binary exists before exec
+	if _, err := os.Stat(binaryPath); err != nil {
+		return fmt.Errorf("entrypoint binary not found at %s: %w", binaryPath, err)
+	}
 
 	if len(os.Args) <= 1 {
-		// Use sudo -u to start zellij as kilo user, which reads /etc/group and sets supplementary groups.
-		// -E: preserve environment (sudo's env_reset would strip KD_* and other vars).
-		// Only use sudo if the kilo user exists (works in Docker container, not in test env).
-		if _, err := user.Lookup("kilo-t8x3m7kp"); err == nil {
-			return syscall.Exec("/usr/bin/sudo", []string{"sudo", "-E", "-u", "kilo-t8x3m7kp", "-s", "/usr/local/bin/zellij"}, os.Environ())
-		}
-		return syscall.Exec("/usr/local/bin/zellij", []string{"zellij"}, os.Environ())
+		// Keep container alive — zellij is started via docker exec from the host.
+		return syscall.Exec("/bin/sleep", []string{"sleep", "infinity"}, os.Environ())
 	}
 
 	return syscall.Exec(binaryPath, os.Args[1:], os.Environ())

@@ -246,18 +246,22 @@ func runContainer(cfg config) {
 	// Run
 	image := repoURL + ":latest"
 	if containerState == "running" {
-		// When detaching via Ctrl+P Ctrl+Q, docker attach exits SUCCESSFULLY (no error)
-		// because the container keeps running. When container exits, we get an error.
-		// So: nil error = detach, non-nil error = container exited.
-		execDockerAttach("attach", containerName)
+		execDockerInteractive(containerName, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
 		handleSessionEnd(containerName, cfg.once)
 	} else if containerState == "exited" || containerState == "created" {
-		execDockerAttach("start", "-ai", containerName)
+		dockerRun("start", "-d", containerName)
+		time.Sleep(2 * time.Second)
+		execDockerInteractive(containerName, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
 		handleSessionEnd(containerName, cfg.once)
 	} else {
-		runArgs := buildRunArgs(containerArgs, image, cfg.args, isTerminal())
-		execDocker(runArgs...)
-		// Check container state after docker run returns and handle session end
+		runArgs := buildRunArgs(containerArgs, image, cfg.args, false)
+		runArgs[1] = "-d" // replace "-i" with "-d" for detached
+		if _, err := dockerRunDetached(runArgs...); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		time.Sleep(2 * time.Second)
+		execDockerInteractive(containerName, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
 		handleSessionEnd(containerName, cfg.once)
 	}
 }
@@ -279,22 +283,16 @@ func buildRunArgs(containerArgs []string, image string, extraArgs []string, term
 }
 
 // handleSessionEnd prints appropriate message after a session ends.
-// It resets the terminal first, then checks container state to determine
-// whether it was a detach (container still running) or exit (container stopped).
+// With exec-based sessions, the container stays running via sleep infinity,
+// so this always indicates the user detached from zellij.
 func handleSessionEnd(containerName string, onceMode bool) {
 	resetTerminal()
-	state := dockerState(containerName)
-	if state == "running" {
-		fmt.Fprintf(os.Stderr, "\nDetached from session '%s'.\n", containerName)
-		if onceMode {
-			fmt.Fprintf(os.Stderr, "To re-attach, run: kilo-docker sessions %s\n\n", containerName)
-		} else {
-			fmt.Fprintln(os.Stderr, "To restart, run: kilo-docker\n")
-		}
-	} else {
+	if onceMode {
+		dockerRun("rm", "-f", containerName)
 		fmt.Fprintf(os.Stderr, "\nSession '%s' ended.\n", containerName)
-		if !onceMode {
-			fmt.Fprintln(os.Stderr, "To restart, run: kilo-docker\n")
-		}
+		fmt.Fprintf(os.Stderr, "Container removed (--once mode).\n")
+	} else {
+		fmt.Fprintf(os.Stderr, "\nDetached from session '%s'.\n", containerName)
+		fmt.Fprintf(os.Stderr, "To re-attach, run: kilo-docker sessions %s\n", containerName)
 	}
 }

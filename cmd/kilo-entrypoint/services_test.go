@@ -16,16 +16,6 @@ func TestGetServiceDocker(t *testing.T) {
 	}
 }
 
-func TestGetServiceZellij(t *testing.T) {
-	svc := getService("zellij")
-	if svc == nil {
-		t.Fatal("expected zellij service, got nil")
-	}
-	if svc.Name != "zellij" {
-		t.Errorf("expected name 'zellij', got %q", svc.Name)
-	}
-}
-
 func TestGetServiceUnknown(t *testing.T) {
 	svc := getService("nonexistent")
 	if svc != nil {
@@ -34,8 +24,8 @@ func TestGetServiceUnknown(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 8 {
-		t.Errorf("expected 8 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 7 {
+		t.Errorf("expected 7 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
@@ -58,37 +48,6 @@ func TestDockerServiceHasInstallCommands(t *testing.T) {
 
 	if len(svc.Install) == 0 {
 		t.Error("expected Install to have commands")
-	}
-}
-
-func TestZellijServiceHasInstallCommands(t *testing.T) {
-	svc := getService("zellij")
-	if svc == nil {
-		t.Fatal("zellij service not found")
-	}
-
-	if len(svc.Install) == 0 {
-		t.Error("expected Install to have commands")
-	}
-}
-
-func TestZellijServiceHasCopyConfigs(t *testing.T) {
-	svc := getService("zellij")
-	if svc == nil {
-		t.Fatal("zellij service not found")
-	}
-
-	if len(svc.CopyConfigs) == 0 {
-		t.Error("expected CopyConfigs to be set for zellij")
-	}
-	if len(svc.CopyConfigs) > 0 {
-		cfg := svc.CopyConfigs[0]
-		if cfg.Src == "" {
-			t.Error("expected CopyConfig Src to be set")
-		}
-		if cfg.Dst == "" {
-			t.Error("expected CopyConfig Dst to be set")
-		}
 	}
 }
 

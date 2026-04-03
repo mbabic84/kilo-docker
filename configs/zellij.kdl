@@ -365,8 +365,8 @@ pane_frames false
 // Options:
 //   - detach (Default)
 //   - quit
-// 
-// on_force_close "quit"
+//
+on_force_close "quit"
  
 // Configure the scroll back buffer size
 // This is the number of lines zellij stores for each pane in the scroll back
@@ -431,8 +431,8 @@ pane_frames false
 // Options:
 //   - true (default)
 //   - false
-// 
-// session_serialization false
+//
+session_serialization false
  
 // Whether pane viewports are serialized along with the session, default is false
 // Options:
