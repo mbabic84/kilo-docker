@@ -1,3 +1,13 @@
+## [1.48.0](https://github.com/mbabic84/kilo-docker/compare/v1.47.0...v1.48.0) (2026-04-03)
+
+### Features
+
+* add flag mismatch detection and clear zellij sessions on recreate ([41a5e97](https://github.com/mbabic84/kilo-docker/commit/41a5e972ed45466ba2adba47363d294d7c7c85af))
+
+### Bug Fixes
+
+* update lodash and lodash-es to 4.18.1 to resolve Dependabot vulnerabilities ([5379655](https://github.com/mbabic84/kilo-docker/commit/53796551df33719b5ce9aefd2f59005592661a93))
+
 ## [1.47.0](https://github.com/mbabic84/kilo-docker/compare/v1.46.0...v1.47.0) (2026-04-03)
 
 ### Features
