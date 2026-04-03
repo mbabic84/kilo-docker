@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"golang.org/x/term"
+	"github.com/mbabic84/kilo-docker/pkg/constants"
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
@@ -25,7 +26,7 @@ func ainstructLogin(image string) (loginResult, error) {
 	var result loginResult
 
 	fmt.Fprintf(os.Stderr, "\n=== Ainstruct Authentication ===\n")
-	fmt.Fprintf(os.Stderr, "Sign in at https://ainstruct-dev.kralicinora.cz\n\n")
+	fmt.Fprintf(os.Stderr, "Sign in at %s\n\n", constants.AinstructBaseURL)
 	fmt.Fprintf(os.Stderr, "Enables:\n")
 	fmt.Fprintf(os.Stderr, "  - Encrypted volume (derived from your user_id)\n")
 	fmt.Fprintf(os.Stderr, "  - File sync (push/pull config, commands, agents, instructions)\n")
@@ -34,7 +35,7 @@ func ainstructLogin(image string) (loginResult, error) {
 	username := promptUsername()
 	password := promptPassword()
 
-	apiURL := "https://ainstruct-dev.kralicinora.cz/api/v1"
+	apiURL := constants.AinstructAPIBaseURL
 
 	output, err := dockerRun(
 		"-e", "USERNAME="+username,
@@ -66,7 +67,7 @@ func ainstructLogin(image string) (loginResult, error) {
 
 	fmt.Fprintf(os.Stderr, "\nSigned in successfully.\n")
 	fmt.Fprintf(os.Stderr, "Volume derived from user_id, tokens encrypted.\n")
-	fmt.Fprintf(os.Stderr, "Manage collections and documents at https://ainstruct-dev.kralicinora.cz\n\n")
+	fmt.Fprintf(os.Stderr, "Manage collections and documents at %s\n\n", constants.AinstructBaseURL)
 
 	return result, nil
 }

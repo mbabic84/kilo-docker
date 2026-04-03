@@ -90,7 +90,7 @@ func NewSyncer() *Syncer {
 	kiloConfigDir := constants.GetKiloConfigDir()
 	apiURL := os.Getenv("KD_AINSTRUCT_API_URL")
 	if apiURL == "" {
-		apiURL = "https://ainstruct-dev.kralicinora.cz/api/v1"
+		apiURL = constants.AinstructAPIBaseURL
 	}
 	var expiry int64
 	if v := os.Getenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY"); v != "" {

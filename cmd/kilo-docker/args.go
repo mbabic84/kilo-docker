@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mbabic84/kilo-docker/pkg/constants"
 )
 
 func serializeArgs(cfg config, sshEnabled bool) string {
@@ -113,7 +115,7 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 
 	if cfg.ainstruct {
 		args = append(args, "-e", "KD_AINSTRUCT_ENABLED=1")
-		args = append(args, "-e", "KD_AINSTRUCT_API_URL=https://ainstruct-dev.kralicinora.cz/api/v1")
+		args = append(args, "-e", "KD_AINSTRUCT_API_URL="+constants.AinstructAPIBaseURL)
 		if ainstructSyncToken != "" {
 			args = append(args, "-e", "KD_AINSTRUCT_SYNC_TOKEN="+ainstructSyncToken)
 		}
