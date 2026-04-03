@@ -133,3 +133,21 @@ func execDockerAttach(args ...string) error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	return cmd.Run()
 }
+
+// execDockerInteractive replaces the current process with a docker exec
+// command for interactive sessions (e.g. attaching to zellij). It uses
+// -it for interactive TTY and does not use SysProcAttr since docker exec
+// doesn't use TTY-detach semantics.
+func execDockerInteractive(container string, user string, args ...string) error {
+	execArgs := []string{"exec", "-it"}
+	if user != "" {
+		execArgs = append(execArgs, "--user", user)
+	}
+	execArgs = append(execArgs, container)
+	execArgs = append(execArgs, args...)
+	cmd := exec.Command("docker", execArgs...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}

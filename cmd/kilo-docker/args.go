@@ -27,9 +27,7 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 		args = append(args, "-v", volume+":"+kiloHome)
 	}
 
-	if cfg.once {
-		args = append(args, "--rm")
-	}
+
 
 	args = append(args, "--label", "kilo.workspace="+pwd)
 

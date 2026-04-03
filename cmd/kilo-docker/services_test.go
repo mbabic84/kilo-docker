@@ -19,18 +19,7 @@ func TestGetServiceDocker(t *testing.T) {
 	}
 }
 
-func TestGetServiceZellij(t *testing.T) {
-	svc := getService("zellij")
-	if svc == nil {
-		t.Fatal("expected zellij service, got nil")
-	}
-	if svc.Name != "zellij" {
-		t.Errorf("expected name 'zellij', got %q", svc.Name)
-	}
-	if svc.Flag != "--zellij" {
-		t.Errorf("expected flag '--zellij', got %q", svc.Flag)
-	}
-}
+
 
 func TestGetServiceUnknown(t *testing.T) {
 	svc := getService("nonexistent")
@@ -41,14 +30,14 @@ func TestGetServiceUnknown(t *testing.T) {
 
 func TestIsServiceEnabled(t *testing.T) {
 	cfg := config{
-		enabledServices: []string{"docker", "zellij"},
+		enabledServices: []string{"docker", "gh"},
 	}
 
 	if !isServiceEnabled(cfg, "docker") {
 		t.Error("expected docker to be enabled")
 	}
-	if !isServiceEnabled(cfg, "zellij") {
-		t.Error("expected zellij to be enabled")
+	if !isServiceEnabled(cfg, "gh") {
+		t.Error("expected gh to be enabled")
 	}
 	if isServiceEnabled(cfg, "nonexistent") {
 		t.Error("expected nonexistent to not be enabled")
@@ -64,8 +53,8 @@ func TestIsServiceEnabledEmpty(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 8 {
-		t.Errorf("expected 8 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 7 {
+		t.Errorf("expected 7 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
@@ -92,32 +81,6 @@ func TestDockerServiceHasRequiredFields(t *testing.T) {
 	}
 	if _, ok := svc.EnvVars["DOCKER_ENABLED"]; !ok {
 		t.Error("expected DOCKER_ENABLED in EnvVars")
-	}
-}
-
-func TestZellijServiceHasRequiredFields(t *testing.T) {
-	svc := getService("zellij")
-	if svc == nil {
-		t.Fatal("zellij service not found")
-	}
-
-	if svc.Name != "zellij" {
-		t.Errorf("expected Name 'zellij', got %q", svc.Name)
-	}
-	if svc.Flag != "--zellij" {
-		t.Errorf("expected Flag '--zellij', got %q", svc.Flag)
-	}
-	if len(svc.Install) == 0 {
-		t.Error("expected Install to have commands")
-	}
-	if svc.RequiresSocket != "" {
-		t.Errorf("expected RequiresSocket to be empty for zellij, got %q", svc.RequiresSocket)
-	}
-	if _, ok := svc.EnvVars["ZELLIJ_ENABLED"]; !ok {
-		t.Error("expected ZELLIJ_ENABLED in EnvVars")
-	}
-	if len(svc.CopyConfigs) == 0 {
-		t.Error("expected CopyConfigs to be set for zellij")
 	}
 }
 

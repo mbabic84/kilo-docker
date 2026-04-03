@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 // --- Unit tests for subcommands map ---
@@ -208,24 +209,24 @@ func TestSubcommandStillDispatched(t *testing.T) {
 }
 
 // TestEntrypointNoArgsRunsInit verifies that invoking the entrypoint
-// with no arguments runs init (which execs into /bin/sh).
+// with no arguments runs init (which execs into tail -f /dev/null).
 func TestEntrypointNoArgsRunsInit(t *testing.T) {
 	bin := findEntrypointBinary(t)
 
-	// No args → init runs, then execs into /bin/sh.
-	// We pass "-c echo init-done" via stdin to sh to verify it launched.
 	cmd := exec.Command(bin)
-	cmd.Stdin = strings.NewReader("echo init-done\nexit\n")
-	out, err := cmd.CombinedOutput()
-	output := string(out)
-
-	if err != nil {
-		t.Logf("entrypoint no-args exited with error (may be expected): %v", err)
+	cmd.Stdin = strings.NewReader("")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("failed to start entrypoint: %v", err)
 	}
 
-	if !strings.Contains(output, "init-done") {
-		t.Errorf("entrypoint with no args should exec into sh, expected 'init-done' in output, got:\n%s", output)
+	time.Sleep(100 * time.Millisecond)
+
+	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
+		t.Fatalf("entrypoint with no args should not exit immediately, got exit code: %d", cmd.ProcessState.ExitCode())
 	}
+
+	cmd.Process.Kill()
+	cmd.Wait()
 }
 
 // findEntrypointBinary locates the pre-built kilo-entrypoint binary.

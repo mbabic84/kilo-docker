@@ -246,20 +246,23 @@ func runContainer(cfg config) {
 	// Run
 	image := repoURL + ":latest"
 	if containerState == "running" {
-		if err := execDockerAttach("attach", containerName); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-		resetTerminal()
+		execDockerInteractive(containerName, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
+		handleSessionEnd(containerName, cfg.once)
 	} else if containerState == "exited" || containerState == "created" {
-		if err := execDockerAttach("start", "-ai", containerName); err != nil {
+		dockerRun("start", "-d", containerName)
+		time.Sleep(2 * time.Second)
+		execDockerInteractive(containerName, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
+		handleSessionEnd(containerName, cfg.once)
+	} else {
+		runArgs := buildRunArgs(containerArgs, image, cfg.args, false)
+		runArgs[1] = "-d" // replace "-i" with "-d" for detached
+		if _, err := dockerRunDetached(runArgs...); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		resetTerminal()
-	} else {
-		runArgs := buildRunArgs(containerArgs, image, cfg.args, isTerminal())
-		execDocker(runArgs...)
+		time.Sleep(2 * time.Second)
+		execDockerInteractive(containerName, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
+		handleSessionEnd(containerName, cfg.once)
 	}
 }
 
@@ -277,4 +280,19 @@ func buildRunArgs(containerArgs []string, image string, extraArgs []string, term
 	args = append(args, image)
 	args = append(args, extraArgs...)
 	return args
+}
+
+// handleSessionEnd prints appropriate message after a session ends.
+// With exec-based sessions, the container stays running via sleep infinity,
+// so this always indicates the user detached from zellij.
+func handleSessionEnd(containerName string, onceMode bool) {
+	resetTerminal()
+	if onceMode {
+		dockerRun("rm", "-f", containerName)
+		fmt.Fprintf(os.Stderr, "\nSession '%s' ended.\n", containerName)
+		fmt.Fprintf(os.Stderr, "Container removed (--once mode).\n")
+	} else {
+		fmt.Fprintf(os.Stderr, "\nDetached from session '%s'.\n", containerName)
+		fmt.Fprintf(os.Stderr, "To re-attach, run: kilo-docker sessions %s\n", containerName)
+	}
 }

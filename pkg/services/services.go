@@ -38,22 +38,6 @@ var BuiltInServices = []Service{
 		GIDEnvVar:      "DOCKER_GID",
 	},
 	{
-		Name:        "zellij",
-		Flag:        "--zellij",
-		Description: "Start with Zellij multiplexer (detach: Ctrl+P Ctrl+Q, reattach: kilo-docker sessions)",
-		Install: []string{
-			"command -v zellij >/dev/null || (curl -fsSL https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz -o /tmp/zellij.tar.gz && tar xzf /tmp/zellij.tar.gz -C /usr/local/bin && rm -rf /tmp/zellij.tar.gz)",
-		},
-		EnvVars: map[string]string{
-			"ZELLIJ_ENABLED": "1",
-		},
-		Volumes:        []string{},
-		RequiresSocket: "",
-		CopyConfigs: []CopyConfig{
-			{Src: "/etc/zellij/config.kdl", Dst: "~/.config/zellij/config.kdl"},
-		},
-	},
-	{
 		Name:        "go",
 		Flag:        "--go",
 		Description: "Install Go 1.26.1 (latest stable) for development",

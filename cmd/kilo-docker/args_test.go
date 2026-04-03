@@ -39,53 +39,6 @@ func TestBuildContainerArgsWithDockerService(t *testing.T) {
 	}
 }
 
-func TestBuildContainerArgsWithZellijService(t *testing.T) {
-	cfg := config{
-		once:            false,
-		enabledServices: []string{"zellij"},
-	}
-
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found",
-		"", nil, "", "", "", "", 0)
-
-	argsStr := strings.Join(args, " ")
-
-	if !strings.Contains(argsStr, "--zellij") {
-		t.Error("expected --zellij in session args")
-	}
-	if !strings.Contains(argsStr, "-e ZELLIJ_ENABLED=1") {
-		t.Error("expected ZELLIJ_ENABLED env var")
-	}
-	if !strings.Contains(argsStr, "-e KD_SERVICES=zellij") {
-		t.Error("expected KD_SERVICES env var")
-	}
-}
-
-func TestBuildContainerArgsWithMultipleServices(t *testing.T) {
-	cfg := config{
-		once:            false,
-		enabledServices: []string{"docker", "zellij"},
-	}
-	hostEnvVars := map[string]string{
-		"DOCKER_GID": "1001",
-	}
-
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found",
-		"", hostEnvVars, "", "", "", "", 0)
-
-	argsStr := strings.Join(args, " ")
-
-	if !strings.Contains(argsStr, "--docker") {
-		t.Error("expected --docker in session args")
-	}
-	if !strings.Contains(argsStr, "--zellij") {
-		t.Error("expected --zellij in session args")
-	}
-	if !strings.Contains(argsStr, "-e KD_SERVICES=docker,zellij") {
-		t.Error("expected KD_SERVICES with both services")
-	}
-}
-
 func TestBuildContainerArgsNoServices(t *testing.T) {
 	cfg := config{
 		once:            false,
@@ -121,7 +74,7 @@ func TestBuildContainerArgsHostEnvVarsOnlyWhenSet(t *testing.T) {
 func TestBuildContainerArgsOnceMode(t *testing.T) {
 	cfg := config{
 		once:            true,
-		enabledServices: []string{"zellij"},
+		enabledServices: []string{"gh"},
 	}
 
 	args := buildContainerArgs(cfg, "", "/pwd", "test-container", "not_found",
@@ -129,9 +82,6 @@ func TestBuildContainerArgsOnceMode(t *testing.T) {
 
 	argsStr := strings.Join(args, " ")
 
-	if !strings.Contains(argsStr, "--rm") {
-		t.Error("expected --rm for once mode")
-	}
 	if !strings.Contains(argsStr, "--once") {
 		t.Error("expected --once in session args")
 	}
