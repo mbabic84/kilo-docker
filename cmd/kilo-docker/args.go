@@ -115,7 +115,7 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 
 	if cfg.ainstruct {
 		args = append(args, "-e", "KD_AINSTRUCT_ENABLED=1")
-		args = append(args, "-e", "KD_AINSTRUCT_API_URL="+constants.AinstructAPIBaseURL)
+		args = append(args, "-e", "KD_AINSTRUCT_BASE_URL="+constants.AinstructBaseURL)
 		if ainstructSyncToken != "" {
 			args = append(args, "-e", "KD_AINSTRUCT_SYNC_TOKEN="+ainstructSyncToken)
 		}

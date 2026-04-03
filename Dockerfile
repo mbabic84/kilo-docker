@@ -21,6 +21,8 @@ RUN apk add --no-cache curl tar \
 # ── Runtime: Alpine with tools ──
 FROM alpine:latest
 
+ARG AINSTRUCT_BASE_URL=https://ainstruct-dev.kralicinora.cz
+
 RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client ripgrep sudo curl tar xz \
     && adduser -D -u 1000 kilo-t8x3m7kp \
     && echo "kilo-t8x3m7kp ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
@@ -34,5 +36,6 @@ COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
 
 ENV HOME=/home/kilo-t8x3m7kp
 ENV SHELL=/bin/bash
+ENV KD_AINSTRUCT_BASE_URL=${AINSTRUCT_BASE_URL}
 
 ENTRYPOINT ["kilo-entrypoint"]
