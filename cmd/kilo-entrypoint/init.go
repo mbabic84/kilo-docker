@@ -142,14 +142,13 @@ func runInit() error {
 	binaryPath, _ := os.Executable()
 
 	if len(os.Args) <= 1 {
-		// Use sudo -u to start shell as kilo user, which reads /etc/group and sets supplementary groups.
-		// -s: shell mode (not login) preserves the working directory (Docker -w).
+		// Use sudo -u to start zellij as kilo user, which reads /etc/group and sets supplementary groups.
 		// -E: preserve environment (sudo's env_reset would strip KD_* and other vars).
 		// Only use sudo if the kilo user exists (works in Docker container, not in test env).
 		if _, err := user.Lookup("kilo-t8x3m7kp"); err == nil {
-			return syscall.Exec("/usr/bin/sudo", []string{"sudo", "-E", "-u", "kilo-t8x3m7kp", "-s"}, os.Environ())
+			return syscall.Exec("/usr/bin/sudo", []string{"sudo", "-E", "-u", "kilo-t8x3m7kp", "-s", "/usr/local/bin/zellij"}, os.Environ())
 		}
-		return syscall.Exec("/bin/sh", []string{"sh"}, os.Environ())
+		return syscall.Exec("/usr/local/bin/zellij", []string{"zellij"}, os.Environ())
 	}
 
 	return syscall.Exec(binaryPath, os.Args[1:], os.Environ())

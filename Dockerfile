@@ -23,7 +23,9 @@ FROM alpine:latest
 
 RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client ripgrep sudo curl tar xz \
     && adduser -D -u 1000 kilo-t8x3m7kp \
-    && echo "kilo-t8x3m7kp ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+    && echo "kilo-t8x3m7kp ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+    && curl -fsSL https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz -o /tmp/zellij.tar.gz \
+    && tar xzf /tmp/zellij.tar.gz -C /usr/local/bin && rm -rf /tmp/zellij.tar.gz && chmod +x /usr/local/bin/zellij
 
 COPY configs/zellij.kdl /etc/zellij/config.kdl
 COPY configs/opencode.json /home/kilo-t8x3m7kp/.config/kilo/opencode.json
