@@ -22,7 +22,7 @@ func backupVolume(image, volume, home, outputFile string) error {
 
 	time.Sleep(500 * time.Millisecond)
 
-	_, err = dockerExec(container, "tar", "czf", "/tmp/backup.tar.gz", "-C", home, ".")
+	_, err = dockerExec(container, "", "tar", "czf", "/tmp/backup.tar.gz", "-C", home, ".")
 	if err != nil {
 		return err
 	}
@@ -51,11 +51,11 @@ func restoreVolume(image, volume, home, backupFile string) error {
 		return err
 	}
 
-	_, err = dockerExec(container, "tar", "xzf", "/tmp/backup.tar.gz", "-C", home)
+	_, err = dockerExec(container, "", "tar", "xzf", "/tmp/backup.tar.gz", "-C", home)
 	if err != nil {
 		return err
 	}
 
-	_, _ = dockerExec(container, "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), home)
+	_, _ = dockerExec(container, "", "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), home)
 	return nil
 }

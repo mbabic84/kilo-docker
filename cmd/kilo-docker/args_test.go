@@ -129,3 +129,81 @@ func TestBuildContainerArgsNoPorts(t *testing.T) {
 		t.Error("expected no --port in session args when no ports configured")
 	}
 }
+
+func TestSerializeArgsEmpty(t *testing.T) {
+	cfg := config{
+		once:            false,
+		enabledServices: []string{},
+	}
+	result := serializeArgs(cfg, false)
+	if result != "" {
+		t.Errorf("expected empty string, got %q", result)
+	}
+}
+
+func TestSerializeArgsOnce(t *testing.T) {
+	cfg := config{
+		once:            true,
+		enabledServices: []string{},
+	}
+	result := serializeArgs(cfg, false)
+	if result != "--once" {
+		t.Errorf("expected '--once', got %q", result)
+	}
+}
+
+func TestSerializeArgsServices(t *testing.T) {
+	cfg := config{
+		once:            false,
+		enabledServices: []string{"docker", "gh"},
+	}
+	result := serializeArgs(cfg, false)
+	if !strings.Contains(result, "--docker") {
+		t.Errorf("expected '--docker' in result, got %q", result)
+	}
+	if !strings.Contains(result, "--gh") {
+		t.Errorf("expected '--gh' in result, got %q", result)
+	}
+}
+
+func TestSerializeArgsCombined(t *testing.T) {
+	cfg := config{
+		once:            true,
+		enabledServices: []string{"docker"},
+		playwright:      true,
+		mcp:             true,
+	}
+	result := serializeArgs(cfg, true)
+	expected := "--once --docker --playwright --ssh --mcp"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestSerializeArgsPorts(t *testing.T) {
+	cfg := config{
+		once:            false,
+		enabledServices: []string{},
+		ports:           []string{"8080:80", "3000:3000"},
+	}
+	result := serializeArgs(cfg, false)
+	if !strings.Contains(result, "--port 8080:80") {
+		t.Errorf("expected '--port 8080:80' in result, got %q", result)
+	}
+	if !strings.Contains(result, "--port 3000:3000") {
+		t.Errorf("expected '--port 3000:3000' in result, got %q", result)
+	}
+}
+
+func TestSerializeArgsNetwork(t *testing.T) {
+	cfg := config{
+		once:            false,
+		enabledServices: []string{},
+		network:         "my-network",
+	}
+	result := serializeArgs(cfg, false)
+	expected := "--network my-network"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}

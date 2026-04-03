@@ -7,6 +7,44 @@ import (
 	"strings"
 )
 
+func serializeArgs(cfg config, sshEnabled bool) string {
+	var sessionArgs string
+	if cfg.once {
+		sessionArgs += "--once "
+	}
+	for _, svcName := range cfg.enabledServices {
+		svc := getService(svcName)
+		if svc != nil && svc.Flag != "" {
+			sessionArgs += svc.Flag + " "
+		}
+	}
+	if cfg.playwright {
+		sessionArgs += "--playwright "
+	}
+	if sshEnabled {
+		sessionArgs += "--ssh "
+	}
+	if cfg.encrypted && !cfg.ainstruct {
+		sessionArgs += "-p "
+	}
+	if cfg.ainstruct {
+		sessionArgs += "--ainstruct "
+	}
+	if cfg.mcp {
+		sessionArgs += "--mcp "
+	}
+	if cfg.network != "" {
+		sessionArgs += "--network " + cfg.network + " "
+	}
+	for _, port := range cfg.ports {
+		sessionArgs += "--port " + port + " "
+	}
+	if len(cfg.args) > 0 {
+		sessionArgs += strings.Join(cfg.args, " ") + " "
+	}
+	return strings.TrimSpace(sessionArgs)
+}
+
 // buildContainerArgs constructs the full docker run argument list from the
 // parsed config, SSH agent state, environment tokens, and container state.
 func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
@@ -31,41 +69,8 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 
 	args = append(args, "--label", "kilo.workspace="+pwd)
 
-	sessionArgs := ""
-	if cfg.once {
-		sessionArgs += "--once "
-	}
-	for _, svcName := range cfg.enabledServices {
-		svc := getService(svcName)
-		if svc != nil && svc.Flag != "" {
-			sessionArgs += svc.Flag + " "
-		}
-	}
-	if cfg.playwright {
-		sessionArgs += "--playwright "
-	}
-	if sshAuthSock != "" {
-		sessionArgs += "--ssh "
-	}
-	if cfg.encrypted && !cfg.ainstruct {
-		sessionArgs += "-p "
-	}
-	if cfg.ainstruct {
-		sessionArgs += "--ainstruct "
-	}
-	if cfg.mcp {
-		sessionArgs += "--mcp "
-	}
-	if cfg.network != "" {
-		sessionArgs += "--network " + cfg.network + " "
-	}
-	for _, port := range cfg.ports {
-		sessionArgs += "--port " + port + " "
-	}
-	if len(cfg.args) > 0 {
-		sessionArgs += strings.Join(cfg.args, " ") + " "
-	}
-	args = append(args, "--label", "kilo.args="+strings.TrimSpace(sessionArgs))
+	sessionArgs := serializeArgs(cfg, sshAuthSock != "")
+	args = append(args, "--label", "kilo.args="+sessionArgs)
 
 	if cfg.mcp && kdContext7Token != "" {
 		args = append(args, "-e", "KD_CONTEXT7_TOKEN="+kdContext7Token)

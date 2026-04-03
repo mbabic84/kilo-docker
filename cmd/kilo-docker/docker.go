@@ -83,8 +83,13 @@ func dockerRunDetached(args ...string) (string, error) {
 
 // dockerExec executes a command inside a running container via docker exec.
 // Returns trimmed combined output.
-func dockerExec(container string, args ...string) (string, error) {
-	execArgs := append([]string{"exec", container}, args...)
+func dockerExec(container string, user string, args ...string) (string, error) {
+	execArgs := []string{"exec"}
+	if user != "" {
+		execArgs = append(execArgs, "--user", user)
+	}
+	execArgs = append(execArgs, container)
+	execArgs = append(execArgs, args...)
 	cmd := exec.Command("docker", execArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -93,9 +98,27 @@ func dockerExec(container string, args ...string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+// deleteZellijSessions removes all zellij sessions inside the container.
+// This prevents stale session resurrection prompts after container recreation.
+// Uses --yes to auto-confirm and --force to kill running sessions before deleting.
+func deleteZellijSessions(container string) {
+	out, err := dockerExec(container, kiloUser, "zellij", "delete-all-sessions", "--yes", "--force")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to delete zellij sessions in %s: %s (err: %v)\n", container, out, err)
+	} else {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Deleted zellij sessions in %s\n", container)
+	}
+}
+
 // dockerInspect returns the output of `docker inspect -f format container`.
 func dockerInspect(container, format string) (string, error) {
 	return dockerRun("inspect", "-f", format, container)
+}
+
+// getContainerLabel retrieves a label value from a container.
+func getContainerLabel(container, label string) string {
+	val, _ := dockerInspect(container, "{{index .Config.Labels \""+label+"\"}}")
+	return strings.TrimSpace(val)
 }
 
 // dockerState returns the container status string (e.g. "running", "exited")

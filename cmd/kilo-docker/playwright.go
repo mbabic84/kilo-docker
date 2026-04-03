@@ -64,7 +64,7 @@ func startPlaywright(network *string) error {
 			return fmt.Errorf("Playwright MCP container exited unexpectedly")
 		}
 
-		ready, _ := dockerExec(playwrightContainer, "node", "-e",
+		ready, _ := dockerExec(playwrightContainer, "", "node", "-e",
 			"const net=require('net');const s=net.connect(8931,'127.0.0.1',()=>{s.destroy();process.exit(0)});s.on('error',()=>process.exit(1));s.setTimeout(2000,()=>{s.destroy();process.exit(1)})")
 		if ready != "" || dockerState(playwrightContainer) == "running" {
 			fmt.Fprintf(os.Stderr, " ready.\n")
