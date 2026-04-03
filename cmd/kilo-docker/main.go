@@ -83,6 +83,42 @@ func runContainer(cfg config) {
 		os.Exit(1)
 	}
 
+	// Container name and state — determined first for flag mismatch check
+	pwd, _ := os.Getwd()
+	containerName := deriveContainerName(pwd)
+	containerState := dockerState(containerName)
+	if cfg.once {
+		if containerState != "not_found" {
+			dockerRun("rm", "-f", containerName)
+		}
+		containerState = "not_found"
+	} else {
+		switch containerState {
+		case "exited", "dead", "created":
+			dockerRun("rm", "-f", containerName)
+			containerState = "not_found"
+		}
+	}
+
+	// Flag mismatch check — runs first, before any expensive setup
+	if containerState == "running" {
+		currentFlags := serializeArgs(cfg, cfg.ssh)
+		storedFlags := getContainerLabel(containerName, "kilo.args")
+		if currentFlags != storedFlags {
+			fmt.Fprintf(os.Stderr, "Existing session uses different flags.\n")
+			fmt.Fprintf(os.Stderr, "  Existing: %s\n", storedFlags)
+			fmt.Fprintf(os.Stderr, "  Current:  %s\n", currentFlags)
+			if cfg.yes || promptConfirm("Recreate with new flags? [y/N]: ") {
+				dockerRun("rm", "-f", containerName)
+				containerState = "not_found"
+			} else {
+				execDockerInteractive(containerName, kiloUser, "zellij", "attach", "--create", "kilo-docker")
+				handleSessionEnd(containerName, cfg.once)
+				return
+			}
+		}
+	}
+
 	// SSH setup
 	sshAuthSock := ""
 	sshAgentStarted := false
@@ -204,25 +240,6 @@ func runContainer(cfg config) {
 		cfg.network = playwrightNetwork
 	}
 
-	// Container name
-	pwd, _ := os.Getwd()
-	containerName := deriveContainerName(pwd)
-
-	// Container state
-	containerState := dockerState(containerName)
-	if cfg.once {
-		if containerState != "not_found" {
-			dockerRun("rm", "-f", containerName)
-		}
-		containerState = "not_found"
-	} else {
-		switch containerState {
-		case "exited", "dead", "created":
-			dockerRun("rm", "-f", containerName)
-			containerState = "not_found"
-		}
-	}
-
 	// Workspace conflict check
 	if !cfg.once {
 		if strings.HasPrefix(pwd, "/home/kilo-t8x3m7kp") {
@@ -246,12 +263,13 @@ func runContainer(cfg config) {
 	// Run
 	image := repoURL + ":latest"
 	if containerState == "running" {
-		execDockerInteractive(containerName, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
+		execDockerInteractive(containerName, kiloUser, "zellij", "attach", "--create", "kilo-docker")
 		handleSessionEnd(containerName, cfg.once)
 	} else if containerState == "exited" || containerState == "created" {
 		dockerRun("start", "-d", containerName)
 		time.Sleep(2 * time.Second)
-		execDockerInteractive(containerName, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
+		deleteZellijSessions(containerName)
+		execDockerInteractive(containerName, kiloUser, "zellij", "attach", "--create", "kilo-docker")
 		handleSessionEnd(containerName, cfg.once)
 	} else {
 		runArgs := buildRunArgs(containerArgs, image, cfg.args, false)
@@ -261,7 +279,8 @@ func runContainer(cfg config) {
 			os.Exit(1)
 		}
 		time.Sleep(2 * time.Second)
-		execDockerInteractive(containerName, "kilo-t8x3m7kp", "zellij", "attach", "--create", "kilo-docker")
+		deleteZellijSessions(containerName)
+		execDockerInteractive(containerName, kiloUser, "zellij", "attach", "--create", "kilo-docker")
 		handleSessionEnd(containerName, cfg.once)
 	}
 }
