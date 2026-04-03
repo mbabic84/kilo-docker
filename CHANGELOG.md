@@ -1,3 +1,16 @@
+## [1.47.0](https://github.com/mbabic84/kilo-docker/compare/v1.46.0...v1.47.0) (2026-04-03)
+
+### Features
+
+* make Zellij the default session instead of bash ([62b0a09](https://github.com/mbabic84/kilo-docker/commit/62b0a09dfb2838dfa26199e9f345928fe2e94c47))
+* **zellij:** start in locked mode by default ([bc5bc75](https://github.com/mbabic84/kilo-docker/commit/bc5bc75df7953e806b34c77b0f9da711a13bb7ea))
+
+### Bug Fixes
+
+* reset terminal and show exit messages after session ends ([e5a34c2](https://github.com/mbabic84/kilo-docker/commit/e5a34c278203b87ee4bbe1da8a85adc85f0d4c0b))
+* **zellij:** hide status bar shortcuts and simplify UI ([ba449d1](https://github.com/mbabic84/kilo-docker/commit/ba449d19bbc2c377b3606326ccdadf22f7de4e6d))
+* **zellij:** remove Ctrl+q binding to allow container detach ([6c02d11](https://github.com/mbabic84/kilo-docker/commit/6c02d11664452c507067f82697b38a3ca4b99808))
+
 ## [1.46.0](https://github.com/mbabic84/kilo-docker/compare/v1.45.1...v1.46.0) (2026-04-03)
 
 ### Features
