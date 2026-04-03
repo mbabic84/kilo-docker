@@ -25,9 +25,10 @@ func ainstructLogin(image string) (loginResult, error) {
 	var result loginResult
 
 	fmt.Fprintf(os.Stderr, "\n=== Ainstruct Authentication ===\n")
-	fmt.Fprintf(os.Stderr, "Sign in with your Ainstruct account to enable:\n")
+	fmt.Fprintf(os.Stderr, "Sign in at https://ainstruct-dev.kralicinora.cz\n\n")
+	fmt.Fprintf(os.Stderr, "Enables:\n")
 	fmt.Fprintf(os.Stderr, "  - Encrypted volume (derived from your user_id)\n")
-	fmt.Fprintf(os.Stderr, "  - File sync (push/pull config, commands, agents)\n")
+	fmt.Fprintf(os.Stderr, "  - File sync (push/pull config, commands, agents, instructions)\n")
 	fmt.Fprintf(os.Stderr, "  - MCP server tokens (stored encrypted in volume)\n\n")
 
 	username := promptUsername()
@@ -64,7 +65,8 @@ func ainstructLogin(image string) (loginResult, error) {
 	}
 
 	fmt.Fprintf(os.Stderr, "\nSigned in successfully.\n")
-	fmt.Fprintf(os.Stderr, "Volume derived from user_id, tokens will be stored encrypted.\n\n")
+	fmt.Fprintf(os.Stderr, "Volume derived from user_id, tokens encrypted.\n")
+	fmt.Fprintf(os.Stderr, "Manage collections and documents at https://ainstruct-dev.kralicinora.cz\n\n")
 
 	return result, nil
 }
