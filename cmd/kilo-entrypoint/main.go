@@ -38,6 +38,7 @@ var subcommands = map[string]bool{
 	"sync":            true,
 	"resync":          true,
 	"zellij-attach":   true,
+	"help":            true,
 }
 
 // resolveCommand checks if name is a known internal subcommand.
@@ -53,6 +54,27 @@ func resolveCommand(name string) (string, bool) {
 		return "", true // unknown, but still a pass-through (will error in main)
 	}
 	return binary, true
+}
+
+func runHelp() {
+	const w = 40
+	fmt.Println("kilo-entrypoint - Container entrypoint for kilo-docker\n")
+	fmt.Println("Usage: kilo-entrypoint [subcommand]\n")
+	fmt.Println("With no arguments, runs container initialization.\n")
+	fmt.Println("Subcommands:")
+	fmt.Printf("  %-*s %s\n", w, "help", "Show this help message")
+	fmt.Printf("  %-*s %s\n", w, "load-tokens", "Read token env file, output KEY=VALUE to stdout")
+	fmt.Printf("  %-*s %s\n", w, "save-tokens", "Read KEY=VALUE from stdin, write to token file")
+	fmt.Printf("  %-*s %s\n", w, "ainstruct-login", "Authenticate with Ainstruct API, output structured result")
+	fmt.Printf("  %-*s %s\n", w, "update-config", "Download config template, merge with existing config")
+	fmt.Printf("  %-*s %s\n", w, "backup [path]", "Create tar.gz of KILO_HOME (default: /tmp/backup.tar.gz)")
+	fmt.Printf("  %-*s %s\n", w, "restore [path]", "Extract tar.gz into KILO_HOME with ownership fix")
+	fmt.Printf("  %-*s %s\n", w, "config", "Toggle MCP servers based on environment variables")
+	fmt.Printf("  %-*s %s\n", w, "sync", "Start ainstruct file watcher + REST sync")
+	fmt.Printf("  %-*s %s\n", w, "resync", "Delete all remote documents and re-push local files")
+	fmt.Printf("  %-*s %s\n", w, "zellij-attach", "Attach to existing zellij session")
+	fmt.Println("\nAny other argument is passed through to exec.LookPath for")
+	fmt.Println("direct binary execution (e.g. \"kilo\", \"sh\", \"bash\").")
 }
 
 func main() {
@@ -137,5 +159,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "zellij-attach error: %v\n", err)
 			os.Exit(1)
 		}
+	case "help":
+		runHelp()
 	}
 }
