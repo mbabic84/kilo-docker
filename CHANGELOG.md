@@ -1,3 +1,10 @@
+## [2.1.0](https://github.com/mbabic84/kilo-docker/compare/v2.0.4...v2.1.0) (2026-04-04)
+
+### Features
+
+* add help subcommand to kilo-entrypoint ([628fbb9](https://github.com/mbabic84/kilo-docker/commit/628fbb9968a696c505d3fe0e7672561b649f6e8b))
+* add help subcommand to kilo-entrypoint ([9fe7e25](https://github.com/mbabic84/kilo-docker/commit/9fe7e2573f1318112cb2732086ef5330214a1e49))
+
 ## [2.0.4](https://github.com/mbabic84/kilo-docker/compare/v2.0.3...v2.0.4) (2026-04-04)
 
 ### Bug Fixes
