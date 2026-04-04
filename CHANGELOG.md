@@ -1,3 +1,9 @@
+## [2.0.3](https://github.com/mbabic84/kilo-docker/compare/v2.0.2...v2.0.3) (2026-04-04)
+
+### Bug Fixes
+
+* clean up log lines and token status output ([793bf64](https://github.com/mbabic84/kilo-docker/commit/793bf64e60ccbadf57db87f9ba593b98a8d12ee1))
+
 ## [2.0.2](https://github.com/mbabic84/kilo-docker/compare/v2.0.1...v2.0.2) (2026-04-04)
 
 ### Bug Fixes
