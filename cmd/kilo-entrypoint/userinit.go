@@ -11,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // runUserInit performs the full first-time initialization inside a container.
@@ -196,7 +198,16 @@ func runUserInit() error {
 	if err := os.WriteFile(userConfigPath, configJSON, 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to save user config: %v\n", err)
 	} else {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Saved user config: %s\n", string(configJSON))
+		redactedConfig := map[string]string{
+			"homeDir":  homeDir,
+			"username": username,
+			"uid":      puidStr,
+			"gid":      pgidStr,
+			"shell":    userConfig["shell"],
+			"userID":   utils.RedactID(userID),
+		}
+		redactedJSON, _ := json.Marshal(redactedConfig)
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Saved user config: %s\n", string(redactedJSON))
 	}
 
 	// Set environment

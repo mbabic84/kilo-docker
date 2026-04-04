@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // apiError represents an error response from the Ainstruct API.
@@ -117,14 +119,14 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 			return nil, fmt.Errorf("INVALID_TOKEN after refresh")
 		}
 		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
-			log.Printf("[ainstruct-sync] API retry error response body: %s", string(respBody))
+			log.Printf("[ainstruct-sync] API retry error response body: %s", utils.Redact(string(respBody)))
 			return nil, fmt.Errorf("API %s %s (retry) returned %d: %s", method, path, retryResp.StatusCode, string(respBody))
 		}
 		return respBody, nil
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Printf("[ainstruct-sync] API error response body: %s", string(respBody))
+		log.Printf("[ainstruct-sync] API error response body: %s", utils.Redact(string(respBody)))
 		return nil, fmt.Errorf("API %s %s returned %d: %s", method, path, resp.StatusCode, string(respBody))
 	}
 	return respBody, nil

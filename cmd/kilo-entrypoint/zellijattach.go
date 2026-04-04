@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 const initMarker = "/tmp/.kilo-initialized"
@@ -145,7 +147,7 @@ func execZellij() error {
 			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to load MCP tokens: %v\n", err)
 		}
 	} else {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: cannot load tokens — homeDir=%q userID=%q\n", homeDir, userID)
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: cannot load tokens — homeDir=%q userID=%q\n", homeDir, utils.RedactID(userID))
 	}
 	
 	fmt.Fprintf(os.Stderr, "[kilo-docker] Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
