@@ -11,10 +11,6 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-// encryptAES encrypts plaintext using AES-256-CBC with PBKDF2 key derivation.
-// The output format is compatible with `openssl enc -aes-256-cbc -salt -pbkdf2`:
-// it prepends "Salted__" + 8-byte salt, followed by IV + ciphertext with PKCS7 padding.
-// This allows interoperability with the original bash-based encryption.
 func encryptAES(plaintext []byte, password string) ([]byte, error) {
 	salt := make([]byte, 8)
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
@@ -47,12 +43,6 @@ func encryptAES(plaintext []byte, password string) ([]byte, error) {
 	return result, nil
 }
 
-// decryptAES decrypts ciphertext produced by encryptAES. It expects the
-// "Salted__" header, extracts salt and IV, derives the key via PBKDF2,
-// and removes PKCS7 padding. Returns the original plaintext.
-// decryptAES decrypts ciphertext produced by encryptAES. It expects the
-// "Salted__" header, extracts salt and IV, derives the key via PBKDF2,
-// and removes PKCS7 padding. Returns the original plaintext.
 func decryptAES(ciphertext []byte, password string) ([]byte, error) {
 	if len(ciphertext) < 16 || string(ciphertext[:8]) != "Salted__" {
 		return nil, fmt.Errorf("invalid encrypted data format")
@@ -90,7 +80,6 @@ func decryptAES(ciphertext []byte, password string) ([]byte, error) {
 	return plaintext, nil
 }
 
-// pkcs7Pad pads data to the given block size using PKCS#7 padding.
 func pkcs7Pad(data []byte, blockSize int) []byte {
 	padding := blockSize - len(data)%blockSize
 	pad := make([]byte, len(data)+padding)
@@ -101,8 +90,6 @@ func pkcs7Pad(data []byte, blockSize int) []byte {
 	return pad
 }
 
-// pkcs7Unpad removes PKCS#7 padding from data. Returns an error if the
-// padding is invalid.
 func pkcs7Unpad(data []byte) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty data")

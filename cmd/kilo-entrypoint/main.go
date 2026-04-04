@@ -37,6 +37,7 @@ var subcommands = map[string]bool{
 	"config":          true,
 	"sync":            true,
 	"resync":          true,
+	"zellij-attach":   true,
 }
 
 // resolveCommand checks if name is a known internal subcommand.
@@ -131,5 +132,10 @@ func main() {
 		}
 		s.pushAll()
 		fmt.Println("Resync complete.")
+	case "zellij-attach":
+		if err := runZellijAttach(); err != nil {
+			fmt.Fprintf(os.Stderr, "zellij-attach error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }

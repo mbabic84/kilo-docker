@@ -15,11 +15,11 @@ func TestBuildContainerArgsWithDockerService(t *testing.T) {
 	}
 
 	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found",
-		"", hostEnvVars, "", "", "", "", 0)
+		"", hostEnvVars)
 
 	argsStr := strings.Join(args, " ")
 
-	if !strings.Contains(argsStr, "-v vol:/home/kilo-t8x3m7kp") {
+	if !strings.Contains(argsStr, "-v vol:/home") {
 		t.Error("expected volume mount in args")
 	}
 	if !strings.Contains(argsStr, "--docker") {
@@ -46,7 +46,7 @@ func TestBuildContainerArgsNoServices(t *testing.T) {
 	}
 
 	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found",
-		"", nil, "", "", "", "", 0)
+		"", nil)
 
 	argsStr := strings.Join(args, " ")
 
@@ -62,7 +62,7 @@ func TestBuildContainerArgsHostEnvVarsOnlyWhenSet(t *testing.T) {
 	}
 
 	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found",
-		"", nil, "", "", "", "", 0)
+		"", nil)
 
 	argsStr := strings.Join(args, " ")
 
@@ -78,7 +78,7 @@ func TestBuildContainerArgsOnceMode(t *testing.T) {
 	}
 
 	args := buildContainerArgs(cfg, "", "/pwd", "test-container", "not_found",
-		"", nil, "", "", "", "", 0)
+		"", nil)
 
 	argsStr := strings.Join(args, " ")
 
@@ -94,7 +94,7 @@ func TestBuildContainerArgsWithPorts(t *testing.T) {
 	}
 
 	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found",
-		"", nil, "", "", "", "", 0)
+		"", nil)
 
 	argsStr := strings.Join(args, " ")
 
@@ -118,7 +118,7 @@ func TestBuildContainerArgsNoPorts(t *testing.T) {
 	}
 
 	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found",
-		"", nil, "", "", "", "", 0)
+		"", nil)
 
 	argsStr := strings.Join(args, " ")
 

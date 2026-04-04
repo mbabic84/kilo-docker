@@ -18,7 +18,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **Ainstruct file sync** - `--ainstruct` flag enables automatic push/pull sync of config files, commands, agents, and instructions via the Ainstruct API
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
-- **Built-in services** - Extensible service system with `--docker`, `--zellij` and more (see [Services](#services))
+- **Built-in services** - Extensible service system with `--docker` and more (see [Services](#services))
 
 ## Quick Start
 
@@ -84,7 +84,6 @@ On first run, the binary prompts for MCP server tokens and saves them to a named
 | Service | Description |
 |---------|-------------|
 | `--docker` | Mount Docker socket for container management from within Kilo |
-| `--zellij` | Start with Zellij multiplexer (detach: Ctrl+P Ctrl+Q, reattach: kilo-docker sessions) |
 | `--go` | Install Go 1.26.1 (latest stable) for development |
 | `--node` | Install Node.js LTS for development |
 | `--gh` | Install GitHub CLI for interacting with GitHub |
@@ -122,23 +121,25 @@ Without `--password`, the volume name is `kilo-data-<username>` and tokens are s
 
 > **Note:** `--once` and `--password` are mutually exclusive. `--once` creates no volume, so there is nothing to encrypt.
 
-## Ainstruct Authentication & File Sync
+## Ainstruct
 
-Use `--ainstruct` to authenticate with the Ainstruct API. This enables two features:
+[Ainstruct](https://ainstruct-dev.kralicinora.cz) provides document storage, semantic search, and configuration sync for Kilo. The web UI lets you manage collections, documents, and API keys.
 
-### Volume naming & encryption
-
-The username and password are used to obtain the user's `user_id`, which is then used for volume naming and token encryption:
+Use `--ainstruct` to authenticate and enable integration:
 
 ```bash
 kilo-docker --ainstruct
 ```
 
-On first run, you are prompted for your Ainstruct username and password. The binary authenticates via the API, obtains the `user_id`, and derives a non-discoverable volume name and encryption key from it. MCP server tokens are then prompted and stored encrypted in the volume.
+On first run, you are prompted for your Ainstruct username and password. The binary authenticates via the API and obtains your `user_id`.
+
+### Volume encryption
+
+The `user_id` is used to derive a non-discoverable volume name and encryption key. MCP server tokens are stored encrypted (AES-256-CBC with PBKDF2) in the volume — plaintext tokens never touch the disk.
 
 ### File sync
 
-When `--ainstruct` is used, configuration files are automatically synced to and from the Ainstruct API:
+Configuration files are automatically synced to and from the Ainstruct API:
 
 **Synced files:**
 - `~/.config/kilo/opencode.json` — Kilo configuration
@@ -149,11 +150,11 @@ When `--ainstruct` is used, configuration files are automatically synced to and 
 - `~/.config/kilo/skills/*/SKILL.md` — Agent skills (per-skill directories with optional `scripts/`, `references/`, `assets/`)
 - `~/.config/kilo/tools/*.{js,ts}` — Custom tools (JavaScript/TypeScript tool definitions)
 
-**Push (local → API):** A Go-based file watcher detects local changes via inotify with a per-file 5-second debounce. Each file has an independent timer that resets on every change — the file is synced only after 5 seconds with no further modifications. Multiple files are synced independently without blocking each other.
+**Push (local → API):** A Go-based file watcher detects local changes via inotify with a per-file 5-second debounce. Each file has an independent timer that resets on every change — the file is synced only after 5 seconds with no further modifications.
 
 **Pull (API → local):** On container startup, the sync state file (`~/.config/kilo/.ainstruct-hashes`) is compared against the API's `content_hash` values. Only changed or new files are downloaded. Unchanged files are skipped without any API calls.
 
-**Token refresh:** JWT access tokens (30 min lifetime) are refreshed automatically before API calls when within 60 seconds of expiry.
+**Token refresh:** JWT access tokens are refreshed automatically before API calls when within 60 seconds of expiry.
 
 The sync engine runs as a subcommand of `kilo-entrypoint` inside the container — no `bash`, `inotify-tools`, `curl`, or `jq` runtime dependencies. It uses native Linux inotify via `golang.org/x/sys/unix` and communicates with the Ainstruct API using Go's `net/http` stdlib.
 
@@ -206,7 +207,7 @@ Inside the container, the entrypoint reads `KD_SERVICES`, runs installation comm
 
 ## Data Persistence
 
-The host binary uses a named Docker volume mounted at `/home/kilo-t8x3m7kp`. This stores:
+The host binary uses a named Docker volume mounted at `/home`. Inside the container, the user home directory is dynamically generated as `/home/kd-<hash>`. This stores:
 
 - SQLite database, auth state, logs
 - Configuration (`opencode.json` — model selection, provider connections, MCP settings)
@@ -278,7 +279,7 @@ kilo-docker sessions cleanup -a
 kilo-docker sessions recreate <name-or-index>
 ```
 
-When attaching to an existing session, `kilo-docker` automatically detects whether the container is running (attaches), stopped (starts it), or missing (creates a new one).
+When attaching to a session, `kilo-docker` detects the container state: if running it attaches directly, if stopped it starts the container then attaches.
 
 ## MCP Servers
 
@@ -350,59 +351,6 @@ docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-
 ```
 
 The build uses a multi-stage Dockerfile: a `golang:1.26-alpine` builder compiles the `kilo-entrypoint` binary as a static binary, then the runtime stage copies it into the final Alpine image. No Go toolchain is needed on the host.
-
-## Project Structure
-
-```
-├── Dockerfile                     # Multi-stage build (Go builder + Alpine runtime)
-├── go.mod                         # Go module definition
-├── go.sum                         # Go dependency checksums
-├── cmd/
-│   ├── kilo-docker/               # Host-side CLI (19 source files)
-│   │   ├── main.go                # CLI dispatch + container launch
-│   │   ├── flags.go               # Config struct, flag parsing
-│   │   ├── args.go                # Docker run argument builder
-│   │   ├── services.go            # Service helper wrappers
-│   │   ├── handlers.go            # update, cleanup, init, update-config
-│   │   ├── handle_sessions.go     # session list/attach/cleanup/recreate
-│   │   ├── handle_backup.go       # backup/restore handlers
-│   │   ├── setup.go               # resolveVolume, isTerminal, help
-│   │   ├── docker.go              # Docker CLI wrappers (run, exec, cp)
-│   │   ├── crypto.go              # AES-256-CBC with PBKDF2 (OpenSSL-compatible)
-│   │   ├── volume.go              # Volume name derivation, CRUD
-│   │   ├── tokens.go              # Token load/save (plaintext + encrypted)
-│   │   ├── ainstruct.go           # Login prompts, auth flow
-│   │   ├── playwright.go          # Playwright MCP sidecar management
-│   │   ├── ssh.go                 # SSH agent detection and forwarding
-│   │   ├── network.go             # Docker network selection
-│   │   ├── terminal.go            # Terminal reset after docker attach
-│   │   ├── session.go             # Session data model
-│   │   └── backup.go              # Backup/restore via docker exec
-│   └── kilo-entrypoint/           # Container entrypoint (14 source files)
-│       ├── main.go                # Subcommand dispatcher
-│       ├── init.go                # Container init (user setup, service installation, privilege drop)
-│       ├── services.go            # Service installation inside container
-│       ├── config.go              # MCP server toggling from env vars
-│       ├── loadsave.go            # Token load/save subcommands
-│       ├── login.go               # Ainstruct HTTP login + profile fetch
-│       ├── updatecfg.go           # Config template download + JSON merge
-│       ├── backup.go              # tar.gz backup/restore subcommands
-│       ├── sync.go                # Ainstruct sync entry point
-│       ├── sync_content.go        # Collection/document sync, Syncer struct
-│       ├── api.go                 # REST client with JWT refresh
-│       ├── watcher.go             # inotify file watcher with 5s debounce
-│       └── hash.go                # Hash tracking for sync
-├── pkg/
-│   ├── constants/home.go          # Shared constants
-│   ├── services/services.go       # Service definitions (BuiltInServices)
-│   └── utils/parse.go             # Parsing utilities
-├── configs/
-│   ├── opencode.json              # Kilo config for base image
-│   └── zellij.kdl                 # Zellij config (keybinds, pane settings)
-└── scripts/
-    ├── build.sh                   # Build helper (via Docker)
-    └── install.sh                 # Bootstrap installer (curl | sh)
-```
 
 ## License
 

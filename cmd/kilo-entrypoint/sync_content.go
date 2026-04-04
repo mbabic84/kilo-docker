@@ -88,10 +88,11 @@ type Syncer struct {
 func NewSyncer() *Syncer {
 	home := constants.GetHomeDir()
 	kiloConfigDir := constants.GetKiloConfigDir()
-	apiURL := os.Getenv("KD_AINSTRUCT_API_URL")
-	if apiURL == "" {
-		apiURL = "https://ainstruct-dev.kralicinora.cz/api/v1"
+	baseURL := os.Getenv("KD_AINSTRUCT_BASE_URL")
+	if baseURL == "" {
+		baseURL = constants.AinstructBaseURL
 	}
+	apiURL := baseURL + "/api/v1"
 	var expiry int64
 	if v := os.Getenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY"); v != "" {
 		expiry, _ = strconv.ParseInt(v, 10, 64)

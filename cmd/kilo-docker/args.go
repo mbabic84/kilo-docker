@@ -24,12 +24,6 @@ func serializeArgs(cfg config, sshEnabled bool) string {
 	if sshEnabled {
 		sessionArgs += "--ssh "
 	}
-	if cfg.encrypted && !cfg.ainstruct {
-		sessionArgs += "-p "
-	}
-	if cfg.ainstruct {
-		sessionArgs += "--ainstruct "
-	}
 	if cfg.mcp {
 		sessionArgs += "--mcp "
 	}
@@ -45,12 +39,8 @@ func serializeArgs(cfg config, sshEnabled bool) string {
 	return strings.TrimSpace(sessionArgs)
 }
 
-// buildContainerArgs constructs the full docker run argument list from the
-// parsed config, SSH agent state, environment tokens, and container state.
 func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
-	sshAuthSock string, hostEnvVars map[string]string,
-	kdContext7Token, kdAinstructToken string,
-	ainstructSyncToken, ainstructSyncRefreshToken string, ainstructSyncTokenExpiry int64) []string {
+	sshAuthSock string, hostEnvVars map[string]string) []string {
 
 	args := []string{
 		"--init",
@@ -62,21 +52,16 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 	}
 
 	if !cfg.once && volume != "" {
-		args = append(args, "-v", volume+":"+kiloHome)
+		args = append(args, "-v", volume+":/home")
 	}
-
-
 
 	args = append(args, "--label", "kilo.workspace="+pwd)
 
 	sessionArgs := serializeArgs(cfg, sshAuthSock != "")
 	args = append(args, "--label", "kilo.args="+sessionArgs)
 
-	if cfg.mcp && kdContext7Token != "" {
-		args = append(args, "-e", "KD_CONTEXT7_TOKEN="+kdContext7Token)
-	}
-	if cfg.mcp && kdAinstructToken != "" {
-		args = append(args, "-e", "KD_AINSTRUCT_TOKEN="+kdAinstructToken)
+	if cfg.mcp {
+		args = append(args, "-e", "KD_MCP_ENABLED=1")
 	}
 	if cfg.playwright {
 		args = append(args, "-e", "PLAYWRIGHT_ENABLED=1")
@@ -110,20 +95,6 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 
 	args = append(args, "--name", containerName)
 	args = append(args, "--hostname", containerName)
-
-	if cfg.ainstruct {
-		args = append(args, "-e", "KD_AINSTRUCT_ENABLED=1")
-		args = append(args, "-e", "KD_AINSTRUCT_API_URL=https://ainstruct-dev.kralicinora.cz/api/v1")
-		if ainstructSyncToken != "" {
-			args = append(args, "-e", "KD_AINSTRUCT_SYNC_TOKEN="+ainstructSyncToken)
-		}
-		if ainstructSyncRefreshToken != "" {
-			args = append(args, "-e", "KD_AINSTRUCT_SYNC_REFRESH_TOKEN="+ainstructSyncRefreshToken)
-		}
-		if ainstructSyncTokenExpiry > 0 {
-			args = append(args, "-e", "KD_AINSTRUCT_SYNC_TOKEN_EXPIRY="+strconv.FormatInt(ainstructSyncTokenExpiry, 10))
-		}
-	}
 
 	if cfg.network != "" {
 		args = append(args, "--network", cfg.network)

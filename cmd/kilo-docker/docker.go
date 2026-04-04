@@ -82,13 +82,10 @@ func dockerRunDetached(args ...string) (string, error) {
 }
 
 // dockerExec executes a command inside a running container via docker exec.
-// Returns trimmed combined output.
-func dockerExec(container string, user string, args ...string) (string, error) {
-	execArgs := []string{"exec"}
-	if user != "" {
-		execArgs = append(execArgs, "--user", user)
-	}
-	execArgs = append(execArgs, container)
+// Returns trimmed combined output. Runs as root — privilege drop is handled
+// by kilo-entrypoint.
+func dockerExec(container string, args ...string) (string, error) {
+	execArgs := []string{"exec", container}
 	execArgs = append(execArgs, args...)
 	cmd := exec.Command("docker", execArgs...)
 	output, err := cmd.CombinedOutput()
@@ -96,18 +93,6 @@ func dockerExec(container string, user string, args ...string) (string, error) {
 		return strings.TrimSpace(string(output)), fmt.Errorf("docker exec %s %s: %w\n%s", container, strings.Join(args, " "), err, string(output))
 	}
 	return strings.TrimSpace(string(output)), nil
-}
-
-// deleteZellijSessions removes all zellij sessions inside the container.
-// This prevents stale session resurrection prompts after container recreation.
-// Uses --yes to auto-confirm and --force to kill running sessions before deleting.
-func deleteZellijSessions(container string) {
-	out, err := dockerExec(container, kiloUser, "zellij", "delete-all-sessions", "--yes", "--force")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to delete zellij sessions in %s: %s (err: %v)\n", container, out, err)
-	} else {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Deleted zellij sessions in %s\n", container)
-	}
 }
 
 // dockerInspect returns the output of `docker inspect -f format container`.
@@ -159,14 +144,10 @@ func execDockerAttach(args ...string) error {
 
 // execDockerInteractive replaces the current process with a docker exec
 // command for interactive sessions (e.g. attaching to zellij). It uses
-// -it for interactive TTY and does not use SysProcAttr since docker exec
-// doesn't use TTY-detach semantics.
-func execDockerInteractive(container string, user string, args ...string) error {
-	execArgs := []string{"exec", "-it"}
-	if user != "" {
-		execArgs = append(execArgs, "--user", user)
-	}
-	execArgs = append(execArgs, container)
+// -it for interactive TTY and runs as root — privilege drop is handled
+// by kilo-entrypoint.
+func execDockerInteractive(container string, args ...string) error {
+	execArgs := []string{"exec", "-it", container}
 	execArgs = append(execArgs, args...)
 	cmd := exec.Command("docker", execArgs...)
 	cmd.Stdin = os.Stdin

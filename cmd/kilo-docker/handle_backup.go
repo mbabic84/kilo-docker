@@ -36,11 +36,7 @@ func handleBackup(cfg config) {
 
 	if backupFile == "" {
 		timestamp := time.Now().Format("20060102-150405")
-		if cfg.encrypted || cfg.ainstruct {
-			backupFile = fmt.Sprintf("kilo-backup-%s.tar.gz.enc", timestamp)
-		} else {
-			backupFile = fmt.Sprintf("kilo-backup-%s.tar.gz", timestamp)
-		}
+		backupFile = fmt.Sprintf("kilo-backup-%s.tar.gz", timestamp)
 	}
 
 	if _, err := os.Stat(backupFile); err == nil && !forceBackup {

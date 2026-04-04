@@ -21,18 +21,18 @@ RUN apk add --no-cache curl tar \
 # ── Runtime: Alpine with tools ──
 FROM alpine:latest
 
-RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client ripgrep sudo curl tar xz \
-    && adduser -D -u 1000 kilo-t8x3m7kp \
-    && echo "kilo-t8x3m7kp ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
+ARG AINSTRUCT_BASE_URL=https://ainstruct-dev.kralicinora.cz
+
+RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client ripgrep curl tar xz \
     && curl -fsSL https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz -o /tmp/zellij.tar.gz \
     && tar xzf /tmp/zellij.tar.gz -C /usr/local/bin && rm -rf /tmp/zellij.tar.gz && chmod +x /usr/local/bin/zellij
 
 COPY configs/zellij.kdl /etc/zellij/config.kdl
-COPY configs/opencode.json /home/kilo-t8x3m7kp/.config/kilo/opencode.json
+COPY configs/opencode.json /etc/kilo/opencode.json
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo
 COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
 
-ENV HOME=/home/kilo-t8x3m7kp
 ENV SHELL=/bin/bash
+ENV KD_AINSTRUCT_BASE_URL=${AINSTRUCT_BASE_URL}
 
 ENTRYPOINT ["kilo-entrypoint"]

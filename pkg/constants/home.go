@@ -5,7 +5,14 @@ import (
 	"path/filepath"
 )
 
-const KiloHome = "/home/kilo-t8x3m7kp"
+// KiloHome is the fallback home directory when $HOME is unset.
+// Actual container home is dynamically generated as /home/kd-<hash>.
+const KiloHome = "/home/kd-default"
+
+const (
+	AinstructBaseURL    = "https://ainstruct-dev.kralicinora.cz"
+	AinstructAPIBaseURL = AinstructBaseURL + "/api/v1"
+)
 
 func GetHomeDir() string {
 	home := os.Getenv("HOME")
