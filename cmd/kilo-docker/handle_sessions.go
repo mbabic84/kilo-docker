@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 // handleSessions lists, attaches to, recreates, or cleans up kilo-docker sessions.
@@ -173,7 +174,7 @@ func handleSessions(cfg config) {
 	state := dockerState(containerToAttach)
 	switch state {
 	case "running":
-		execDockerInteractive(containerToAttach, kiloUser, "zellij", "attach", "--create", "kilo-docker")
+		execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerToAttach, false)
 	case "exited", "created":
 		needsSSH := false
@@ -190,7 +191,8 @@ func handleSessions(cfg config) {
 			}
 		}
 		dockerRun("start", "-d", containerToAttach)
-		execDockerInteractive(containerToAttach, kiloUser, "zellij", "attach", "--create", "kilo-docker")
+		time.Sleep(2 * time.Second)
+		execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerToAttach, false)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: Container '%s' is in state '%s'.\n", containerToAttach, state)

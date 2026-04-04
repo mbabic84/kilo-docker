@@ -136,14 +136,17 @@ func TestNvmServiceHasRequiredFields(t *testing.T) {
 	if svc.Flag != "--nvm" {
 		t.Errorf("expected Flag '--nvm', got %q", svc.Flag)
 	}
-	if len(svc.Install) != 3 {
-		t.Errorf("expected 3 Install commands for nvm, got %d", len(svc.Install))
+	if len(svc.UserInstall) != 2 {
+		t.Errorf("expected 2 UserInstall commands for nvm, got %d", len(svc.UserInstall))
+	}
+	if len(svc.Install) != 0 {
+		t.Errorf("expected 0 Install commands for nvm, got %d", len(svc.Install))
 	}
 	if svc.RequiresSocket != "" {
 		t.Errorf("expected RequiresSocket to be empty for nvm, got %q", svc.RequiresSocket)
 	}
-	if _, ok := svc.EnvVars["NVM_DIR"]; !ok {
-		t.Error("expected NVM_DIR in EnvVars")
+	if _, ok := svc.EnvVars["NVM_NODEJS_ORG_MIRROR"]; !ok {
+		t.Error("expected NVM_NODEJS_ORG_MIRROR in EnvVars")
 	}
 }
 

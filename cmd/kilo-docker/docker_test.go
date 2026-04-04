@@ -185,18 +185,18 @@ func TestEnsureRunArgsBrokenPatternsFromBugReport(t *testing.T) {
 		},
 		{
 			name:     "tokens.go loadTokens encrypted call",
-			args:     []string{"-v", "vol:/home/kilo", "image", "cat", "/home/kilo/.tokens.env.enc"},
-			wantFull: "run --rm -v vol:/home/kilo image cat /home/kilo/.tokens.env.enc",
+			args:     []string{"-v", "vol:/home/kd", "image", "cat", "/home/kd/.tokens.env.enc"},
+			wantFull: "run --rm -v vol:/home/kd image cat /home/kd/.tokens.env.enc",
 		},
 		{
 			name:     "tokens.go loadTokens unencrypted call",
-			args:     []string{"-v", "vol:/home/kilo", "image", "load-tokens"},
-			wantFull: "run --rm -v vol:/home/kilo image load-tokens",
+			args:     []string{"-v", "vol:/home/kd", "image", "load-tokens"},
+			wantFull: "run --rm -v vol:/home/kd image load-tokens",
 		},
 		{
 			name:     "handlers.go updateConfig call",
-			args:     []string{"-v", "vol:/home/kilo", "image:latest", "update-config"},
-			wantFull: "run --rm -v vol:/home/kilo image:latest update-config",
+			args:     []string{"-v", "vol:/home/kd", "image:latest", "update-config"},
+			wantFull: "run --rm -v vol:/home/kd image:latest update-config",
 		},
 	}
 
@@ -236,19 +236,19 @@ func TestBuildRunArgs(t *testing.T) {
 	}{
 		{
 			name:       "terminal mode adds -it after run",
-			dockerArgs: []string{"--name", "test", "-v", "vol:/home/kilo"},
+			dockerArgs: []string{"--name", "test", "-v", "vol:/home/kd"},
 			image:      "ghcr.io/mbabic84/kilo-docker:latest",
 			extraArgs:  nil,
 			terminal:   true,
-			expected:   []string{"run", "-it", "--name", "test", "-v", "vol:/home/kilo", "ghcr.io/mbabic84/kilo-docker:latest"},
+			expected:   []string{"run", "-it", "--name", "test", "-v", "vol:/home/kd", "ghcr.io/mbabic84/kilo-docker:latest"},
 		},
 		{
 			name:       "non-terminal mode adds -i after run",
-			dockerArgs: []string{"--name", "test", "-v", "vol:/home/kilo"},
+			dockerArgs: []string{"--name", "test", "-v", "vol:/home/kd"},
 			image:      "ghcr.io/mbabic84/kilo-docker:latest",
 			extraArgs:  nil,
 			terminal:   false,
-			expected:   []string{"run", "-i", "--name", "test", "-v", "vol:/home/kilo", "ghcr.io/mbabic84/kilo-docker:latest"},
+			expected:   []string{"run", "-i", "--name", "test", "-v", "vol:/home/kd", "ghcr.io/mbabic84/kilo-docker:latest"},
 		},
 		{
 			name:       "with extra args appended after image",
@@ -301,7 +301,7 @@ func TestBuildRunArgs(t *testing.T) {
 // where "-it" was prepended before "run", producing "docker -it run ..."
 // instead of "docker run -it ...".
 func TestBuildRunArgsProducesDockerRunNotDashIT(t *testing.T) {
-	dockerArgs := []string{"--rm", "--name", "kilo-test", "-v", "vol:/home/kilo"}
+	dockerArgs := []string{"--rm", "--name", "kilo-test", "-v", "vol:/home/kd"}
 	image := "ghcr.io/mbabic84/kilo-docker:latest"
 
 	result := buildRunArgs(dockerArgs, image, nil, true)
@@ -314,7 +314,7 @@ func TestBuildRunArgsProducesDockerRunNotDashIT(t *testing.T) {
 		}
 		joined += s
 	}
-	expected := "run -it --rm --name kilo-test -v vol:/home/kilo ghcr.io/mbabic84/kilo-docker:latest"
+	expected := "run -it --rm --name kilo-test -v vol:/home/kd ghcr.io/mbabic84/kilo-docker:latest"
 	if joined != expected {
 		t.Errorf("buildRunArgs() produced:\n  %q\nwant:\n  %q", joined, expected)
 	}
@@ -339,18 +339,18 @@ func TestDockerRunWithStdinInsertsStdinFlag(t *testing.T) {
 	}{
 		{
 			name:     "saveTokens encrypted call",
-			args:     []string{"-v", "vol:/home/kilo", "image", "sh", "-c", "cat > /path"},
-			wantFull: "run --rm -i -v vol:/home/kilo image sh -c cat > /path",
+			args:     []string{"-v", "vol:/home/kd", "image", "sh", "-c", "cat > /path"},
+			wantFull: "run --rm -i -v vol:/home/kd image sh -c cat > /path",
 		},
 		{
 			name:     "saveTokens unencrypted call",
-			args:     []string{"-v", "vol:/home/kilo", "image", "save-tokens"},
-			wantFull: "run --rm -i -v vol:/home/kilo image save-tokens",
+			args:     []string{"-v", "vol:/home/kd", "image", "save-tokens"},
+			wantFull: "run --rm -i -v vol:/home/kd image save-tokens",
 		},
 		{
 			name:     "saveSkipMarker call",
-			args:     []string{"-v", "vol:/home/kilo", "image", "sh", "-c", "mkdir -p dir && cat > file"},
-			wantFull: "run --rm -i -v vol:/home/kilo image sh -c mkdir -p dir && cat > file",
+			args:     []string{"-v", "vol:/home/kd", "image", "sh", "-c", "mkdir -p dir && cat > file"},
+			wantFull: "run --rm -i -v vol:/home/kd image sh -c mkdir -p dir && cat > file",
 		},
 	}
 
@@ -390,7 +390,7 @@ func TestDockerRunWithStdinInsertsStdinFlag(t *testing.T) {
 // TestDockerRunDoesNotInsertStdinFlag verifies that the regular dockerRun
 // does NOT insert -i (it uses terminal stdin, not programmatic input).
 func TestDockerRunDoesNotInsertStdinFlag(t *testing.T) {
-	args := []string{"-v", "vol:/home/kilo", "image", "cat", "/path"}
+	args := []string{"-v", "vol:/home/kd", "image", "cat", "/path"}
 	result := ensureRunArgs(args)
 
 	// ensureRunArgs should produce "run --rm ..." WITHOUT -i
@@ -401,7 +401,7 @@ func TestDockerRunDoesNotInsertStdinFlag(t *testing.T) {
 		}
 		got += s
 	}
-	expected := "run --rm -v vol:/home/kilo image cat /path"
+	expected := "run --rm -v vol:/home/kd image cat /path"
 	if got != expected {
 		t.Errorf("ensureRunArgs() produced:\n  %q\nwant:\n  %q", got, expected)
 	}

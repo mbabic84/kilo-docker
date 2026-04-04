@@ -6,14 +6,6 @@ import (
 	"os/exec"
 )
 
-// deriveVolumeName returns the Docker volume name for a given password.
-// The name is derived from the SHA-256 hash of the password (first 6 bytes),
-// ensuring a deterministic mapping while hiding the actual password.
-func deriveVolumeName(password string) string {
-	hash := sha256.Sum256([]byte(password))
-	return fmt.Sprintf("kilo-%x", hash[:6])
-}
-
 // deriveContainerName returns the Docker container name for a given working
 // directory. The name is derived from the SHA-256 hash (first 6 bytes) to
 // ensure one session per directory.

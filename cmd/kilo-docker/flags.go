@@ -10,8 +10,7 @@ import (
 
 const (
 	repoURL  = "ghcr.io/mbabic84/kilo-docker"
-	kiloHome = "/home/kilo-t8x3m7kp"
-	kiloUser = "kilo-t8x3m7kp"
+	kiloHome = "/home"
 )
 
 var version = "dev"
@@ -21,8 +20,6 @@ var autoConfirm bool
 // config holds parsed CLI flags for the host binary.
 type config struct {
 	once            bool
-	encrypted       bool
-	ainstruct       bool
 	playwright      bool
 	ssh             bool
 	mcp             bool
@@ -43,16 +40,11 @@ func parseArgs(args []string) config {
 		switch args[i] {
 		case "--once":
 			cfg.once = true
-		case "--password":
-			cfg.encrypted = true
 		case "--port", "-p":
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
 				cfg.ports = append(cfg.ports, args[i+1])
 				i++
 			}
-		case "--ainstruct":
-			cfg.ainstruct = true
-			cfg.encrypted = true
 		case "--playwright":
 			cfg.playwright = true
 		case "--ssh":

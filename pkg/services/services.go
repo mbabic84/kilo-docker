@@ -10,6 +10,7 @@ type Service struct {
 	Flag           string
 	Description    string
 	Install        []string
+	UserInstall    []string // Install commands that run after user creation with HOME set to user home
 	EnvVars        map[string]string
 	HostEnvVars    map[string]string
 	Volumes        []string
@@ -90,13 +91,11 @@ var BuiltInServices = []Service{
 		Name:        "nvm",
 		Flag:        "--nvm",
 		Description: "Install NVM (Node Version Manager) for managing Node.js versions",
-		Install: []string{
-			"[ -d /home/kilo-t8x3m7kp/.nvm ] || (export HOME=/home/kilo-t8x3m7kp && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash)",
-			"chown -R ${PUID:-1000}:${PGID:-1000} /home/kilo-t8x3m7kp/.nvm",
-			"grep -q 'nvm.sh' /home/kilo-t8x3m7kp/.bashrc 2>/dev/null || printf '\\nexport NVM_DIR=\"$HOME/.nvm\"\\nexport NVM_NODEJS_ORG_MIRROR=\"https://unofficial-builds.nodejs.org/download/release\"\\n[ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\"\\n[ -s \"$NVM_DIR/bash_completion\" ] && . \"$NVM_DIR/bash_completion\"\\n' >> /home/kilo-t8x3m7kp/.bashrc",
+		UserInstall: []string{
+			"[ -d ~/.nvm ] || (curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash)",
+			"grep -q 'nvm.sh' ~/.bashrc 2>/dev/null || printf '\\nexport NVM_DIR=\"$HOME/.nvm\"\\nexport NVM_NODEJS_ORG_MIRROR=\"https://unofficial-builds.nodejs.org/download/release\"\\n[ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\"\\n[ -s \"$NVM_DIR/bash_completion\" ] && . \"$NVM_DIR/bash_completion\"\\n' >> ~/.bashrc",
 		},
 		EnvVars: map[string]string{
-			"NVM_DIR":           "/home/kilo-t8x3m7kp/.nvm",
 			"NVM_NODEJS_ORG_MIRROR": "https://unofficial-builds.nodejs.org/download/release",
 		},
 		Volumes:        []string{},
