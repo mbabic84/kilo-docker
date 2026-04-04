@@ -1,3 +1,9 @@
+## [2.0.2](https://github.com/mbabic84/kilo-docker/compare/v2.0.1...v2.0.2) (2026-04-04)
+
+### Bug Fixes
+
+* redact sensitive IDs from logs ([24ddda5](https://github.com/mbabic84/kilo-docker/commit/24ddda5ea01cb6fe8d7e6a0a945f95d7439f7ef0))
+
 ## [2.0.1](https://github.com/mbabic84/kilo-docker/compare/v2.0.0...v2.0.1) (2026-04-04)
 
 ### Bug Fixes
