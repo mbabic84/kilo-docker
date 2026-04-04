@@ -58,9 +58,12 @@ func resolveCommand(name string) (string, bool) {
 
 func runHelp() {
 	const w = 40
-	fmt.Println("kilo-entrypoint - Container entrypoint for kilo-docker\n")
-	fmt.Println("Usage: kilo-entrypoint [subcommand]\n")
-	fmt.Println("With no arguments, runs container initialization.\n")
+	fmt.Println("kilo-entrypoint - Container entrypoint for kilo-docker")
+	fmt.Println("")
+	fmt.Println("Usage: kilo-entrypoint [subcommand]")
+	fmt.Println("")
+	fmt.Println("With no arguments, runs container initialization.")
+	fmt.Println("")
 	fmt.Println("Subcommands:")
 	fmt.Printf("  %-*s %s\n", w, "help", "Show this help message")
 	fmt.Printf("  %-*s %s\n", w, "load-tokens", "Read token env file, output KEY=VALUE to stdout")
@@ -73,7 +76,8 @@ func runHelp() {
 	fmt.Printf("  %-*s %s\n", w, "sync", "Start ainstruct file watcher + REST sync")
 	fmt.Printf("  %-*s %s\n", w, "resync", "Delete all remote documents and re-push local files")
 	fmt.Printf("  %-*s %s\n", w, "zellij-attach", "Attach to existing zellij session")
-	fmt.Println("\nAny other argument is passed through to exec.LookPath for")
+	fmt.Println("")
+	fmt.Println("Any other argument is passed through to exec.LookPath for")
 	fmt.Println("direct binary execution (e.g. \"kilo\", \"sh\", \"bash\").")
 }
 
