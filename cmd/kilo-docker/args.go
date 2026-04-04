@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -119,6 +120,15 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 		target, _ := os.Readlink("/etc/localtime")
 		args = append(args, "-e", "TZ="+filepath.Base(target))
 	}
+
+	u, _ := user.Current()
+	hostname, _ := os.Hostname()
+	username := "unknown"
+	if u != nil {
+		username = u.Username
+	}
+	args = append(args, "-e", "PAT_USERNAME="+username)
+	args = append(args, "-e", "PAT_HOSTNAME="+hostname)
 
 	return args
 }

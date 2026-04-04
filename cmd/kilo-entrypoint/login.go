@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -369,11 +368,10 @@ func promptContext7Token() string {
 }
 
 func buildPATLabel() string {
-	u, _ := user.Current()
-	hostname, _ := os.Hostname()
-	username := "unknown"
-	if u != nil {
-		username = u.Username
+	username := os.Getenv("PAT_USERNAME")
+	hostname := os.Getenv("PAT_HOSTNAME")
+	if username == "" {
+		username = "unknown"
 	}
 	if hostname == "" {
 		hostname = "unknown"
