@@ -1,3 +1,15 @@
+## [2.0.0](https://github.com/mbabic84/kilo-docker/compare/v1.48.0...v2.0.0) (2026-04-04)
+
+### ⚠ BREAKING CHANGES
+
+* changed fs structure
+
+* Merge pull request [#104](https://github.com/mbabic84/kilo-docker/issues/104) from mbabic84/feat/containerize-authentication ([06eed7c](https://github.com/mbabic84/kilo-docker/commit/06eed7c3e0d978fdd6d3123b9d3487ff5f8ca5b7))
+
+### Features
+
+* add container-side authentication and token management ([6d99743](https://github.com/mbabic84/kilo-docker/commit/6d9974314e68dea21a7a120f79211b12c623e1b8))
+
 ## [1.48.0](https://github.com/mbabic84/kilo-docker/compare/v1.47.0...v1.48.0) (2026-04-03)
 
 ### Features
