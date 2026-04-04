@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mbabic84/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 	"golang.org/x/term"
 )
 
@@ -111,7 +112,7 @@ func listPATs(apiURL, accessToken string) ([]patListItem, error) {
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] PAT list returned status %d: %s\n", resp.StatusCode, string(body))
+		fmt.Fprintf(os.Stderr, "[kilo-docker] PAT list returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 		return nil, fmt.Errorf("list PATs failed with status %d", resp.StatusCode)
 	}
 
@@ -169,11 +170,11 @@ func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
 			}
 			defer resp.Body.Close()
 
-			if resp.StatusCode != 200 {
-				body, _ := io.ReadAll(resp.Body)
-				fmt.Fprintf(os.Stderr, "[kilo-docker] PAT rotate returned status %d: %s\n", resp.StatusCode, string(body))
-				return "", fmt.Errorf("rotate PAT failed with status %d", resp.StatusCode)
-			}
+		if resp.StatusCode != 200 {
+			body, _ := io.ReadAll(resp.Body)
+			fmt.Fprintf(os.Stderr, "[kilo-docker] PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+			return "", fmt.Errorf("rotate PAT failed with status %d", resp.StatusCode)
+		}
 
 			var rotateResp patResponse
 			body, _ := io.ReadAll(resp.Body)
@@ -207,7 +208,7 @@ func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
 
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] PAT create returned status %d: %s\n", resp.StatusCode, string(body))
+		fmt.Fprintf(os.Stderr, "[kilo-docker] PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 		return "", fmt.Errorf("create PAT failed with status %d", resp.StatusCode)
 	}
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mbabic84/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 const collectionName = "kilo-docker"
@@ -214,7 +215,7 @@ func (s *Syncer) ensureCollection() error {
 		return err
 	}
 	if found {
-		log.Printf("[ainstruct-sync] Collection ready: %s", s.collectionID)
+		log.Printf("[ainstruct-sync] Collection ready: %s", utils.RedactID(s.collectionID))
 		return nil
 	}
 	body := map[string]string{"name": collectionName}
@@ -222,7 +223,7 @@ func (s *Syncer) ensureCollection() error {
 	if err != nil {
 		return fmt.Errorf("creating collection: %w", err)
 	}
-	log.Printf("[ainstruct-sync] POST /collections response: %s", string(data))
+	log.Printf("[ainstruct-sync] POST /collections response: %s", utils.Redact(string(data)))
 	var created struct {
 		CollectionID string `json:"collection_id"`
 	}
@@ -233,7 +234,7 @@ func (s *Syncer) ensureCollection() error {
 	if s.collectionID == "" {
 		return fmt.Errorf("failed to initialize collection — no collection_id in response")
 	}
-	log.Printf("[ainstruct-sync] Collection ready: %s", s.collectionID)
+	log.Printf("[ainstruct-sync] Collection ready: %s", utils.RedactID(s.collectionID))
 	return nil
 }
 
@@ -392,12 +393,12 @@ func (s *Syncer) pullCollection() error {
 		log.Println("[ainstruct-sync] No existing collection — nothing to pull")
 		return nil
 	}
-	log.Printf("[ainstruct-sync] Pulling documents from collection %s", s.collectionID)
+	log.Printf("[ainstruct-sync] Pulling documents from collection %s", utils.RedactID(s.collectionID))
 	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
 	if err != nil {
 		return fmt.Errorf("listing documents: %w", err)
 	}
-	log.Printf("[ainstruct-sync] Pull: GET /documents response: %s", string(data))
+	log.Printf("[ainstruct-sync] Pull: GET /documents response: %s", utils.Redact(string(data)))
 	var dr documentsResponse
 	if err := json.Unmarshal(data, &dr); err != nil {
 		return fmt.Errorf("parsing documents response: %w (body: %s)", err, string(data))
@@ -409,7 +410,7 @@ func (s *Syncer) pullCollection() error {
 	log.Printf("[ainstruct-sync] Pull: processing %d documents", len(dr.Documents))
 	for i, doc := range dr.Documents {
 		relPath := doc.Metadata.LocalPath
-		log.Printf("[ainstruct-sync] Pull: doc[%d] id=%s relPath=%q contentHash=%s", i, doc.DocumentID, relPath, doc.ContentHash)
+		log.Printf("[ainstruct-sync] Pull: doc[%d] id=%s relPath=%q contentHash=%s", i, utils.RedactID(doc.DocumentID), relPath, doc.ContentHash)
 		if relPath == "" {
 			log.Printf("[ainstruct-sync] Pull: doc[%d] skipped — empty relPath", i)
 			continue
@@ -478,10 +479,10 @@ func (s *Syncer) deleteAllDocuments() error {
 		fmt.Println("Collection is empty — nothing to delete")
 		return nil
 	}
-	fmt.Printf("Deleting %d documents from collection %s...\n", len(dr.Documents), s.collectionID)
+	fmt.Printf("Deleting %d documents from collection %s...\n", len(dr.Documents), utils.RedactID(s.collectionID))
 	for _, doc := range dr.Documents {
 		if _, err := s.apiRequest("DELETE", "/documents/"+doc.DocumentID, nil); err != nil {
-			fmt.Fprintf(os.Stderr, "  Failed to delete %s (%s): %v\n", doc.Metadata.LocalPath, doc.DocumentID, err)
+			fmt.Fprintf(os.Stderr, "  Failed to delete %s (%s): %v\n", doc.Metadata.LocalPath, utils.RedactID(doc.DocumentID), err)
 			continue
 		}
 		fmt.Printf("  Deleted: %s\n", doc.Metadata.LocalPath)
