@@ -213,11 +213,11 @@ func handleSessionEnd(containerName string, onceMode bool) {
 	resetTerminal()
 	if onceMode {
 		dockerRun("rm", "-f", containerName)
-		fmt.Fprintf(os.Stderr, "\nSession '%s' ended.\n", containerName)
-		fmt.Fprintf(os.Stderr, "Container removed (--once mode).\n")
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Session '%s' ended.\n", containerName)
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Container removed (--once mode).\n")
 	} else {
-		fmt.Fprintf(os.Stderr, "\nDetached from session '%s'.\n", containerName)
-		fmt.Fprintf(os.Stderr, "To re-attach, run: kilo-docker sessions %s\n", containerName)
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Detached from session '%s'.\n", containerName)
+		fmt.Fprintf(os.Stderr, "[kilo-docker] To re-attach, run: kilo-docker sessions %s\n", containerName)
 	}
 }
 

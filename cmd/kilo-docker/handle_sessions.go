@@ -91,11 +91,11 @@ func handleSessions(cfg config) {
 				fmt.Fprintf(os.Stderr, "Current directory: %s\n", originalDir)
 				os.Exit(1)
 			}
-			fmt.Fprintf(os.Stderr, "Recreating session in workspace: %s\n", targetSession.Workspace)
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Recreating session in workspace: %s\n", targetSession.Workspace)
 		}
 
 		// Remove the old container (volume persists)
-		fmt.Fprintf(os.Stderr, "Removing old container '%s'...\n", containerName)
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Removing old container '%s'...\n", containerName)
 		dockerRun("rm", "-f", containerName)
 
 		// Run with the original flags — this creates a fresh container

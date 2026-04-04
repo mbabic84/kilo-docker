@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
@@ -126,22 +127,27 @@ func execZellij() error {
 	if homeDir != "" && userID != "" {
 		if context7, ainstruct, syncToken, syncRefresh, syncExpiry, err := loadEncryptedTokens(homeDir, userID); err == nil {
 			fmt.Fprintf(os.Stderr, "[kilo-docker] Loaded MCP tokens from encrypted storage\n")
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Token status: ainstruct=%s context7=%s sync=%s\n",
-				maskToken(ainstruct), maskToken(context7), maskToken(syncToken))
+			status := ""
 			if ainstruct != "" {
 				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_TOKEN", ainstruct)
+				status += "ainstruct=ok "
 			}
 			if context7 != "" {
 				env = appendOrReplaceEnv(env, "KD_CONTEXT7_TOKEN", context7)
+				status += "context7=ok "
 			}
 			if syncToken != "" {
 				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_SYNC_TOKEN", syncToken)
+				status += "sync=ok "
 			}
 			if syncRefresh != "" {
 				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_SYNC_REFRESH_TOKEN", syncRefresh)
 			}
 			if syncExpiry != "" {
 				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", syncExpiry)
+			}
+			if status != "" {
+				fmt.Fprintf(os.Stderr, "[kilo-docker] MCP Token status: %s\n", strings.TrimSpace(status))
 			}
 		} else {
 			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to load MCP tokens: %v\n", err)
@@ -164,15 +170,4 @@ func appendOrReplaceEnv(env []string, key, value string) []string {
 		}
 	}
 	return append(env, prefix+value)
-}
-
-// maskToken returns a masked preview of a token for safe logging.
-func maskToken(token string) string {
-	if token == "" {
-		return "<empty>"
-	}
-	if len(token) <= 8 {
-		return "***"
-	}
-	return token[:4] + "..." + token[len(token)-4:]
 }

@@ -96,7 +96,6 @@ type patResponse struct {
 }
 
 func listPATs(apiURL, accessToken string) ([]patListItem, error) {
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Listing PATs: %s/auth/pat\n", apiURL)
 	req, err := http.NewRequest("GET", apiURL+"/auth/pat", nil)
 	if err != nil {
 		return nil, err
