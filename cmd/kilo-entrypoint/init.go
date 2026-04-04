@@ -8,72 +8,34 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
-
-	"github.com/mbabic84/kilo-docker/pkg/constants"
 )
 
 // runInit performs container initialization when invoked with no subcommand.
-//
-// If running as root (UID 0), it:
-//   - Creates/updates the kilo user with PUID/PGID from environment
+// It runs as root and handles infrastructure setup:
 //   - Installs enabled services from KD_SERVICES env var
-//   - Fixes SSH agent socket ownership
-//   - Pre-populates known_hosts for GitHub, GitLab, Bitbucket
-//   - Creates config directories under ~/.config/kilo/
-//   - Drops privileges via syscall.Setuid/Setgid
-//   - Launches ainstruct-sync in background if KD_AINSTRUCT_ENABLED=1
+//   - Sets up service groups for socket access
+//   - Validates SSH agent socket
 //
-// After privilege drop, it applies MCP server config, copies Zellij config,
-// and execs into the requested command (or /bin/sh if no args).
+// User creation, home directory, and privilege drop are handled by
+// runUserInit() when docker exec calls kilo-entrypoint zellij-attach.
 func runInit() error {
-	puidStr := os.Getenv("PUID")
-	if puidStr == "" {
-		puidStr = "1000"
-	}
-	pgidStr := os.Getenv("PGID")
-	if pgidStr == "" {
-		pgidStr = "1000"
-	}
-	puid, _ := strconv.Atoi(puidStr)
-	pgid, _ := strconv.Atoi(pgidStr)
-
+	fmt.Fprintf(os.Stderr, "[kilo-docker] Container initializing\n")
 	if os.Getuid() == 0 {
-		if puid != 1000 || pgid != 1000 {
-			exec.Command("deluser", "kilo-t8x3m7kp").Run()
-			exec.Command("addgroup", "-g", pgidStr, "kilo-t8x3m7kp").Run()
-			cmd := exec.Command("adduser", "-u", puidStr, "-G", "kilo-t8x3m7kp", "-D", "-s", "/bin/sh", "kilo-t8x3m7kp")
-			cmd.Stdout = os.Stderr
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("adduser failed: %w", err)
-			}
-		}
-
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Running as root (UID=0)\n")
 		if err := installServices(); err != nil {
 			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: service installation error: %v\n", err)
 		}
 
-		// Setup groups for services that require socket access
 		if err := setupServiceGroups(); err != nil {
 			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: group setup error: %v\n", err)
 		}
 
 		if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
 			if info, err := os.Stat(sshAuthSock); err == nil && info.Mode()&os.ModeSocket != 0 {
-				if err := os.Chown(sshAuthSock, puid, pgid); err != nil {
-					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to chown SSH socket: %v\n", err)
-				}
-				if err := os.Chmod(sshAuthSock, 0600); err != nil {
-					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to chmod SSH socket: %v\n", err)
-				}
-				// Use net.DialTimeout instead of os.OpenFile to test socket connectivity.
-				// os.OpenFile with O_RDWR can falsely fail on Unix sockets even when
-				// they are fully functional for SSH agent communication.
 				if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
-					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH socket not accessible after fix: %v\n", err)
+					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH socket not accessible: %v\n", err)
 				} else {
 					conn.Close()
 					fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent socket ready: %s\n", sshAuthSock)
@@ -82,60 +44,6 @@ func runInit() error {
 				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
 			}
 		}
-
-		if err := setupKnownHosts(); err != nil {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to setup known_hosts: %v\n", err)
-		}
-
-		configDirs := []string{
-			"/home/kilo-t8x3m7kp/.config/kilo/commands",
-			"/home/kilo-t8x3m7kp/.config/kilo/agents",
-			"/home/kilo-t8x3m7kp/.config/kilo/plugins",
-			"/home/kilo-t8x3m7kp/.config/kilo/skills",
-			"/home/kilo-t8x3m7kp/.config/kilo/tools",
-			"/home/kilo-t8x3m7kp/.config/kilo/rules",
-		}
-		for _, dir := range configDirs {
-			os.MkdirAll(dir, 0755)
-		}
-
-		chownRecursive("/home/kilo-t8x3m7kp", puid, pgid)
-
-		syscall.Setgid(pgid)
-		syscall.Setuid(puid)
-
-		// Set correct user identity environment variables after privilege drop.
-		// These must be set before any os.Environ() call so they appear in the
-		// environment passed to child processes (sudo, exec).
-		kiloHome := "/home/kilo-t8x3m7kp"
-		os.Setenv("HOME", kiloHome)
-		os.Setenv("USER", "kilo-t8x3m7kp")
-		os.Setenv("LOGNAME", "kilo-t8x3m7kp")
-		if _, err := os.Stat("/bin/bash"); err == nil {
-			os.Setenv("SHELL", "/bin/bash")
-		} else {
-			os.Setenv("SHELL", "/bin/sh")
-		}
-	}
-
-	// Start ainstruct sync in background after privilege drop.
-	// Must run as kilo user (not root) and must not block init.
-	if os.Getenv("KD_AINSTRUCT_ENABLED") == "1" {
-		cmd := exec.Command("kilo-entrypoint", "sync")
-		cmd.Stdout = io.Discard
-		cmd.Stderr = io.Discard
-		cmd.Start()
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Ainstruct sync started\n")
-	}
-
-	if err := runConfig(); err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: config error: %v\n", err)
-	}
-
-	home := constants.GetHomeDir()
-
-	if err := copyServiceConfigs(home); err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to copy service configs: %v\n", err)
 	}
 
 	// Use known absolute path instead of os.Executable() which can fail
@@ -143,13 +51,13 @@ func runInit() error {
 	// doesn't resolve correctly.
 	binaryPath := "/usr/local/bin/kilo-entrypoint"
 
-	// Validate binary exists before exec
 	if _, err := os.Stat(binaryPath); err != nil {
 		return fmt.Errorf("entrypoint binary not found at %s: %w", binaryPath, err)
 	}
 
 	if len(os.Args) <= 1 {
 		// Keep container alive — zellij is started via docker exec from the host.
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Init complete, waiting for exec\n")
 		return syscall.Exec("/bin/sleep", []string{"sleep", "infinity"}, os.Environ())
 	}
 
@@ -161,11 +69,9 @@ func runInit() error {
 // volume) so that it survives container restarts but is lost on container
 // recreation — at which point the ephemeral /usr/local/bin/ binaries are
 // also gone and services must be reinstalled.
-// Exported as a variable so tests can override it with a temporary path.
 var servicesMarkerPath = "/tmp/.kilo-services-installed"
 
 // runInstallCmd executes a shell command for service installation.
-// Exported as a variable so tests can stub it out.
 var runInstallCmd = func(cmd string) error {
 	c := exec.Command("sh", "-c", cmd)
 	c.Stdout = os.Stderr
@@ -174,14 +80,12 @@ var runInstallCmd = func(cmd string) error {
 }
 
 // installServices reads KD_SERVICES env var and runs install commands for each enabled service.
-// On subsequent starts with the same set of services, installation is skipped entirely.
 func installServices() error {
 	servicesEnv := os.Getenv("KD_SERVICES")
 	if servicesEnv == "" {
 		return nil
 	}
 
-	// Check marker file — if the same services were already installed, skip.
 	if existing, err := os.ReadFile(servicesMarkerPath); err == nil && strings.TrimSpace(string(existing)) == servicesEnv {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] KD_SERVICES=%s (already installed)\n", servicesEnv)
 		return nil
@@ -205,11 +109,41 @@ func installServices() error {
 		}
 	}
 
-	// Write marker file so next start skips installation.
 	if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0644); err != nil {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to write services marker: %v\n", err)
 	}
 
+	return nil
+}
+
+// installUserServices runs UserInstall commands for services that require
+// the user's home directory. Called from runUserInit() after user creation
+// but before privilege drop, with HOME set to the actual user home.
+func installUserServices(homeDir string) error {
+	servicesEnv := os.Getenv("KD_SERVICES")
+	if servicesEnv == "" {
+		return nil
+	}
+
+	for _, svcName := range strings.Split(servicesEnv, ",") {
+		svc := getService(svcName)
+		if svc == nil || len(svc.UserInstall) == 0 {
+			continue
+		}
+		for _, installCmd := range svc.UserInstall {
+			if installCmd == "" {
+				continue
+			}
+			fmt.Fprintf(os.Stderr, "[kilo-docker] User-installing %s: %s\n", svc.Name, installCmd)
+			c := exec.Command("sh", "-c", installCmd)
+			c.Env = append(os.Environ(), "HOME="+homeDir)
+			c.Stdout = os.Stderr
+			c.Stderr = os.Stderr
+			if err := c.Run(); err != nil {
+				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to user-install %s: %v\n", svc.Name, err)
+			}
+		}
+	}
 	return nil
 }
 
@@ -262,8 +196,7 @@ func expandHome(path, home string) string {
 }
 
 // setupServiceGroups reads KD_SERVICES and DOCKER_GID env vars, then sets up
-// group membership for services that require socket access. This must run as
-// root before privilege drop so that addgroup can modify /etc/group.
+// group membership for services that require socket access.
 func setupServiceGroups() error {
 	servicesEnv := os.Getenv("KD_SERVICES")
 	if servicesEnv == "" {
@@ -281,7 +214,6 @@ func setupServiceGroups() error {
 		}
 		cmd := exec.Command("addgroup", "-g", gid, svc.Name)
 		if err := cmd.Run(); err == nil {
-			exec.Command("addgroup", "kilo-t8x3m7kp", svc.Name).Run()
 			continue
 		}
 		cmd2 := exec.Command("getent", "group", gid)
@@ -291,7 +223,7 @@ func setupServiceGroups() error {
 		}
 		parts := strings.SplitN(string(out), ":", 2)
 		if len(parts) > 0 && parts[0] != "" {
-			exec.Command("addgroup", "kilo-t8x3m7kp", parts[0]).Run()
+			_ = parts[0] // group exists, service groups will be joined in userinit
 		}
 	}
 	return nil
@@ -299,8 +231,7 @@ func setupServiceGroups() error {
 
 // setupKnownHosts runs ssh-keyscan to pre-populate ~/.ssh/known_hosts
 // for GitHub, GitLab, and Bitbucket, avoiding interactive host key prompts.
-func setupKnownHosts() error {
-	home := "/home/kilo-t8x3m7kp"
+func setupKnownHosts(home string) error {
 	sshDir := filepath.Join(home, ".ssh")
 	os.MkdirAll(sshDir, 0700)
 
@@ -319,16 +250,11 @@ func setupKnownHosts() error {
 }
 
 // chownRecursive changes ownership of path and its contents to uid:gid.
-// It skips individual files and directories already owned by the target
-// user, but continues walking into directories so that any root-owned
-// subdirectories created later (e.g. by Docker volume mounts or external
-// processes) are still fixed.
 func chownRecursive(path string, uid, gid int) {
 	filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		// Never follow symlinks
 		if d.Type()&os.ModeSymlink != 0 {
 			return nil
 		}
@@ -339,8 +265,6 @@ func chownRecursive(path string, uid, gid int) {
 		}
 		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
 			if int(stat.Uid) == uid && int(stat.Gid) == gid {
-				// Already correct ownership — skip this entry, but continue
-				// walking into subdirectories in case they contain root-owned files.
 				return nil
 			}
 			os.Chown(p, uid, gid)
@@ -348,3 +272,4 @@ func chownRecursive(path string, uid, gid int) {
 		return nil
 	})
 }
+

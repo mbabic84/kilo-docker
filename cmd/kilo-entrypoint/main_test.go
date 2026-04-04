@@ -25,6 +25,7 @@ func TestSubcommandsContainsAllInternal(t *testing.T) {
 		"config",
 		"sync",
 		"resync",
+		"zellij-attach",
 	}
 
 	for _, name := range expected {
@@ -90,6 +91,7 @@ func TestResolveCommandInternalSubcommands(t *testing.T) {
 		"config",
 		"sync",
 		"resync",
+		"zellij-attach",
 	}
 
 	for _, name := range internal {
