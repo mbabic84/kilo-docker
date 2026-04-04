@@ -104,14 +104,14 @@ func listPATs(apiURL, accessToken string) ([]patListItem, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] PAT list request failed: %v\n", err)
+	utils.LogError("PAT list request failed: %v\n", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] PAT list returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+utils.Log("PAT list returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 		return nil, fmt.Errorf("list PATs failed with status %d", resp.StatusCode)
 	}
 
@@ -125,7 +125,7 @@ func listPATs(apiURL, accessToken string) ([]patListItem, error) {
 }
 
 func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Ensuring PAT with label: %q\n", label)
+utils.Log("Ensuring PAT with label: %q\n", label)
 	pats, err := listPATs(apiURL, accessToken)
 	if err != nil {
 		return "", err
@@ -138,17 +138,17 @@ func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
 			// rotation needed.
 			if storedToken != "" {
 				if pat.ExpiresAt == nil || time.Until(pat.ExpiresAt.Time) <= patRotationThreshold {
-					fmt.Fprintf(os.Stderr, "[kilo-docker] Existing PAT expiring soon or no expiry, rotating\n")
+					utils.LogWarn("Existing PAT expiring soon or no expiry, rotating\n")
 				} else {
-					fmt.Fprintf(os.Stderr, "[kilo-docker] Existing PAT still valid (expires %s), using stored token\n", pat.ExpiresAt.Time.Format("2006-01-02"))
+				utils.Log("Existing PAT still valid (expires %s), using stored token\n", pat.ExpiresAt.Time.Format("2006-01-02"))
 					return storedToken, nil
 				}
 			} else {
 				// No stored token — must rotate to obtain the value.
 				if pat.ExpiresAt != nil {
-					fmt.Fprintf(os.Stderr, "[kilo-docker] No stored token, rotating existing PAT (expires %s)\n", pat.ExpiresAt.Time.Format("2006-01-02"))
+					utils.Log("No stored token, rotating existing PAT (expires %s)\n", pat.ExpiresAt.Time.Format("2006-01-02"))
 				} else {
-					fmt.Fprintf(os.Stderr, "[kilo-docker] No stored token, rotating existing PAT (no expiry)\n")
+					utils.Log("No stored token, rotating existing PAT (no expiry)\n")
 				}
 			}
 			rotateReq := map[string]interface{}{
@@ -164,14 +164,14 @@ func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] PAT rotate request failed: %v\n", err)
+			utils.LogError("PAT rotate request failed: %v\n", err)
 				return "", err
 			}
 			defer resp.Body.Close()
 
 		if resp.StatusCode != 200 {
 			body, _ := io.ReadAll(resp.Body)
-			fmt.Fprintf(os.Stderr, "[kilo-docker] PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+utils.Log("PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 			return "", fmt.Errorf("rotate PAT failed with status %d", resp.StatusCode)
 		}
 
@@ -180,12 +180,12 @@ func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
 			if err := json.Unmarshal(body, &rotateResp); err != nil {
 				return "", err
 			}
-			fmt.Fprintf(os.Stderr, "[kilo-docker] PAT rotated successfully (id=%s)\n", rotateResp.PatID)
+			utils.Log("PAT rotated successfully (id=%s)\n", rotateResp.PatID)
 			return rotateResp.Token, nil
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "[kilo-docker] No existing PAT found, creating new one...\n")
+utils.Log("No existing PAT found, creating new one...\n")
 	createReq := map[string]interface{}{
 		"label":           label,
 		"expires_in_days": 30,
@@ -200,14 +200,14 @@ func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] PAT create request failed: %v\n", err)
+		utils.LogError("PAT create request failed: %v\n", err)
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+utils.Log("PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 		return "", fmt.Errorf("create PAT failed with status %d", resp.StatusCode)
 	}
 
@@ -216,7 +216,7 @@ func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
 	if err := json.Unmarshal(body, &createResp); err != nil {
 		return "", err
 	}
-	fmt.Fprintf(os.Stderr, "[kilo-docker] PAT created successfully (id=%s)\n", createResp.PatID)
+	utils.Log("PAT created successfully (id=%s)\n", createResp.PatID)
 	return createResp.Token, nil
 }
 

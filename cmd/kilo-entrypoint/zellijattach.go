@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,10 +18,10 @@ const initMarker = "/tmp/.kilo-initialized"
 // Otherwise it runs the first-time user init flow.
 func runZellijAttach() error {
 	if _, err := os.Stat(initMarker); err == nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Container already initialized, attaching zellij\n")
+		utils.Log("Container already initialized, attaching zellij\n")
 		return execZellij()
 	}
-	fmt.Fprintf(os.Stderr, "[kilo-docker] First-time initialization\n")
+	utils.Log("First-time initialization\n")
 	return runUserInit()
 }
 
@@ -33,21 +32,21 @@ func loadUserConfig() (homeDir, username, shell, userID string) {
 	baseDir := "/home"
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Error reading /home: %v\n", err)
+		utils.LogError("Error reading /home: %v\n", err)
 		return "", "", "", ""
 	}
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Scanning /home for user config: %d entries\n", len(entries))
+	utils.Log("Scanning /home for user config: %d entries\n", len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() || !filepath.HasPrefix(entry.Name(), "kd-") {
 			continue
 		}
 		configPath := filepath.Join(baseDir, entry.Name(), ".local/share/kilo/.user-config.json")
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Checking for user config: %s\n", configPath)
+		utils.Log("Checking for user config: %s\n", configPath)
 		if _, err := os.Stat(configPath); err == nil {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Found user config: %s\n", configPath)
+			utils.Log("Found user config: %s\n", configPath)
 			data, err := os.ReadFile(configPath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Error reading user config: %v\n", err)
+				utils.LogError("Error reading user config: %v\n", err)
 				continue
 			}
 			var config map[string]string
@@ -65,13 +64,13 @@ func loadUserConfig() (homeDir, username, shell, userID string) {
 					userID = uid
 				}
 				if homeDir != "" && username != "" {
-					fmt.Fprintf(os.Stderr, "[kilo-docker] Loaded user config: homeDir=%s, username=%s, shell=%s\n", homeDir, username, shell)
+					utils.Log("Loaded user config: homeDir=%s, username=%s, shell=%s\n", homeDir, username, shell)
 					return homeDir, username, shell, userID
 				}
 			}
 		}
 	}
-	fmt.Fprintf(os.Stderr, "[kilo-docker] No user config found\n")
+	utils.Log("No user config found\n")
 	return "", "", "", ""
 }
 
@@ -84,7 +83,7 @@ func execZellij() error {
 	
 	// If no user config found, we can't properly run as user
 	if homeDir == "" || username == "" {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: No user config found, running as root\n")
+		utils.LogWarn("No user config found, running as root\n")
 	} else {
 		// Load UID/GID from config to drop privileges
 		configPath := filepath.Join(homeDir, ".local/share/kilo/.user-config.json")
@@ -96,7 +95,7 @@ func execZellij() error {
 					if gidStr, ok := config["gid"]; ok {
 						uid, _ := strconv.Atoi(uidStr)
 						gid, _ := strconv.Atoi(gidStr)
-						fmt.Fprintf(os.Stderr, "[kilo-docker] Dropping privileges to UID=%d, GID=%d\n", uid, gid)
+						utils.Log("Dropping privileges to UID=%d, GID=%d\n", uid, gid)
 						syscall.Setgid(gid)
 						syscall.Setuid(uid)
 					}
@@ -126,7 +125,7 @@ func execZellij() error {
 	// docker exec processes — we must re-read them from the volume.
 	if homeDir != "" && userID != "" {
 		if context7, ainstruct, syncToken, syncRefresh, syncExpiry, err := loadEncryptedTokens(homeDir, userID); err == nil {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Loaded MCP tokens from encrypted storage\n")
+			utils.Log("Loaded MCP tokens from encrypted storage\n")
 			status := ""
 			if ainstruct != "" {
 				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_TOKEN", ainstruct)
@@ -147,16 +146,16 @@ func execZellij() error {
 				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", syncExpiry)
 			}
 			if status != "" {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] MCP Token status: %s\n", strings.TrimSpace(status))
+				utils.Log("MCP Token status: %s\n", strings.TrimSpace(status))
 			}
 		} else {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to load MCP tokens: %v\n", err)
+			utils.LogWarn("failed to load MCP tokens: %v\n", err)
 		}
 	} else {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: cannot load tokens — homeDir=%q userID=%q\n", homeDir, utils.RedactID(userID))
+		utils.LogWarn("cannot load tokens — homeDir=%q userID=%q\n", homeDir, utils.RedactID(userID))
 	}
 	
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
+	utils.Log("Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
 	return syscall.Exec("/usr/local/bin/zellij", []string{"zellij", "attach", "--create", "kilo-docker"}, env)
 }
 

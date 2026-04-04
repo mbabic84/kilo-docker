@@ -93,8 +93,8 @@ func handleUpdate() {
 
 // handleCleanup removes all kilo-docker artifacts: containers, volumes,
 // Docker images, and the installed script.
-func handleCleanup() {
-	if !promptConfirm("Remove volume, containers, and images for kilo-docker? [y/N]: ") {
+func handleCleanup(yes bool) {
+	if !promptConfirm("Remove volume, containers, and images for kilo-docker? [y/N]: ", yes) {
 		fmt.Fprintf(os.Stderr, "Aborted.\n")
 		return
 	}
@@ -132,7 +132,7 @@ func handleInit(cfg config) {
 	}
 
 	if volumeExists(dataVolume) {
-		if promptConfirm("Remove volume '" + dataVolume + "' and reset all configuration? [y/N]: ") {
+		if promptConfirm("Remove volume '" + dataVolume + "' and reset all configuration? [y/N]: ", cfg.yes) {
 			removeVolume(dataVolume)
 			fmt.Fprintf(os.Stderr, "Volume removed. You will be prompted for tokens on next run.\n")
 		}

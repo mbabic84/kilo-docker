@@ -40,7 +40,7 @@ func handleBackup(cfg config) {
 	}
 
 	if _, err := os.Stat(backupFile); err == nil && !forceBackup {
-		if !promptConfirm("Backup file '" + backupFile + "' exists. Overwrite? [y/N]: ") {
+		if !promptConfirm("Backup file '" + backupFile + "' exists. Overwrite? [y/N]: ", cfg.yes) {
 			fmt.Fprintf(os.Stderr, "Aborted.\n")
 			os.Exit(0)
 		}
@@ -111,7 +111,7 @@ func handleRestore(cfg config) {
 
 	if volumeExists(targetVolume) {
 		if !forceRestore {
-			if !promptConfirm("Volume '" + targetVolume + "' exists and will be overwritten. Continue? [y/N]: ") {
+			if !promptConfirm("Volume '" + targetVolume + "' exists and will be overwritten. Continue? [y/N]: ", cfg.yes) {
 				fmt.Fprintf(os.Stderr, "Aborted.\n")
 				os.Exit(0)
 			}

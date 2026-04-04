@@ -104,31 +104,20 @@ func TestParseFlagsYesWithoutCommand(t *testing.T) {
 	}
 }
 
-// TestPromptConfirmAutoConfirm tests that promptConfirm returns true
-// immediately when autoConfirm is set, without reading from stdin.
-func TestPromptConfirmAutoConfirm(t *testing.T) {
-	origAutoConfirm := autoConfirm
-	defer func() { autoConfirm = origAutoConfirm }()
-
-	autoConfirm = true
-
-	result := promptConfirm("Continue? [y/N]: ")
+// TestPromptConfirmYesFlag tests that promptConfirm returns true
+// when yes=true is passed, without reading from stdin.
+func TestPromptConfirmYesFlag(t *testing.T) {
+	result := promptConfirm("Continue? [y/N]: ", true)
 	if !result {
-		t.Error("expected promptConfirm to return true when autoConfirm is true")
+		t.Error("expected promptConfirm to return true when yes=true")
 	}
 }
 
 // TestPromptConfirmReadsStdin tests that promptConfirm reads from stdin
-// when autoConfirm is false, returning true for "y" input.
+// when yes=false, returning true for "y" input.
 func TestPromptConfirmReadsStdin(t *testing.T) {
-	origAutoConfirm := autoConfirm
 	origStdin := os.Stdin
-	defer func() {
-		autoConfirm = origAutoConfirm
-		os.Stdin = origStdin
-	}()
-
-	autoConfirm = false
+	defer func() { os.Stdin = origStdin }()
 
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -141,23 +130,17 @@ func TestPromptConfirmReadsStdin(t *testing.T) {
 		w.Close()
 	}()
 
-	result := promptConfirm("Continue? [y/N]: ")
+	result := promptConfirm("Continue? [y/N]: ", false)
 	if !result {
 		t.Error("expected promptConfirm to return true for 'y' input")
 	}
 }
 
 // TestPromptConfirmRejectsEmpty tests that promptConfirm returns false
-// for empty input when autoConfirm is false.
+// for empty input when yes=false.
 func TestPromptConfirmRejectsEmpty(t *testing.T) {
-	origAutoConfirm := autoConfirm
 	origStdin := os.Stdin
-	defer func() {
-		autoConfirm = origAutoConfirm
-		os.Stdin = origStdin
-	}()
-
-	autoConfirm = false
+	defer func() { os.Stdin = origStdin }()
 
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -170,23 +153,17 @@ func TestPromptConfirmRejectsEmpty(t *testing.T) {
 		w.Close()
 	}()
 
-	result := promptConfirm("Continue? [y/N]: ")
+	result := promptConfirm("Continue? [y/N]: ", false)
 	if result {
 		t.Error("expected promptConfirm to return false for empty input")
 	}
 }
 
 // TestPromptConfirmRejectsN tests that promptConfirm returns false
-// for "n" input when autoConfirm is false.
+// for "n" input when yes=false.
 func TestPromptConfirmRejectsN(t *testing.T) {
-	origAutoConfirm := autoConfirm
 	origStdin := os.Stdin
-	defer func() {
-		autoConfirm = origAutoConfirm
-		os.Stdin = origStdin
-	}()
-
-	autoConfirm = false
+	defer func() { os.Stdin = origStdin }()
 
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -199,22 +176,17 @@ func TestPromptConfirmRejectsN(t *testing.T) {
 		w.Close()
 	}()
 
-	result := promptConfirm("Continue? [y/N]: ")
+	result := promptConfirm("Continue? [y/N]: ", false)
 	if result {
 		t.Error("expected promptConfirm to return false for 'n' input")
 	}
 }
 
-// TestAutoConfirmWithPipedStdin simulates the curl | sh install flow.
-// When stdin is a pipe (not a TTY), isTerminal() returns false,
-// causing autoConfirm to be set even without the -y flag.
-func TestAutoConfirmWithPipedStdin(t *testing.T) {
+// TestIsTerminalWithPipedStdin verifies that isTerminal() returns false
+// when stdin is a pipe.
+func TestIsTerminalWithPipedStdin(t *testing.T) {
 	origStdin := os.Stdin
-	origAutoConfirm := autoConfirm
-	defer func() {
-		os.Stdin = origStdin
-		autoConfirm = origAutoConfirm
-	}()
+	defer func() { os.Stdin = origStdin }()
 
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -229,56 +201,19 @@ func TestAutoConfirmWithPipedStdin(t *testing.T) {
 	if isTerminal() {
 		t.Error("expected isTerminal() = false with piped stdin")
 	}
-
-	// Simulate what main() does: autoConfirm = cfg.yes || !isTerminal()
-	cfg := parseFlags()
-	autoConfirm = cfg.yes || !isTerminal()
-
-	if !autoConfirm {
-		t.Error("expected autoConfirm = true when stdin is piped (non-TTY)")
-	}
-
-	// Verify promptConfirm returns true without waiting for input
-	result := promptConfirm("Replace it? [y/N]: ")
-	if !result {
-		t.Error("expected promptConfirm to return true with piped stdin")
-	}
 }
 
-// TestAutoConfirmWithTerminalStdin verifies that in a real terminal,
-// autoConfirm is false and promptConfirm requires actual input.
-func TestAutoConfirmWithTerminalStdin(t *testing.T) {
-	// When running in a real terminal (as in `go test` directly),
-	// isTerminal() returns true, so autoConfirm should be false.
-	origAutoConfirm := autoConfirm
-	origStdin := os.Stdin
-	defer func() {
-		autoConfirm = origAutoConfirm
-		os.Stdin = origStdin
-	}()
-
-	// Pipe stdin to simulate non-interactive but verify the logic:
-	// Without -y and with terminal, autoConfirm should be false.
-	// We can't test real terminal in go test, so we test the inverse:
-	// pipe stdin + no -y => autoConfirm = true
-
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("failed to create pipe: %v", err)
-	}
-	os.Stdin = r
-	w.Close()
-
-	// With -y flag explicitly set
+// TestYesFlagDirectlyPassed verifies that -y flag is correctly parsed
+// and passed to prompt functions.
+func TestYesFlagDirectlyPassed(t *testing.T) {
 	origArgs := os.Args
-	os.Args = []string{"kilo-docker", "-y", "install"}
 	defer func() { os.Args = origArgs }()
 
+	os.Args = []string{"kilo-docker", "-y", "cleanup"}
 	cfg := parseFlags()
-	autoConfirm = cfg.yes || !isTerminal()
 
-	if !autoConfirm {
-		t.Error("expected autoConfirm = true with -y flag regardless of TTY")
+	if !cfg.yes {
+		t.Error("expected cfg.yes = true with -y flag")
 	}
 }
 

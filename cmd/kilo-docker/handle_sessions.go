@@ -147,7 +147,7 @@ func handleSessions(cfg config) {
 			}
 		}
 
-		if cleanupYes || promptConfirm("Remove session '"+containerToClean+"'? [y/N]: ") {
+		if cleanupYes || promptConfirm("Remove session '"+containerToClean+"'? [y/N]: ", cleanupYes) {
 			dockerRun("rm", "-f", containerToClean)
 			fmt.Fprintf(os.Stderr, "Session '%s' removed.\n", containerToClean)
 		} else {

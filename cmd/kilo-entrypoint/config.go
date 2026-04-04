@@ -2,11 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/mbabic84/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // runConfig toggles MCP server enabled/disabled state in the user's
@@ -23,7 +23,7 @@ func runConfig() error {
 
 	configPath := filepath.Join(constants.GetKiloConfigDir(), "opencode.json")
 	if err := applyConfigFilter(configPath, mapping, mcpEnabled, playwrightEnabled); err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: config error for %s: %v\n", configPath, err)
+		utils.LogWarn("config error for %s: %v\n", configPath, err)
 	}
 	return nil
 }
