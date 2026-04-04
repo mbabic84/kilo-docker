@@ -41,11 +41,11 @@ func runUserInit() error {
 
 	existingUser := findExistingUser()
 	if existingUser != "" {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Found existing user data: %s\n", existingUser)
+		utils.Log("Found existing user data: %s\n", existingUser)
 	}
 
 	// Login
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Starting Ainstruct authentication\n")
+	utils.Log("Starting Ainstruct authentication\n")
 	loginRes, err := runLoginInteractive()
 	if err != nil {
 		return fmt.Errorf("login failed: %w", err)
@@ -57,14 +57,14 @@ func runUserInit() error {
 		if derived != existingUser {
 			return fmt.Errorf("user mismatch: expected %s, got %s", existingUser, derived)
 		}
-		fmt.Fprintf(os.Stderr, "[kilo-docker] User verified: %s\n", derived)
+		utils.Log("User verified: %s\n", derived)
 	}
 
 	username := deriveHomeName(userID)
 	homeDir := "/home/" + username
 
 	// Create OS user
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Creating user: %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
+	utils.Log("Creating user: %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
 	if err := createOSUser(username, puidStr, pgidStr); err != nil {
 		return fmt.Errorf("failed to create user %s: %w", username, err)
 	}
@@ -73,7 +73,7 @@ func runUserInit() error {
 	joinServiceGroups(username)
 
 	// Create home directory and config structure
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Creating home directory: %s\n", homeDir)
+	utils.Log("Creating home directory: %s\n", homeDir)
 	os.MkdirAll(homeDir, 0755)
 	os.MkdirAll(filepath.Join(homeDir, ".config/kilo/commands"), 0755)
 	os.MkdirAll(filepath.Join(homeDir, ".config/kilo/agents"), 0755)
@@ -95,15 +95,15 @@ func runUserInit() error {
 	copyFileIfMissing("/etc/zellij/config.kdl", filepath.Join(homeDir, ".config/zellij/config.kdl"))
 
 	// Setup SSH known_hosts
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Setting up SSH known_hosts\n")
+	utils.Log("Setting up SSH known_hosts\n")
 	setupKnownHosts(homeDir)
 
 	// Copy service configs to the new home
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Copying service configs\n")
+	utils.Log("Copying service configs\n")
 	copyServiceConfigs(homeDir)
 
 	// Install user-scoped services (NVM, etc.) with HOME set to user home
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Installing user-scoped services\n")
+	utils.Log("Installing user-scoped services\n")
 	installUserServices(homeDir)
 
 	// Set HOME temporarily so GetKiloConfigDir() and token paths resolve correctly
@@ -143,7 +143,7 @@ func runUserInit() error {
 		}
 
 		// Run MCP config now that token env vars are set
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Updating MCP config\n")
+		utils.Log("Updating MCP config\n")
 		runConfig()
 
 		// Prompt for Context7 token if not stored and MCP is enabled
@@ -151,7 +151,7 @@ func runUserInit() error {
 		if storedContext7 != "" {
 			context7Token = storedContext7
 		} else {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Initializing MCP tokens\n")
+			utils.Log("Initializing MCP tokens\n")
 			context7Token = promptContext7Token()
 			if context7Token != "" {
 				os.Setenv("KD_CONTEXT7_TOKEN", context7Token)
@@ -161,15 +161,15 @@ func runUserInit() error {
 		}
 
 		// Save all tokens (ainstruct PAT from login + context7 + sync tokens)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Saving MCP tokens\n")
+		utils.Log("Saving MCP tokens\n")
 		if err := initTokens(homeDir, userID, loginRes); err != nil {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: token init failed: %v\n", err)
+			utils.LogWarn("token init failed: %v\n", err)
 		}
 	}
 
 	// Chown SSH agent socket to the new user
 	if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Setting SSH agent socket ownership: %s\n", sshAuthSock)
+		utils.Log("Setting SSH agent socket ownership: %s\n", sshAuthSock)
 		os.Chown(sshAuthSock, puid, pgid)
 		os.Chmod(sshAuthSock, 0600)
 	}
@@ -182,7 +182,7 @@ func runUserInit() error {
 	// Persist user configuration for re-attach
 	// Store info in a file on the volume so it survives container restarts
 	userConfigPath := filepath.Join(homeDir, ".local/share/kilo/.user-config.json")
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Saving user config to: %s\n", userConfigPath)
+	utils.Log("Saving user config to: %s\n", userConfigPath)
 	userConfig := map[string]string{
 		"homeDir": homeDir,
 		"username": username,
@@ -196,7 +196,7 @@ func runUserInit() error {
 	}
 	configJSON, _ := json.Marshal(userConfig)
 	if err := os.WriteFile(userConfigPath, configJSON, 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to save user config: %v\n", err)
+		utils.LogWarn("failed to save user config: %v\n", err)
 	} else {
 		redactedConfig := map[string]string{
 			"homeDir":  homeDir,
@@ -207,7 +207,7 @@ func runUserInit() error {
 			"userID":   utils.RedactID(userID),
 		}
 		redactedJSON, _ := json.Marshal(redactedConfig)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Saved user config: %s\n", string(redactedJSON))
+		utils.Log("Saved user config: %s\n", string(redactedJSON))
 	}
 
 	// Set environment
@@ -217,23 +217,23 @@ func runUserInit() error {
 	os.Setenv("SHELL", userConfig["shell"])
 
 	// Chown everything to the new user (after all root-level file writes)
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Setting ownership: %s\n", homeDir)
+	utils.Log("Setting ownership: %s\n", homeDir)
 	chownRecursive(homeDir, puid, pgid)
 
 	// Drop privileges and exec zellij
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Dropping privileges to %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
+	utils.Log("Dropping privileges to %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
 	syscall.Setgid(pgid)
 	syscall.Setuid(puid)
 
 	// Start file sync as the user (after privilege drop so files are owned correctly)
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Starting file sync\n")
+	utils.Log("Starting file sync\n")
 	startSyncWithTokens(homeDir, userID)
 
 	// Delete stale zellij sessions from previous container lifecycle
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Clearing old zellij sessions\n")
+	utils.Log("Clearing old zellij sessions\n")
 	clearZellijSessions()
 
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Starting zellij\n")
+	utils.Log("Starting zellij\n")
 	return execZellij()
 }
 
@@ -263,7 +263,7 @@ func copyFileIfMissing(src, dst string) {
 	}
 	os.MkdirAll(filepath.Dir(dst), 0755)
 	os.WriteFile(dst, data, 0644)
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Copied %s\n", filepath.Base(src))
+	utils.Log("Copied %s\n", filepath.Base(src))
 }
 
 // joinServiceGroups adds the user to service groups created by init.
@@ -343,7 +343,7 @@ func clearZellijSessions() {
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to delete zellij sessions: %v\n", err)
+		utils.LogWarn("failed to delete zellij sessions: %v\n", err)
 	}
 }
 

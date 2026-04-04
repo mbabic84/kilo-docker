@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // runInit performs container initialization when invoked with no subcommand.
@@ -21,27 +23,27 @@ import (
 // User creation, home directory, and privilege drop are handled by
 // runUserInit() when docker exec calls kilo-entrypoint zellij-attach.
 func runInit() error {
-	fmt.Fprintf(os.Stderr, "[kilo-docker] Container initializing\n")
+	utils.Log("Container initializing\n")
 	if os.Getuid() == 0 {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Running as root (UID=0)\n")
+		utils.Log("Running as root (UID=0)\n")
 		if err := installServices(); err != nil {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: service installation error: %v\n", err)
+			utils.LogWarn("service installation error: %v\n", err)
 		}
 
 		if err := setupServiceGroups(); err != nil {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: group setup error: %v\n", err)
+			utils.LogWarn("group setup error: %v\n", err)
 		}
 
 		if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
 			if info, err := os.Stat(sshAuthSock); err == nil && info.Mode()&os.ModeSocket != 0 {
 				if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
-					fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH socket not accessible: %v\n", err)
+					utils.LogWarn("SSH socket not accessible: %v\n", err)
 				} else {
 					conn.Close()
-					fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent socket ready: %s\n", sshAuthSock)
+					utils.Log("SSH agent socket ready: %s\n", sshAuthSock)
 				}
 			} else {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
+				utils.LogWarn("SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
 			}
 		}
 	}
@@ -57,7 +59,7 @@ func runInit() error {
 
 	if len(os.Args) <= 1 {
 		// Keep container alive — zellij is started via docker exec from the host.
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Init complete, waiting for exec\n")
+		utils.Log("Init complete, waiting for exec\n")
 		return syscall.Exec("/bin/sleep", []string{"sleep", "infinity"}, os.Environ())
 	}
 
@@ -87,30 +89,30 @@ func installServices() error {
 	}
 
 	if existing, err := os.ReadFile(servicesMarkerPath); err == nil && strings.TrimSpace(string(existing)) == servicesEnv {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] KD_SERVICES=%s (already installed)\n", servicesEnv)
+		utils.Log("KD_SERVICES=%s (already installed)\n", servicesEnv)
 		return nil
 	}
 
-	fmt.Fprintf(os.Stderr, "[kilo-docker] KD_SERVICES=%s\n", servicesEnv)
+	utils.Log("KD_SERVICES=%s\n", servicesEnv)
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Service %q not found in builtInServices\n", svcName)
+			utils.LogError("Service %q not found in builtInServices\n", svcName)
 			continue
 		}
 		for _, installCmd := range svc.Install {
 			if installCmd == "" {
 				continue
 			}
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Installing %s: %s\n", svc.Name, installCmd)
+			utils.Log("Installing %s: %s\n", svc.Name, installCmd)
 			if err := runInstallCmd(installCmd); err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to install %s: %v\n", svc.Name, err)
+				utils.LogWarn("failed to install %s: %v\n", svc.Name, err)
 			}
 		}
 	}
 
 	if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to write services marker: %v\n", err)
+		utils.LogWarn("failed to write services marker: %v\n", err)
 	}
 
 	return nil
@@ -134,13 +136,13 @@ func installUserServices(homeDir string) error {
 			if installCmd == "" {
 				continue
 			}
-			fmt.Fprintf(os.Stderr, "[kilo-docker] User-installing %s: %s\n", svc.Name, installCmd)
+			utils.Log("User-installing %s: %s\n", svc.Name, installCmd)
 			c := exec.Command("sh", "-c", installCmd)
 			c.Env = append(os.Environ(), "HOME="+homeDir)
 			c.Stdout = os.Stderr
 			c.Stderr = os.Stderr
 			if err := c.Run(); err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to user-install %s: %v\n", svc.Name, err)
+				utils.LogWarn("failed to user-install %s: %v\n", svc.Name, err)
 			}
 		}
 	}

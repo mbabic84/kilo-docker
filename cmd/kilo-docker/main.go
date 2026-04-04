@@ -40,11 +40,17 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 func main() {
 	cfg := parseFlags()
-	autoConfirm = cfg.yes || !isTerminal()
+
+	// Warn if running in non-interactive mode without -y flag
+	if !isTerminal() && !cfg.yes {
+		utils.LogWarn("Running in non-interactive mode (non-TTY). Use -y to auto-confirm prompts.\n")
+	}
 
 	switch cfg.command {
 	case "help":
@@ -58,7 +64,7 @@ func main() {
 	case "update":
 		handleUpdate()
 	case "cleanup":
-		handleCleanup()
+		handleCleanup(cfg.yes)
 	case "backup":
 		handleBackup(cfg)
 	case "restore":
@@ -74,7 +80,7 @@ func main() {
 
 func runContainer(cfg config) {
 	if !dockerDaemonRunning() {
-		fmt.Fprintf(os.Stderr, "Error: Docker daemon is not running.\n")
+		utils.LogError("Docker daemon is not running.\n")
 		os.Exit(1)
 	}
 
@@ -98,10 +104,10 @@ func runContainer(cfg config) {
 		currentFlags := serializeArgs(cfg, cfg.ssh)
 		storedFlags := getContainerLabel(containerName, "kilo.args")
 		if currentFlags != storedFlags {
-			fmt.Fprintf(os.Stderr, "Existing session uses different flags.\n")
-			fmt.Fprintf(os.Stderr, "  Existing: %s\n", storedFlags)
-			fmt.Fprintf(os.Stderr, "  Current:  %s\n", currentFlags)
-			if cfg.yes || confirmPrompt("Recreate with new flags? [y/N]: ") {
+			utils.Log("Existing session uses different flags.\n")
+			utils.Log("  Existing: %s\n", storedFlags)
+			utils.Log("  Current:  %s\n", currentFlags)
+			if cfg.yes || confirmPrompt("Recreate with new flags? [y/N]: ", cfg.yes) {
 				dockerRun("rm", "-f", containerName)
 				containerState = "not_found"
 			} else {
@@ -129,7 +135,7 @@ func runContainer(cfg config) {
 			continue
 		}
 		if _, err := os.Stat(svc.RequiresSocket); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Error: %s not found. Is the host socket available?\n", svc.RequiresSocket)
+			utils.LogError("%s not found. Is the host socket available?\n", svc.RequiresSocket)
 			os.Exit(1)
 		}
 		info, _ := os.Stat(svc.RequiresSocket)
@@ -146,7 +152,7 @@ func runContainer(cfg config) {
 	playwrightNetwork := cfg.network
 	if cfg.playwright {
 		if err := startPlaywright(&playwrightNetwork); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			utils.LogError("%v\n", err)
 			os.Exit(1)
 		}
 		defer cleanupPlaywright(playwrightNetwork)
@@ -163,7 +169,7 @@ func runContainer(cfg config) {
 
 	if !cfg.once {
 		if strings.HasPrefix(pwd, "/home/kd-") {
-			fmt.Fprintf(os.Stderr, "Warning: Current directory (%s) overlaps with the container's home path.\n", pwd)
+			utils.LogWarn("Current directory (%s) overlaps with the container's home path.\n", pwd)
 		}
 	}
 
@@ -187,7 +193,7 @@ func runContainer(cfg config) {
 		runArgs := buildRunArgs(containerArgs, image, cfg.args, false)
 		runArgs[1] = "-d"
 		if _, err := dockerRunDetached(runArgs...); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			utils.LogError("%v\n", err)
 			os.Exit(1)
 		}
 		time.Sleep(2 * time.Second)
@@ -213,17 +219,17 @@ func handleSessionEnd(containerName string, onceMode bool) {
 	resetTerminal()
 	if onceMode {
 		dockerRun("rm", "-f", containerName)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Session '%s' ended.\n", containerName)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Container removed (--once mode).\n")
+		utils.Log("Session '%s' ended.\n", containerName)
+		utils.Log("Container removed (--once mode).\n")
 	} else {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Detached from session '%s'.\n", containerName)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] To re-attach, run: kilo-docker sessions %s\n", containerName)
+		utils.Log("Detached from session '%s'.\n", containerName)
+		utils.Log("To re-attach, run: kilo-docker sessions %s\n", containerName)
 	}
 }
 
-func confirmPrompt(message string) bool {
-	if autoConfirm {
-		fmt.Fprintf(os.Stderr, "%sy\n", message)
+func confirmPrompt(message string, yes bool) bool {
+	if yes {
+		utils.Log("%sy\n", message)
 		return true
 	}
 	fmt.Print(message)

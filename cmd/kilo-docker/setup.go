@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/mbabic84/kilo-docker/pkg/services"
+	"github.com/mbabic84/kilo-docker/pkg/utils"
+	"golang.org/x/term"
 )
 
 func resolveVolume(cfg config) string {
@@ -17,11 +19,7 @@ func resolveVolume(cfg config) string {
 }
 
 func isTerminal() bool {
-	return isatty()
-}
-
-func isatty() bool {
-	return false
+	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
 func dockerDaemonRunning() bool {
@@ -29,9 +27,9 @@ func dockerDaemonRunning() bool {
 	return err == nil
 }
 
-func promptConfirm(message string) bool {
-	if autoConfirm {
-		fmt.Fprintf(os.Stderr, "%sy\n", message)
+func promptConfirm(message string, yes bool) bool {
+	if yes {
+		utils.Log("%sy\n", message)
 		return true
 	}
 	fmt.Print(message)
