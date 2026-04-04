@@ -1,3 +1,9 @@
+## [2.0.1](https://github.com/mbabic84/kilo-docker/compare/v2.0.0...v2.0.1) (2026-04-04)
+
+### Bug Fixes
+
+* pass host user and hostname for PAT label ([c998fa4](https://github.com/mbabic84/kilo-docker/commit/c998fa4575e56c0bc0b0a77c1d66d9c0f80a563b))
+
 ## [2.0.0](https://github.com/mbabic84/kilo-docker/compare/v1.48.0...v2.0.0) (2026-04-04)
 
 ### ⚠ BREAKING CHANGES
