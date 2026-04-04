@@ -207,7 +207,7 @@ Inside the container, the entrypoint reads `KD_SERVICES`, runs installation comm
 
 ## Data Persistence
 
-The host binary uses a named Docker volume mounted at `/home/kilo-t8x3m7kp`. This stores:
+The host binary uses a named Docker volume mounted at `/home`. Inside the container, the user home directory is dynamically generated as `/home/kd-<hash>`. This stores:
 
 - SQLite database, auth state, logs
 - Configuration (`opencode.json` — model selection, provider connections, MCP settings)
