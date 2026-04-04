@@ -1,3 +1,9 @@
+## [2.0.4](https://github.com/mbabic84/kilo-docker/compare/v2.0.3...v2.0.4) (2026-04-04)
+
+### Bug Fixes
+
+* sessions cleanup requires -y flag, add shared logging ([418ff02](https://github.com/mbabic84/kilo-docker/commit/418ff020930ba37e087685efdaba72217ebeed40))
+
 ## [2.0.3](https://github.com/mbabic84/kilo-docker/compare/v2.0.2...v2.0.3) (2026-04-04)
 
 ### Bug Fixes
