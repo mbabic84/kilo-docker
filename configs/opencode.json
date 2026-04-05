@@ -4,7 +4,7 @@
   "mcp": {
     "ainstruct": {
       "type": "remote",
-      "url": "http://{env:KD_AINSTRUCT_BASE_URL}/mcp",
+      "url": "{env:KD_AINSTRUCT_BASE_URL}/mcp",
       "enabled": false,
       "headers": {
         "Authorization": "Bearer {env:KD_MCP_AINSTRUCT_TOKEN}"
