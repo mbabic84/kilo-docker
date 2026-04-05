@@ -118,13 +118,6 @@ func execZellij() error {
 		env = appendOrReplaceEnv(env, "SHELL", shell)
 	}
 	
-	// Sync MCP config to ensure opencode.json reflects current token state
-	// Note: KD_MCP_* tokens are NOT set globally - they are loaded only by
-	// kilo-wrapper.sh when starting Kilo sessions. syncMCPConfig() reads
-	// tokens directly from encrypted storage, not from environment variables.
-	utils.Log("Syncing MCP config\n")
-	syncMCPConfig(homeDir)
-	
 	utils.Log("Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
 	return syscall.Exec("/usr/local/bin/zellij", []string{"zellij", "attach", "--create", "kilo-docker"}, env)
 }

@@ -27,10 +27,12 @@ if command -v kilo-entrypoint &>/dev/null; then
     fi
 fi
 
-# Sync MCP config to enable/disable servers based on loaded tokens
-log "Syncing MCP config..."
+# Apply MCP enabled states based on KD_MCP_* env vars (set above)
+# This updates opencode.json before Kilo starts
+# NOTE: See docs/MCP_ENABLED_KNOWN_ISSUE.md for details about container-specific issue
+log "Applying MCP enabled states..."
 if command -v kilo-entrypoint &>/dev/null; then
-    kilo-entrypoint mcp-config 2>/dev/null || true
+    kilo-entrypoint mcp-config || true
 fi
 
 log "Starting kilo..."

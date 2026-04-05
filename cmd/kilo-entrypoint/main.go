@@ -10,7 +10,7 @@
 //	update-config   Download config template, merge with existing config
 //	backup          Create tar.gz of KILO_HOME
 //	restore         Extract tar.gz into KILO_HOME with ownership fix
-//	mcp-config      Sync MCP servers based on current token environment
+//	mcp-config      Apply MCP enabled states from KD_MCP_* env vars
 //	mcp-tokens      Interactive token management
 //	sync            Start ainstruct file watcher + REST sync
 //	resync          Delete all remote documents and re-push local files
@@ -69,7 +69,7 @@ func runHelp() {
 	fmt.Printf("  %-*s %s\n", w, "update-config", "Download config template, merge with existing config")
 	fmt.Printf("  %-*s %s\n", w, "backup [path]", "Create tar.gz of KILO_HOME (default: /tmp/backup.tar.gz)")
 	fmt.Printf("  %-*s %s\n", w, "restore [path]", "Extract tar.gz into KILO_HOME with ownership fix")
-	fmt.Printf("  %-*s %s\n", w, "mcp-config", "Sync MCP servers based on current token environment")
+	fmt.Printf("  %-*s %s\n", w, "mcp-config", "Apply MCP enabled states from KD_MCP_* env vars")
 	fmt.Printf("  %-*s %s\n", w, "mcp-tokens", "Interactive token management")
 	fmt.Printf("  %-*s %s\n", w, "sync", "Start ainstruct file watcher + REST sync")
 	fmt.Printf("  %-*s %s\n", w, "resync", "Delete all remote documents and re-push local files")
@@ -148,7 +148,9 @@ func main() {
 			os.Exit(1)
 		}
 	case "mcp-config":
-		if err := syncMCPConfig(""); err != nil {
+		// Apply MCP enabled states from env vars set by kilo-wrapper.sh
+		// This runs AFTER tokens are loaded and BEFORE kilo starts
+		if err := applyMCPEnabledFromEnv(""); err != nil {
 			fmt.Fprintf(os.Stderr, "mcp-config error: %v\n", err)
 			os.Exit(1)
 		}
