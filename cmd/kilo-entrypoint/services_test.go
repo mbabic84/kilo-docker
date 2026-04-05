@@ -71,8 +71,8 @@ func TestNvmServiceHasRequiredFields(t *testing.T) {
 	if svc.Name != "nvm" {
 		t.Errorf("expected Name 'nvm', got %q", svc.Name)
 	}
-	if len(svc.UserInstall) != 2 {
-		t.Errorf("expected 2 UserInstall commands for nvm, got %d", len(svc.UserInstall))
+	if len(svc.UserInstall) != 1 {
+		t.Errorf("expected 1 UserInstall command for nvm, got %d", len(svc.UserInstall))
 	}
 	if len(svc.Install) != 0 {
 		t.Errorf("expected 0 Install commands for nvm, got %d", len(svc.Install))

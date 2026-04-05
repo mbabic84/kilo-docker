@@ -136,8 +136,8 @@ func TestNvmServiceHasRequiredFields(t *testing.T) {
 	if svc.Flag != "--nvm" {
 		t.Errorf("expected Flag '--nvm', got %q", svc.Flag)
 	}
-	if len(svc.UserInstall) != 2 {
-		t.Errorf("expected 2 UserInstall commands for nvm, got %d", len(svc.UserInstall))
+	if len(svc.UserInstall) != 1 {
+		t.Errorf("expected 1 UserInstall command for nvm, got %d", len(svc.UserInstall))
 	}
 	if len(svc.Install) != 0 {
 		t.Errorf("expected 0 Install commands for nvm, got %d", len(svc.Install))
