@@ -1,3 +1,13 @@
+## [2.3.0](https://github.com/mbabic84/kilo-docker/compare/v2.2.3...v2.3.0) (2026-04-05)
+
+### Features
+
+* add version checking and improved logging for user-scoped services ([81d0d6d](https://github.com/mbabic84/kilo-docker/commit/81d0d6d77927e141565bf7616adda2fb661af9a5))
+
+### Bug Fixes
+
+* update nvm UserInstall count in tests (2 -> 1) ([8a92ce3](https://github.com/mbabic84/kilo-docker/commit/8a92ce3c4507c84570ec2c7206f76ae77d7c689b))
+
 ## [2.2.3](https://github.com/mbabic84/kilo-docker/compare/v2.2.2...v2.2.3) (2026-04-05)
 
 ### Bug Fixes
