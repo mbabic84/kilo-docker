@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -93,7 +94,7 @@ func installServices() error {
 		return nil
 	}
 
-	utils.Log("KD_SERVICES=%s\n", servicesEnv)
+	utils.Log("Installing system-scoped services: %s\n", servicesEnv)
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil {
@@ -104,9 +105,10 @@ func installServices() error {
 			if installCmd == "" {
 				continue
 			}
-			utils.Log("Installing %s: %s\n", svc.Name, installCmd)
 			if err := runInstallCmd(installCmd); err != nil {
-				utils.LogWarn("failed to install %s: %v\n", svc.Name, err)
+				utils.LogWarn("Installing %s: error: %v\n", svc.Name, err)
+			} else {
+				utils.Log("Installing %s: ok\n", svc.Name)
 			}
 		}
 	}
@@ -118,6 +120,58 @@ func installServices() error {
 	return nil
 }
 
+// runVersionCheck executes a command and returns its trimmed output.
+func runVersionCheck(cmd string, homeDir string) string {
+	if cmd == "" {
+		return ""
+	}
+	c := exec.Command("sh", "-c", cmd)
+	c.Env = append(os.Environ(), "HOME="+homeDir)
+	c.Stderr = nil
+	out, err := c.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// compareVersions compares two version strings. Returns:
+//   -1 if v1 < v2 (v1 is older)
+//    0 if v1 == v2
+//    1 if v1 > v2 (v1 is newer)
+func compareVersions(v1, v2 string) int {
+	if v1 == v2 {
+		return 0
+	}
+	parts1 := strings.Split(v1, ".")
+	parts2 := strings.Split(v2, ".")
+	for i := 0; i < max(len(parts1), len(parts2)); i++ {
+		p1 := 0
+		p2 := 0
+		if i < len(parts1) {
+			p1, _ = strconv.Atoi(parts1[i])
+		}
+		if i < len(parts2) {
+			p2, _ = strconv.Atoi(parts2[i])
+		}
+		if p1 < p2 {
+			return -1
+		}
+		if p1 > p2 {
+			return 1
+		}
+	}
+	return 0
+}
+
+// promptYesNo prompts the user with a question and returns true if they answered yes.
+func promptYesNo(question string) bool {
+	fmt.Fprintf(os.Stderr, "%s [y/N]: ", question)
+	var answer string
+	fmt.Scanln(&answer)
+	return strings.ToLower(strings.TrimSpace(answer)) == "y"
+}
+
 // installUserServices runs UserInstall commands for services that require
 // the user's home directory. Called from runUserInit() after user creation
 // but before privilege drop, with HOME set to the actual user home.
@@ -127,22 +181,60 @@ func installUserServices(homeDir string) error {
 		return nil
 	}
 
+	var userServices []string
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil || len(svc.UserInstall) == 0 {
 			continue
 		}
+		userServices = append(userServices, svc.Name)
+	}
+
+	if len(userServices) > 0 {
+		utils.Log("Installing user-scoped services: %s\n", strings.Join(userServices, ", "))
+	}
+
+	for _, svcName := range strings.Split(servicesEnv, ",") {
+		svc := getService(svcName)
+		if svc == nil || len(svc.UserInstall) == 0 {
+			continue
+		}
+
 		for _, installCmd := range svc.UserInstall {
 			if installCmd == "" {
 				continue
 			}
-			utils.Log("User-installing %s: %s\n", svc.Name, installCmd)
+
+			currentVer := runVersionCheck(svc.VersionCheck, homeDir)
+			latestVer := runVersionCheck(svc.LatestVersion, homeDir)
+
+			if currentVer != "" && latestVer != "" {
+				if compareVersions(currentVer, latestVer) < 0 {
+					utils.Log("Updating %s: %s -> %s\n", svc.Name, currentVer, latestVer)
+					if !promptYesNo(fmt.Sprintf("Update %s?", svc.Name)) {
+						utils.Log("Skipping %s update\n", svc.Name)
+						continue
+					}
+				} else {
+					utils.Log("Skipping %s: already at latest version (%s)\n", svc.Name, currentVer)
+					continue
+				}
+			} else {
+				if currentVer == "" && latestVer != "" {
+					utils.Log("Installing %s (current: none, latest: %s)\n", svc.Name, latestVer)
+				} else {
+					utils.Log("Installing %s\n", svc.Name)
+				}
+			}
+
 			c := exec.Command("sh", "-c", installCmd)
 			c.Env = append(os.Environ(), "HOME="+homeDir)
 			c.Stdout = os.Stderr
 			c.Stderr = os.Stderr
 			if err := c.Run(); err != nil {
-				utils.LogWarn("failed to user-install %s: %v\n", svc.Name, err)
+				utils.LogWarn("Installing %s: error: %v\n", svc.Name, err)
+			} else {
+				utils.Log("Installing %s: ok\n", svc.Name)
 			}
 		}
 	}
