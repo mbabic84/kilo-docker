@@ -1,3 +1,9 @@
+## [2.3.1](https://github.com/mbabic84/kilo-docker/compare/v2.3.0...v2.3.1) (2026-04-05)
+
+### Bug Fixes
+
+* refactor MCP config sync to use env vars and run once ([19c5286](https://github.com/mbabic84/kilo-docker/commit/19c52868b64a6b6561efe24a20ed6c57dfb536ab))
+
 ## [2.3.0](https://github.com/mbabic84/kilo-docker/compare/v2.2.3...v2.3.0) (2026-04-05)
 
 ### Features
