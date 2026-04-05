@@ -94,9 +94,10 @@ func runUserInit() error {
 		os.WriteFile(bashrc, []byte("# ~/.bashrc\n"), 0644)
 	}
 
-	// Copy default config templates if user doesn't have them
-	copyFileIfMissing("/etc/kilo/opencode.json", filepath.Join(homeDir, ".config/kilo/opencode.json"))
-	copyFileIfMissing("/etc/zellij/config.kdl", filepath.Join(homeDir, ".config/zellij/config.kdl"))
+	// Copy default config templates if user doesn't have them.
+	// Templates use 'template-' prefix to avoid being read as system configs.
+	copyFileIfMissing("/etc/kilo/template-opencode.json", filepath.Join(homeDir, ".config/kilo/opencode.json"))
+	copyFileIfMissing("/etc/zellij/template-config.kdl", filepath.Join(homeDir, ".config/zellij/config.kdl"))
 
 	// Setup SSH known_hosts
 	utils.Log("Setting up SSH known_hosts\n")
