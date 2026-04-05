@@ -1,3 +1,9 @@
+## [2.3.3](https://github.com/mbabic84/kilo-docker/compare/v2.3.2...v2.3.3) (2026-04-05)
+
+### Bug Fixes
+
+* trim command output in joinServiceGroups log ([b182689](https://github.com/mbabic84/kilo-docker/commit/b1826890746e3ad325a6b80b0943d0ed078338b3))
+
 ## [2.3.2](https://github.com/mbabic84/kilo-docker/compare/v2.3.1...v2.3.2) (2026-04-05)
 
 ### Bug Fixes
