@@ -1,3 +1,14 @@
+## [2.4.0](https://github.com/mbabic84/kilo-docker/compare/v2.3.3...v2.4.0) (2026-04-05)
+
+### Features
+
+* add docker-buildx plugin installation to docker service ([c8a9df8](https://github.com/mbabic84/kilo-docker/commit/c8a9df8c61a9c7402a392fe54d9a2bbfd2c40c8b))
+* bump Kilo CLI to v7.1.21 ([3a8cdde](https://github.com/mbabic84/kilo-docker/commit/3a8cdde19e444a3dd44c0f533cb44726549c5c56))
+
+### Bug Fixes
+
+* rename config templates to avoid system config override ([9b88325](https://github.com/mbabic84/kilo-docker/commit/9b883251a7b8fbd0ce4f19014f903a1132f3e7e1))
+
 ## [2.3.3](https://github.com/mbabic84/kilo-docker/compare/v2.3.2...v2.3.3) (2026-04-05)
 
 ### Bug Fixes
