@@ -1,3 +1,9 @@
+## [2.2.3](https://github.com/mbabic84/kilo-docker/compare/v2.2.2...v2.2.3) (2026-04-05)
+
+### Bug Fixes
+
+* use correct homeDir when syncing MCP config on session attach ([163b497](https://github.com/mbabic84/kilo-docker/commit/163b49751ee5f8c8fcda07af421cc35fd5b8f56d))
+
 ## [2.2.2](https://github.com/mbabic84/kilo-docker/compare/v2.2.1...v2.2.2) (2026-04-05)
 
 ### Bug Fixes
