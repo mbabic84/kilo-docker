@@ -1,3 +1,9 @@
+## [2.2.0](https://github.com/mbabic84/kilo-docker/compare/v2.1.0...v2.2.0) (2026-04-05)
+
+### Features
+
+* remove --mcp flag, auto-enable MCP based on token presence ([af884c7](https://github.com/mbabic84/kilo-docker/commit/af884c76700ba10a5acbe30bf9a05d64bef02f8a))
+
 ## [2.1.0](https://github.com/mbabic84/kilo-docker/compare/v2.0.4...v2.1.0) (2026-04-04)
 
 ### Features
