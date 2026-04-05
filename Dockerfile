@@ -29,8 +29,10 @@ RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client
     && echo "ALL ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/nopasswd \
     && chmod 0440 /etc/sudoers.d/nopasswd
 
-COPY configs/zellij.kdl /etc/zellij/config.kdl
-COPY configs/opencode.json /etc/kilo/opencode.json
+# Templates for initial user configs - use 'template-' prefix to avoid
+# being read as system configs (which would override user settings).
+COPY configs/zellij.kdl /etc/zellij/template-config.kdl
+COPY configs/opencode.json /etc/kilo/template-opencode.json
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo-real
 COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
 COPY scripts/kilo-wrapper.sh /usr/local/bin/kilo

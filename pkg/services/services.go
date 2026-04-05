@@ -29,6 +29,7 @@ var BuiltInServices = []Service{
 		Install: []string{
 			"command -v docker >/dev/null || (DOCKER_VERSION=$(curl -fsSL https://api.github.com/repos/docker/docker/releases/latest 2>/dev/null | grep -o 'docker-v[0-9.]*' | head -1 | sed 's/docker-v//') && curl -fsSL \"https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz\" -o /tmp/docker.tgz && tar xzf /tmp/docker.tgz -C /tmp && mv /tmp/docker/docker /usr/local/bin/docker && chmod +x /usr/local/bin/docker && rm -rf /tmp/docker*)",
 			"command -v docker-compose >/dev/null || (curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose && mkdir -p /usr/libexec/docker/cli-plugins && ln -sf /usr/local/bin/docker-compose /usr/libexec/docker/cli-plugins/docker-compose)",
+			"command -v docker-buildx >/dev/null || (BUILDX_VERSION=$(curl -fsSL https://api.github.com/repos/docker/buildx/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && BUILDX_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${BUILDX_ARCH}\" -o /tmp/docker-buildx && chmod +x /tmp/docker-buildx && mkdir -p /usr/libexec/docker/cli-plugins && mv /tmp/docker-buildx /usr/libexec/docker/cli-plugins/docker-buildx)",
 		},
 		EnvVars: map[string]string{
 			"DOCKER_ENABLED": "1",
