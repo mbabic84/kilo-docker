@@ -21,7 +21,6 @@ type config struct {
 	once            bool
 	playwright      bool
 	ssh             bool
-	mcp             bool
 	yes             bool
 	network         string
 	networkFlag     bool
@@ -48,8 +47,6 @@ func parseArgs(args []string) config {
 			cfg.playwright = true
 		case "--ssh":
 			cfg.ssh = true
-		case "--mcp":
-			cfg.mcp = true
 		case "--yes", "-y":
 			cfg.yes = true
 		case "--network":

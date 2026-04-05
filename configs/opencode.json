@@ -7,7 +7,7 @@
       "url": "http://{env:KD_AINSTRUCT_BASE_URL}/mcp",
       "enabled": false,
       "headers": {
-        "Authorization": "Bearer {env:KD_AINSTRUCT_TOKEN}"
+        "Authorization": "Bearer {env:KD_MCP_AINSTRUCT_TOKEN}"
       }
     },
     "context7": {
@@ -15,7 +15,7 @@
       "url": "https://mcp.context7.com/mcp",
       "enabled": false,
       "headers": {
-        "Authorization": "Bearer {env:KD_CONTEXT7_TOKEN}"
+        "Authorization": "Bearer {env:KD_MCP_CONTEXT7_TOKEN}"
       }
     },
     "playwright": {

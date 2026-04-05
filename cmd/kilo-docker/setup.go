@@ -70,7 +70,6 @@ func printHelp() {
 	var optLines []string
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--once", "Run a one-time session without persisting data (no volume)"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--port, -p <host:container>", "Map a port (host_port:container_port). Can be specified multiple times"))
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--mcp", "Enable remote MCP servers (Context7, Ainstruct)"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--playwright", "Start a Playwright MCP sidecar container for browser automation"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--ssh", "Enable SSH agent forwarding into the container"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--network <name>", "Connect the container to a Docker network"))
@@ -79,7 +78,6 @@ func printHelp() {
 	var exLines []string
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker", "# start a shell in the container"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --once", "# one-time session"))
-	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --mcp", "# with MCP servers"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --playwright", "# with Playwright browser automation"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --ssh", "# with SSH agent forwarding"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker -p 8080:8080 -p 3000:3000", "# with port mappings"))

@@ -111,60 +111,57 @@ func runUserInit() error {
 	os.Setenv("HOME", homeDir)
 
 	// MCP token initialization and config
-	if os.Getenv("KD_MCP_ENABLED") == "1" {
-		// Set ainstruct token from login PAT immediately so runConfig() can
-		// enable the ainstruct MCP server (config.go checks KD_AINSTRUCT_TOKEN).
-		if loginRes.MCPToken != "" {
-			os.Setenv("KD_AINSTRUCT_TOKEN", loginRes.MCPToken)
-		}
-
-		// Load stored encrypted tokens and set env vars (context7 + sync only).
-		// We intentionally skip ainstruct here — the login's PAT takes precedence.
-		var storedContext7 string
-		if _, encErr := os.Stat(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); encErr == nil {
-			if encData, readErr := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); readErr == nil {
-				if decrypted, decErr := decryptAES(encData, userID); decErr == nil {
-					c7, _, sTok, sRef, sExp, _ := parseTokenEnv(string(decrypted))
-					storedContext7 = c7
-					if c7 != "" {
-						os.Setenv("KD_CONTEXT7_TOKEN", c7)
-					}
-					if sTok != "" {
-						os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", sTok)
-					}
-					if sRef != "" {
-						os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", sRef)
-					}
-					if sExp != "" {
-						os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", sExp)
-					}
+	// Note: KD_MCP_* tokens should ONLY be set by the kilo wrapper script,
+	// not globally. syncMCPConfig() reads directly from encrypted storage.
+	// Load stored encrypted tokens to check if context7 is configured.
+	// Note: KD_MCP_CONTEXT7_TOKEN should ONLY be set by the kilo wrapper script
+	var context7TokenExists bool
+	var context7TokenEmpty bool
+	tokenFilePath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
+	if _, encErr := os.Stat(tokenFilePath); encErr == nil {
+		if encData, readErr := os.ReadFile(tokenFilePath); readErr == nil {
+			if decrypted, decErr := decryptAES(encData, userID); decErr == nil {
+				c7, _, sTok, sRef, sExp, _ := parseTokenEnv(string(decrypted))
+				context7TokenExists = true
+				if c7 == "" {
+					context7TokenEmpty = true
+				}
+				if sTok != "" {
+					os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", sTok)
+				}
+				if sRef != "" {
+					os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", sRef)
+				}
+				if sExp != "" {
+					os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", sExp)
 				}
 			}
 		}
+	}
 
-		// Run MCP config now that token env vars are set
-		utils.Log("Updating MCP config\n")
-		runConfig()
+	// Run MCP config now that token env vars are set
+	utils.Log("Updating MCP config\n")
+	syncMCPConfig()
 
-		// Prompt for Context7 token if not stored and MCP is enabled
-		var context7Token string
-		if storedContext7 != "" {
-			context7Token = storedContext7
-		} else {
-			utils.Log("Initializing MCP tokens\n")
-			context7Token = promptContext7Token()
-			if context7Token != "" {
-				os.Setenv("KD_CONTEXT7_TOKEN", context7Token)
-				// Re-run config to enable Context7 server now that token is set
-				runConfig()
-			}
-		}
+	// Prompt for Context7 token only if never configured (not stored or empty)
+	if context7TokenExists && !context7TokenEmpty {
+		// Token exists and is set - nothing to do
+	} else if context7TokenEmpty {
+		// User explicitly disabled context7, keep it disabled
+		utils.Log("Context7 token explicitly disabled, skipping prompt\n")
+	} else {
+		// Not set (never configured), prompt user to get token
+		utils.Log("Initializing MCP tokens\n")
+		promptContext7Token()
+		// KD_MCP_CONTEXT7_TOKEN should ONLY be set by the kilo wrapper script
+		// Re-run config to enable Context7 server now that token is set
+		syncMCPConfig()
+	}
 
-		// Save all tokens (ainstruct PAT from login + context7 + sync tokens)
-		utils.Log("Saving MCP tokens\n")
-		if err := initTokens(homeDir, userID, loginRes); err != nil {
-			utils.LogWarn("token init failed: %v\n", err)
-		}
+	// Save all tokens (ainstruct PAT from login + context7 + sync tokens)
+	utils.Log("Saving MCP tokens\n")
+	if err := initTokens(homeDir, userID, loginRes); err != nil {
+		utils.LogWarn("token init failed: %v\n", err)
 	}
 
 	// Chown SSH agent socket to the new user
@@ -324,7 +321,7 @@ func initTokens(homeDir, userID string, loginRes loginResult) error {
 
 	// Check env var for newly prompted context7 token (set in runUserInit)
 	if context7Token == "" {
-		if envC7 := os.Getenv("KD_CONTEXT7_TOKEN"); envC7 != "" {
+		if envC7 := os.Getenv("KD_MCP_CONTEXT7_TOKEN"); envC7 != "" {
 			context7Token = envC7
 		}
 	}
@@ -392,13 +389,9 @@ func startSyncWithTokens(homeDir, userID string) error {
 		return nil
 	}
 
-	context7Token, ainstructToken, syncToken, syncRefresh, syncExpiry, _ := parseTokenEnv(string(decrypted))
-	if context7Token != "" {
-		os.Setenv("KD_CONTEXT7_TOKEN", context7Token)
-	}
-	if ainstructToken != "" {
-		os.Setenv("KD_AINSTRUCT_TOKEN", ainstructToken)
-	}
+	_, _, syncToken, syncRefresh, syncExpiry, _ := parseTokenEnv(string(decrypted))
+
+	// Sync tokens are needed globally for file sync - set via os.Setenv
 	if syncToken != "" {
 		os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", syncToken)
 	}
@@ -408,6 +401,8 @@ func startSyncWithTokens(homeDir, userID string) error {
 	if syncExpiry != "" {
 		os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", syncExpiry)
 	}
+	// MCP tokens (context7, ainstruct) should ONLY be set by the kilo wrapper script
+	// Not here - not even for the sync subprocess
 
 	go func() {
 		cmd := exec.Command("kilo-entrypoint", "sync")
@@ -417,4 +412,72 @@ func startSyncWithTokens(homeDir, userID string) error {
 	}()
 
 	return nil
+}
+
+func runMCPTokens() error {
+	homeDir, _, _, userID := loadUserConfig()
+	if homeDir == "" || userID == "" {
+		return fmt.Errorf("no user config found")
+	}
+
+	ainstructToken := os.Getenv("KD_MCP_AINSTRUCT_TOKEN")
+	var context7Token string
+	var syncToken, syncRefresh, syncExpiry string
+
+	if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); err == nil {
+		if decrypted, err := decryptAES(encData, userID); err == nil {
+			c7, aInst, sTok, sRef, sExp, _ := parseTokenEnv(string(decrypted))
+			context7Token = c7
+			if ainstructToken == "" {
+				ainstructToken = aInst
+			}
+			syncToken = sTok
+			syncRefresh = sRef
+			syncExpiry = sExp
+		}
+	}
+
+	fmt.Println("MCP Token Management")
+	fmt.Println("====================")
+	fmt.Println()
+
+	currentContext7 := "[not set]"
+	if context7Token != "" {
+		currentContext7 = maskToken(context7Token)
+	}
+	fmt.Printf("Context7 token: %s\n", currentContext7)
+	fmt.Println("  - Press Enter to keep current")
+	fmt.Println("  - Type a new token to update")
+	fmt.Println("  - Type 'clear' to disable")
+	fmt.Print("> ")
+
+	var input string
+	fmt.Scanln(&input)
+	input = strings.TrimSpace(input)
+
+	if input == "clear" {
+		context7Token = ""
+		fmt.Println("Context7 token disabled")
+	} else if input != "" {
+		context7Token = input
+		fmt.Println("Context7 token updated")
+	}
+
+	if err := saveEncryptedTokens(homeDir, userID, context7Token, ainstructToken, syncToken, syncRefresh, syncExpiry); err != nil {
+		utils.LogWarn("failed to save tokens: %v\n", err)
+	}
+
+	if err := syncMCPConfig(); err != nil {
+		return fmt.Errorf("failed to sync MCP config: %w", err)
+	}
+
+	fmt.Println("MCP config updated")
+	return nil
+}
+
+func maskToken(token string) string {
+	if len(token) <= 8 {
+		return strings.Repeat("*", len(token))
+	}
+	return token[:4] + strings.Repeat("*", len(token)-8) + token[len(token)-4:]
 }

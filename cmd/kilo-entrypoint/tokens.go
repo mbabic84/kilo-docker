@@ -10,7 +10,7 @@ import (
 // saveEncryptedTokens encrypts the MCP and sync tokens with userID as the key
 // and writes them to <home>/.local/share/kilo/.tokens.env.enc.
 func saveEncryptedTokens(home, userID, context7Token, ainstructToken, syncToken, syncRefreshToken, syncTokenExpiry string) error {
-	tokenData := fmt.Sprintf("KD_CONTEXT7_TOKEN=%s\nKD_AINSTRUCT_TOKEN=%s\nKD_AINSTRUCT_SYNC_TOKEN=%s\nKD_AINSTRUCT_SYNC_REFRESH_TOKEN=%s\nKD_AINSTRUCT_SYNC_TOKEN_EXPIRY=%s\n",
+	tokenData := fmt.Sprintf("KD_MCP_CONTEXT7_TOKEN=%s\nKD_MCP_AINSTRUCT_TOKEN=%s\nKD_AINSTRUCT_SYNC_TOKEN=%s\nKD_AINSTRUCT_SYNC_REFRESH_TOKEN=%s\nKD_AINSTRUCT_SYNC_TOKEN_EXPIRY=%s\n",
 		context7Token, ainstructToken, syncToken, syncRefreshToken, syncTokenExpiry)
 	encData, err := encryptAES([]byte(tokenData), userID)
 	if err != nil {
@@ -38,10 +38,10 @@ func loadEncryptedTokens(home, userID string) (context7, ainstruct, syncToken, s
 func parseTokenEnv(data string) (context7, ainstruct, syncToken, syncRefresh, syncExpiry string, err error) {
 	for _, line := range strings.Split(data, "\n") {
 		switch {
-		case strings.HasPrefix(line, "KD_CONTEXT7_TOKEN="):
-			context7 = strings.TrimPrefix(line, "KD_CONTEXT7_TOKEN=")
-		case strings.HasPrefix(line, "KD_AINSTRUCT_TOKEN="):
-			ainstruct = strings.TrimPrefix(line, "KD_AINSTRUCT_TOKEN=")
+		case strings.HasPrefix(line, "KD_MCP_CONTEXT7_TOKEN="):
+			context7 = strings.TrimPrefix(line, "KD_MCP_CONTEXT7_TOKEN=")
+		case strings.HasPrefix(line, "KD_MCP_AINSTRUCT_TOKEN="):
+			ainstruct = strings.TrimPrefix(line, "KD_MCP_AINSTRUCT_TOKEN=")
 		case strings.HasPrefix(line, "KD_AINSTRUCT_SYNC_TOKEN="):
 			syncToken = strings.TrimPrefix(line, "KD_AINSTRUCT_SYNC_TOKEN=")
 		case strings.HasPrefix(line, "KD_AINSTRUCT_SYNC_REFRESH_TOKEN="):

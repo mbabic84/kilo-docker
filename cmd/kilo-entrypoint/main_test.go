@@ -16,16 +16,16 @@ import (
 // internal subcommands are registered in the subcommands map.
 func TestSubcommandsContainsAllInternal(t *testing.T) {
 	expected := []string{
-		"load-tokens",
-		"save-tokens",
 		"ainstruct-login",
 		"update-config",
 		"backup",
 		"restore",
-		"config",
+		"mcp-config",
+		"mcp-tokens",
 		"sync",
 		"resync",
 		"zellij-attach",
+		"print-env",
 		"help",
 	}
 
@@ -83,13 +83,12 @@ func TestSubcommandsExcludesPassThroughCommands(t *testing.T) {
 // NOT passed through to exec.
 func TestResolveCommandInternalSubcommands(t *testing.T) {
 	internal := []string{
-		"load-tokens",
-		"save-tokens",
 		"ainstruct-login",
 		"update-config",
 		"backup",
 		"restore",
-		"config",
+		"mcp-config",
+		"mcp-tokens",
 		"sync",
 		"resync",
 		"zellij-attach",
@@ -200,15 +199,15 @@ func TestPassThroughUnknownBinary(t *testing.T) {
 func TestSubcommandStillDispatched(t *testing.T) {
 	bin := findEntrypointBinary(t)
 
-	// "config" is an internal subcommand. It must NOT be passed through
+	// "mcp-config" is an internal subcommand. It must NOT be passed through
 	// to exec.LookPath — the old error "unknown subcommand or command"
 	// would indicate it was incorrectly treated as pass-through.
-	cmd := exec.Command(bin, "config")
+	cmd := exec.Command(bin, "mcp-config")
 	out, _ := cmd.CombinedOutput()
 	output := string(out)
 
-	if strings.Contains(output, "unknown subcommand or command: config") {
-		t.Fatalf("internal subcommand 'config' was incorrectly passed through to exec:\n%s", output)
+	if strings.Contains(output, "unknown subcommand or command: mcp-config") {
+		t.Fatalf("internal subcommand 'mcp-config' was incorrectly passed through to exec:\n%s", output)
 	}
 }
 

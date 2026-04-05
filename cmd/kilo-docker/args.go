@@ -25,9 +25,6 @@ func serializeArgs(cfg config, sshEnabled bool) string {
 	if sshEnabled {
 		sessionArgs += "--ssh "
 	}
-	if cfg.mcp {
-		sessionArgs += "--mcp "
-	}
 	if cfg.network != "" {
 		sessionArgs += "--network " + cfg.network + " "
 	}
@@ -61,9 +58,6 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 	sessionArgs := serializeArgs(cfg, sshAuthSock != "")
 	args = append(args, "--label", "kilo.args="+sessionArgs)
 
-	if cfg.mcp {
-		args = append(args, "-e", "KD_MCP_ENABLED=1")
-	}
 	if cfg.playwright {
 		args = append(args, "-e", "PLAYWRIGHT_ENABLED=1")
 	}
