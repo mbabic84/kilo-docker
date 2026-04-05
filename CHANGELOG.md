@@ -1,3 +1,9 @@
+## [2.2.2](https://github.com/mbabic84/kilo-docker/compare/v2.2.1...v2.2.2) (2026-04-05)
+
+### Bug Fixes
+
+* remove hardcoded http:// prefix from ainstruct URL ([1445ca6](https://github.com/mbabic84/kilo-docker/commit/1445ca6931063ca2af0ee40da9ca7bb0d03519c6))
+
 ## [2.2.1](https://github.com/mbabic84/kilo-docker/compare/v2.2.0...v2.2.1) (2026-04-05)
 
 ### Bug Fixes
