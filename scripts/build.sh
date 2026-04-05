@@ -2,10 +2,13 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR}")"
+
+NO_CACHE=""
+IMAGE_TAG="ghcr.io/mbabic84/kilo-docker:latest"
 
 usage() {
-    echo "Usage: $0 <command>"
+    echo "Usage: $0 <command> [--no-cache]"
     echo ""
     echo "Commands:"
     echo "  entrypoint   Build kilo-entrypoint binary"
@@ -15,6 +18,9 @@ usage() {
     echo "  tidy         Run go mod tidy"
     echo "  docker       Build Docker image"
     echo "  clean        Remove built binaries"
+    echo ""
+    echo "Options:"
+    echo "  --no-cache   Build Docker image without using cache"
     exit 1
 }
 
@@ -22,7 +28,22 @@ if [ $# -eq 0 ]; then
     usage
 fi
 
-COMMAND="$1"
+COMMAND=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --no-cache)
+            NO_CACHE="--no-cache"
+            ;;
+        *)
+            COMMAND="$1"
+            ;;
+    esac
+    shift
+done
+
+if [ -z "$COMMAND" ]; then
+    usage
+fi
 
 run_go() {
     docker run --rm \
@@ -47,6 +68,12 @@ run_go_env() {
         "$@"
 }
 
+build_image() {
+    echo "Building Docker image..."
+    docker build $NO_CACHE -t "${IMAGE_TAG}" "${PROJECT_DIR}"
+    echo "Image: ${IMAGE_TAG}"
+}
+
 case "$COMMAND" in
     entrypoint)
         echo "Building kilo-entrypoint..."
@@ -65,9 +92,7 @@ case "$COMMAND" in
         run_go_env go build -ldflags="-s -w" -o /build/bin/kilo-docker ./cmd/kilo-docker
         echo "Binaries: bin/kilo-entrypoint, bin/kilo-docker"
         echo ""
-        echo "Building Docker image..."
-        docker build -t ghcr.io/mbabic84/kilo-docker:latest "${PROJECT_DIR}"
-        echo "Image: ghcr.io/mbabic84/kilo-docker:latest"
+        build_image
         ;;
     test)
         echo "Running tests..."
@@ -78,9 +103,7 @@ case "$COMMAND" in
         run_go go mod tidy
         ;;
     docker)
-        echo "Building Docker image..."
-        docker build -t ghcr.io/mbabic84/kilo-docker:latest "${PROJECT_DIR}"
-        echo "Image: ghcr.io/mbabic84/kilo-docker:latest"
+        build_image
         ;;
     clean)
         echo "Cleaning..."

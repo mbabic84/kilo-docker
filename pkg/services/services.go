@@ -11,6 +11,8 @@ type Service struct {
 	Description    string
 	Install        []string
 	UserInstall    []string // Install commands that run after user creation with HOME set to user home
+	VersionCheck   string   // Command to check current version (returns version string or empty)
+	LatestVersion  string   // Command to get latest available version
 	EnvVars        map[string]string
 	HostEnvVars    map[string]string
 	Volumes        []string
@@ -78,9 +80,11 @@ var BuiltInServices = []Service{
 		Name:        "uv",
 		Flag:        "--uv",
 		Description: "Install uv for fast Python package management",
-		Install: []string{
-			"command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh",
+		UserInstall: []string{
+			"curl -LsSf https://astral.sh/uv/install.sh | sh",
 		},
+		VersionCheck:  "[ -f \"$HOME/.local/bin/uv\" ] && \"$HOME/.local/bin/uv\" --version 2>/dev/null | awk '{print $2}'",
+		LatestVersion: "curl -s https://api.github.com/repos/astral-sh/uv/releases/latest | grep '\"tag_name\":' | sed 's/.*\"v*\\([0-9.]*\\)\".*/\\1/'",
 		EnvVars: map[string]string{
 			"UV_ENABLED": "1",
 		},
@@ -92,9 +96,10 @@ var BuiltInServices = []Service{
 		Flag:        "--nvm",
 		Description: "Install NVM (Node Version Manager) for managing Node.js versions",
 		UserInstall: []string{
-			"[ -d ~/.nvm ] || (curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash)",
-			"grep -q 'nvm.sh' ~/.bashrc 2>/dev/null || printf '\\nexport NVM_DIR=\"$HOME/.nvm\"\\nexport NVM_NODEJS_ORG_MIRROR=\"https://unofficial-builds.nodejs.org/download/release\"\\n[ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\"\\n[ -s \"$NVM_DIR/bash_completion\" ] && . \"$NVM_DIR/bash_completion\"\\n' >> ~/.bashrc",
+			"curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash",
 		},
+		VersionCheck:  "[ -d \"$HOME/.nvm\" ] && git -C \"$HOME/.nvm\" describe --tags 2>/dev/null | sed 's/v//' || echo \"\"",
+		LatestVersion: "curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep '\"tag_name\":' | sed 's/.*v\\([0-9.]*\\).*/\\1/'",
 		EnvVars: map[string]string{
 			"NVM_NODEJS_ORG_MIRROR": "https://unofficial-builds.nodejs.org/download/release",
 		},
