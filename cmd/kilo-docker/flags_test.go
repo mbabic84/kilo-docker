@@ -71,14 +71,11 @@ func TestParseFlagsYesWithOtherFlags(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	os.Args = []string{"kilo-docker", "--mcp", "-y", "--docker", "install"}
+	os.Args = []string{"kilo-docker", "-y", "--docker", "install"}
 	cfg := parseFlags()
 
 	if !cfg.yes {
 		t.Error("expected cfg.yes = true")
-	}
-	if !cfg.mcp {
-		t.Error("expected cfg.mcp = true")
 	}
 	if !isServiceEnabled(cfg, "docker") {
 		t.Error("expected docker service to be enabled")
@@ -277,12 +274,9 @@ func TestParseFlagsPortWithOtherFlags(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	os.Args = []string{"kilo-docker", "--mcp", "-p", "8080:80", "--docker", "install"}
+	os.Args = []string{"kilo-docker", "-p", "8080:80", "--docker", "install"}
 	cfg := parseFlags()
 
-	if !cfg.mcp {
-		t.Error("expected cfg.mcp = true")
-	}
 	if len(cfg.ports) != 1 || cfg.ports[0] != "8080:80" {
 		t.Errorf("expected ports = [8080:80], got %v", cfg.ports)
 	}

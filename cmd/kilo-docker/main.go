@@ -13,7 +13,6 @@
 //
 //	--once            One-time session (no volume)
 //	--port, -p        Map a port (host_port:container_port), repeatable
-//	--mcp             Enable MCP servers (Context7, Ainstruct)
 //	--playwright      Start Playwright MCP sidecar
 //	--ssh             Enable SSH agent forwarding
 //	--network <name>  Connect to a Docker network

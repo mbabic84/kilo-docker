@@ -171,10 +171,9 @@ func TestSerializeArgsCombined(t *testing.T) {
 		once:            true,
 		enabledServices: []string{"docker"},
 		playwright:      true,
-		mcp:             true,
 	}
 	result := serializeArgs(cfg, true)
-	expected := "--once --docker --playwright --ssh --mcp"
+	expected := "--once --docker --playwright --ssh"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
 	}

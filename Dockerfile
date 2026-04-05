@@ -29,8 +29,11 @@ RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client
 
 COPY configs/zellij.kdl /etc/zellij/config.kdl
 COPY configs/opencode.json /etc/kilo/opencode.json
-COPY --from=builder /tmp/kilo /usr/local/bin/kilo
+COPY --from=builder /tmp/kilo /usr/local/bin/kilo-real
 COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
+COPY scripts/kilo-wrapper.sh /usr/local/bin/kilo
+
+RUN chmod +x /usr/local/bin/kilo /usr/local/bin/kilo-real
 
 ENV SHELL=/bin/bash
 ENV KD_AINSTRUCT_BASE_URL=${AINSTRUCT_BASE_URL}

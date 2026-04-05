@@ -9,30 +9,32 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
-// runConfig toggles MCP server enabled/disabled state in the user's
-// opencode.json based on environment variables.
-func runConfig() error {
-	mcpEnabled := os.Getenv("KD_MCP_ENABLED") == "1"
-
-	mapping := map[string]string{
-		"ainstruct": "KD_AINSTRUCT_TOKEN",
-		"context7":  "KD_CONTEXT7_TOKEN",
-	}
-
+func syncMCPConfig() error {
 	playwrightEnabled := os.Getenv("PLAYWRIGHT_ENABLED") == "1"
 
+	context7Set := false
+	ainstructSet := false
+
+	// Load tokens from encrypted file (source of truth)
+	homeDir, _, _, userID := loadUserConfig()
+	if homeDir != "" && userID != "" {
+		if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); err == nil {
+			if decrypted, err := decryptAES(encData, userID); err == nil {
+				c7, aInst, _, _, _, _ := parseTokenEnv(string(decrypted))
+				context7Set = c7 != ""
+				ainstructSet = aInst != ""
+			}
+		}
+	}
+
 	configPath := filepath.Join(constants.GetKiloConfigDir(), "opencode.json")
-	if err := applyConfigFilter(configPath, mapping, mcpEnabled, playwrightEnabled); err != nil {
+	if err := applyConfigFilter(configPath, playwrightEnabled, context7Set, ainstructSet); err != nil {
 		utils.LogWarn("config error for %s: %v\n", configPath, err)
 	}
 	return nil
 }
 
-// applyConfigFilter reads a JSON config file and toggles MCP server entries
-// based on environment variables. The mapping connects server names to their
-// token env vars; when mcpEnabled is true, servers with non-empty token env
-// vars are enabled; Playwright is toggled separately via PLAYWRIGHT_ENABLED.
-func applyConfigFilter(configPath string, mapping map[string]string, mcpEnabled, playwrightEnabled bool) error {
+func applyConfigFilter(configPath string, playwrightEnabled, context7Set, ainstructSet bool) error {
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -63,9 +65,10 @@ func applyConfigFilter(configPath string, mapping map[string]string, mcpEnabled,
 
 		if key == "playwright" {
 			entry["enabled"] = playwrightEnabled
-		} else if envVar, exists := mapping[key]; exists {
-			tokenSet := os.Getenv(envVar) != ""
-			entry["enabled"] = mcpEnabled && tokenSet
+		} else if key == "context7" {
+			entry["enabled"] = context7Set
+		} else if key == "ainstruct" {
+			entry["enabled"] = ainstructSet
 		}
 
 		mcp[key] = entry

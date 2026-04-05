@@ -6,13 +6,12 @@
 //
 // When invoked with a subcommand, it delegates to the appropriate handler:
 //
-//	load-tokens     Read token env file, output KEY=VALUE to stdout
-//	save-tokens     Read KEY=VALUE from stdin, write to token file
 //	ainstruct-login Authenticate with Ainstruct API, output structured result
 //	update-config   Download config template, merge with existing config
 //	backup          Create tar.gz of KILO_HOME
 //	restore         Extract tar.gz into KILO_HOME with ownership fix
-//	config          Toggle MCP servers based on environment variables
+//	mcp-config      Sync MCP servers based on current token environment
+//	mcp-tokens      Interactive token management
 //	sync            Start ainstruct file watcher + REST sync
 //	resync          Delete all remote documents and re-push local files
 package main
@@ -28,16 +27,16 @@ import (
 // Any argument NOT in this map is passed through to exec.LookPath for
 // direct binary execution (e.g. "kilo", "sh", "bash").
 var subcommands = map[string]bool{
-	"load-tokens":     true,
-	"save-tokens":     true,
 	"ainstruct-login": true,
 	"update-config":   true,
 	"backup":          true,
 	"restore":         true,
-	"config":          true,
+	"mcp-config":      true,
+	"mcp-tokens":      true,
 	"sync":            true,
 	"resync":          true,
 	"zellij-attach":   true,
+	"print-env":       true,
 	"help":            true,
 }
 
@@ -66,19 +65,34 @@ func runHelp() {
 	fmt.Println("")
 	fmt.Println("Subcommands:")
 	fmt.Printf("  %-*s %s\n", w, "help", "Show this help message")
-	fmt.Printf("  %-*s %s\n", w, "load-tokens", "Read token env file, output KEY=VALUE to stdout")
-	fmt.Printf("  %-*s %s\n", w, "save-tokens", "Read KEY=VALUE from stdin, write to token file")
 	fmt.Printf("  %-*s %s\n", w, "ainstruct-login", "Authenticate with Ainstruct API, output structured result")
 	fmt.Printf("  %-*s %s\n", w, "update-config", "Download config template, merge with existing config")
 	fmt.Printf("  %-*s %s\n", w, "backup [path]", "Create tar.gz of KILO_HOME (default: /tmp/backup.tar.gz)")
 	fmt.Printf("  %-*s %s\n", w, "restore [path]", "Extract tar.gz into KILO_HOME with ownership fix")
-	fmt.Printf("  %-*s %s\n", w, "config", "Toggle MCP servers based on environment variables")
+	fmt.Printf("  %-*s %s\n", w, "mcp-config", "Sync MCP servers based on current token environment")
+	fmt.Printf("  %-*s %s\n", w, "mcp-tokens", "Interactive token management")
 	fmt.Printf("  %-*s %s\n", w, "sync", "Start ainstruct file watcher + REST sync")
 	fmt.Printf("  %-*s %s\n", w, "resync", "Delete all remote documents and re-push local files")
 	fmt.Printf("  %-*s %s\n", w, "zellij-attach", "Attach to existing zellij session")
+	fmt.Printf("  %-*s %s\n", w, "print-env", "Print export statements for current tokens")
 	fmt.Println("")
 	fmt.Println("Any other argument is passed through to exec.LookPath for")
 	fmt.Println("direct binary execution (e.g. \"kilo\", \"sh\", \"bash\").")
+}
+
+func runPrintEnv() {
+	homeDir, _, _, userID := loadUserConfig()
+	if homeDir == "" || userID == "" {
+		return
+	}
+
+	context7, ainstruct, _, _, _, err := loadEncryptedTokens(homeDir, userID)
+	if err != nil {
+		return
+	}
+
+	fmt.Printf("export KD_MCP_CONTEXT7_TOKEN=%q\n", context7)
+	fmt.Printf("export KD_MCP_AINSTRUCT_TOKEN=%q\n", ainstruct)
 }
 
 func main() {
@@ -105,16 +119,6 @@ func main() {
 	}
 
 	switch name {
-	case "load-tokens":
-		if err := runLoadTokens(); err != nil {
-			fmt.Fprintf(os.Stderr, "load-tokens error: %v\n", err)
-			os.Exit(1)
-		}
-	case "save-tokens":
-		if err := runSaveTokens(); err != nil {
-			fmt.Fprintf(os.Stderr, "save-tokens error: %v\n", err)
-			os.Exit(1)
-		}
 	case "ainstruct-login":
 		if err := runAinstructLogin(); err != nil {
 			fmt.Fprintf(os.Stderr, "STATUS=error\nERROR=%v\n", err)
@@ -143,9 +147,14 @@ func main() {
 			fmt.Fprintf(os.Stderr, "restore error: %v\n", err)
 			os.Exit(1)
 		}
-	case "config":
-		if err := runConfig(); err != nil {
-			fmt.Fprintf(os.Stderr, "config error: %v\n", err)
+	case "mcp-config":
+		if err := syncMCPConfig(); err != nil {
+			fmt.Fprintf(os.Stderr, "mcp-config error: %v\n", err)
+			os.Exit(1)
+		}
+	case "mcp-tokens":
+		if err := runMCPTokens(); err != nil {
+			fmt.Fprintf(os.Stderr, "mcp-tokens error: %v\n", err)
 			os.Exit(1)
 		}
 	case "sync":
@@ -163,6 +172,8 @@ func main() {
 			fmt.Fprintf(os.Stderr, "zellij-attach error: %v\n", err)
 			os.Exit(1)
 		}
+	case "print-env":
+		runPrintEnv()
 	case "help":
 		runHelp()
 	}

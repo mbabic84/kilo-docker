@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
@@ -79,7 +78,7 @@ func loadUserConfig() (homeDir, username, shell, userID string) {
 // from the persisted user config, and drops privileges to the user.
 func execZellij() error {
 	// Load user configuration to set environment variables and drop privileges
-	homeDir, username, shell, userID := loadUserConfig()
+	homeDir, username, shell, _ := loadUserConfig()
 	
 	// If no user config found, we can't properly run as user
 	if homeDir == "" || username == "" {
@@ -119,41 +118,12 @@ func execZellij() error {
 		env = appendOrReplaceEnv(env, "SHELL", shell)
 	}
 	
-	// Load MCP token env vars from encrypted storage so they are available
-	// to zellij and child processes (Kilo). The tokens were set via
-	// os.Setenv() during first-time init but are absent in subsequent
-	// docker exec processes — we must re-read them from the volume.
-	if homeDir != "" && userID != "" {
-		if context7, ainstruct, syncToken, syncRefresh, syncExpiry, err := loadEncryptedTokens(homeDir, userID); err == nil {
-			utils.Log("Loaded MCP tokens from encrypted storage\n")
-			status := ""
-			if ainstruct != "" {
-				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_TOKEN", ainstruct)
-				status += "ainstruct=ok "
-			}
-			if context7 != "" {
-				env = appendOrReplaceEnv(env, "KD_CONTEXT7_TOKEN", context7)
-				status += "context7=ok "
-			}
-			if syncToken != "" {
-				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_SYNC_TOKEN", syncToken)
-				status += "sync=ok "
-			}
-			if syncRefresh != "" {
-				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_SYNC_REFRESH_TOKEN", syncRefresh)
-			}
-			if syncExpiry != "" {
-				env = appendOrReplaceEnv(env, "KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", syncExpiry)
-			}
-			if status != "" {
-				utils.Log("MCP Token status: %s\n", strings.TrimSpace(status))
-			}
-		} else {
-			utils.LogWarn("failed to load MCP tokens: %v\n", err)
-		}
-	} else {
-		utils.LogWarn("cannot load tokens — homeDir=%q userID=%q\n", homeDir, utils.RedactID(userID))
-	}
+	// Sync MCP config to ensure opencode.json reflects current token state
+	// Note: KD_MCP_* tokens are NOT set globally - they are loaded only by
+	// kilo-wrapper.sh when starting Kilo sessions. syncMCPConfig() reads
+	// tokens directly from encrypted storage, not from environment variables.
+	utils.Log("Syncing MCP config\n")
+	syncMCPConfig()
 	
 	utils.Log("Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
 	return syscall.Exec("/usr/local/bin/zellij", []string{"zellij", "attach", "--create", "kilo-docker"}, env)
