@@ -294,30 +294,34 @@ func expandHome(path, home string) string {
 func setupServiceGroups() error {
 	servicesEnv := os.Getenv("KD_SERVICES")
 	if servicesEnv == "" {
+		utils.Log("setupServiceGroups: no services enabled\n")
 		return nil
 	}
+	utils.Log("setupServiceGroups: services=%s\n", servicesEnv)
 
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil || svc.RequiresSocket == "" {
+			utils.Log("setupServiceGroups: skipping %s (no socket required)\n", svcName)
 			continue
 		}
 		gid := os.Getenv(svc.GIDEnvVar)
 		if gid == "" {
+			utils.Log("setupServiceGroups: skipping %s (no GID env var)\n", svcName)
 			continue
 		}
+		utils.Log("setupServiceGroups: creating group %s with GID %s\n", svc.Name, gid)
+		// Try to create the group; if it fails (e.g., GID already exists),
+		// joinServiceGroups will handle adding the user to the existing group.
 		cmd := exec.Command("addgroup", "-g", gid, svc.Name)
-		if err := cmd.Run(); err == nil {
-			continue
-		}
-		cmd2 := exec.Command("getent", "group", gid)
-		out, err := cmd2.Output()
-		if err != nil {
-			continue
-		}
-		parts := strings.SplitN(string(out), ":", 2)
-		if len(parts) > 0 && parts[0] != "" {
-			_ = parts[0] // group exists, service groups will be joined in userinit
+		if err := cmd.Run(); err != nil {
+			utils.Log("setupServiceGroups: failed to create group %s (GID %s): %v\n", svc.Name, gid, err)
+			// Check what group already has this GID
+			if out, err := exec.Command("getent", "group", gid).Output(); err == nil {
+				utils.Log("setupServiceGroups: GID %s already assigned to: %s\n", gid, strings.TrimSpace(string(out)))
+			}
+		} else {
+			utils.Log("setupServiceGroups: created group %s with GID %s\n", svc.Name, gid)
 		}
 	}
 	return nil
