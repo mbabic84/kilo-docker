@@ -87,7 +87,7 @@ func TestInstallServicesMultipleServices(t *testing.T) {
 	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
 	defer func() { servicesMarkerPath = orig }()
 
-	os.Setenv("KD_SERVICES", "docker,zellij")
+	os.Setenv("KD_SERVICES", "docker,gh")
 	defer os.Unsetenv("KD_SERVICES")
 
 	err := installServices()
@@ -104,7 +104,7 @@ func TestInstallServicesMarkerSkipsReinstall(t *testing.T) {
 	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
 	defer func() { servicesMarkerPath = orig }()
 
-	os.Setenv("KD_SERVICES", "zellij")
+	os.Setenv("KD_SERVICES", "gh")
 	defer os.Unsetenv("KD_SERVICES")
 
 	// First call should install and write marker.
@@ -116,8 +116,8 @@ func TestInstallServicesMarkerSkipsReinstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marker file not created: %v", err)
 	}
-	if strings.TrimSpace(string(data)) != "zellij" {
-		t.Errorf("marker content = %q, want %q", strings.TrimSpace(string(data)), "zellij")
+	if strings.TrimSpace(string(data)) != "gh" {
+		t.Errorf("marker content = %q, want %q", strings.TrimSpace(string(data)), "gh")
 	}
 
 	// Second call should detect the marker and skip installation.
@@ -134,14 +134,14 @@ func TestInstallServicesChangedServicesReinstalls(t *testing.T) {
 	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
 	defer func() { servicesMarkerPath = orig }()
 
-	// Install with "zellij".
-	os.Setenv("KD_SERVICES", "zellij")
+	// Install with "gh".
+	os.Setenv("KD_SERVICES", "gh")
 	if err := installServices(); err != nil {
 		t.Fatalf("first installServices() error = %v", err)
 	}
 
-	// Change to "zellij,gh" — should reinstall.
-	os.Setenv("KD_SERVICES", "zellij,gh")
+	// Change to "gh,node" — should reinstall.
+	os.Setenv("KD_SERVICES", "gh,node")
 	defer os.Unsetenv("KD_SERVICES")
 
 	if err := installServices(); err != nil {
@@ -152,8 +152,8 @@ func TestInstallServicesChangedServicesReinstalls(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marker file not readable: %v", err)
 	}
-	if strings.TrimSpace(string(data)) != "zellij,gh" {
-		t.Errorf("marker content = %q, want %q", strings.TrimSpace(string(data)), "zellij,gh")
+	if strings.TrimSpace(string(data)) != "gh,node" {
+		t.Errorf("marker content = %q, want %q", strings.TrimSpace(string(data)), "gh,node")
 	}
 }
 
@@ -175,37 +175,6 @@ func TestCopyServiceConfigsUnknownService(t *testing.T) {
 	}
 }
 
-func TestCopyServiceConfigsZellijCreatesConfig(t *testing.T) {
-	tmpDir := t.TempDir()
-	homeDir := filepath.Join(tmpDir, "user")
-	if err := os.MkdirAll(homeDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	configDir := filepath.Join(homeDir, ".config", "zellij")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		t.Fatal(err)
-	}
-
-	srcFile := filepath.Join(configDir, "config.kdl")
-	if err := os.WriteFile(srcFile, []byte("test config"), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	os.Setenv("KD_SERVICES", "zellij")
-	defer os.Unsetenv("KD_SERVICES")
-
-	err := copyServiceConfigs(homeDir)
-	if err != nil {
-		t.Errorf("copyServiceConfigs() error = %v", err)
-	}
-
-	dstFile := filepath.Join(homeDir, ".config", "zellij", "config.kdl")
-	if _, err := os.Stat(dstFile); os.IsNotExist(err) {
-		t.Error("expected config file to be copied")
-	}
-}
-
 func TestCopyServiceConfigsSkipsExisting(t *testing.T) {
 	tmpDir := t.TempDir()
 	homeDir := filepath.Join(tmpDir, "user")
@@ -213,22 +182,22 @@ func TestCopyServiceConfigsSkipsExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	configDir := filepath.Join(homeDir, ".config", "zellij")
+	configDir := filepath.Join(homeDir, ".config", "gh")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	srcFile := filepath.Join(configDir, "config.kdl")
+	srcFile := filepath.Join(configDir, "config.yml")
 	if err := os.WriteFile(srcFile, []byte("source config"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	dstFile := filepath.Join(configDir, "config.kdl")
+	dstFile := filepath.Join(configDir, "config.yml")
 	if err := os.WriteFile(dstFile, []byte("existing config"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	os.Setenv("KD_SERVICES", "zellij")
+	os.Setenv("KD_SERVICES", "gh")
 	defer os.Unsetenv("KD_SERVICES")
 
 	err := copyServiceConfigs(homeDir)
