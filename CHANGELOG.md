@@ -1,3 +1,9 @@
+## [2.3.2](https://github.com/mbabic84/kilo-docker/compare/v2.3.1...v2.3.2) (2026-04-05)
+
+### Bug Fixes
+
+* add user to correct group for Docker socket access ([e4ed393](https://github.com/mbabic84/kilo-docker/commit/e4ed3936a9fa36bbb7aa4dffe2e1b0add0f64265))
+
 ## [2.3.1](https://github.com/mbabic84/kilo-docker/compare/v2.3.0...v2.3.1) (2026-04-05)
 
 ### Bug Fixes
