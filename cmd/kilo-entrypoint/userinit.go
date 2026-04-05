@@ -297,7 +297,7 @@ func joinServiceGroups(username string) {
 			utils.Log("joinServiceGroups: added %s to %s\n", username, svc.Name)
 			continue
 		} else {
-			utils.Log("joinServiceGroups: failed to add %s to %s: %v, output: %s\n", username, svc.Name, err, string(out))
+			utils.Log("joinServiceGroups: failed to add %s to %s: %v, output: %s\n", username, svc.Name, err, strings.TrimSpace(string(out)))
 		}
 
 		// If that failed, check if a group with the target GID already exists
