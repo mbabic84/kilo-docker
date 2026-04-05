@@ -28,6 +28,8 @@ import (
 //   - Privilege drop to the created user
 //   - Exec zellij
 func runUserInit() error {
+	utils.Log("runUserInit: starting initialization\n")
+
 	puidStr := os.Getenv("PUID")
 	if puidStr == "" {
 		puidStr = "1000"
@@ -38,6 +40,8 @@ func runUserInit() error {
 	}
 	puid, _ := strconv.Atoi(puidStr)
 	pgid, _ := strconv.Atoi(pgidStr)
+
+	utils.Log("runUserInit: PUID=%s, PGID=%s\n", puidStr, pgidStr)
 
 	existingUser := findExistingUser()
 	if existingUser != "" {
@@ -166,6 +170,7 @@ func runUserInit() error {
 	os.Setenv("HOME", savedHome)
 
 	// Mark initialized
+	utils.Log("Marking container as initialized: %s\n", initMarker)
 	os.WriteFile(initMarker, []byte("1\n"), 0644)
 
 	// Persist user configuration for re-attach
@@ -209,8 +214,22 @@ func runUserInit() error {
 	utils.Log("Setting ownership: %s\n", homeDir)
 	chownRecursive(homeDir, puid, pgid)
 
+	// Get supplementary groups for the user before dropping privileges
+	utils.Log("Getting supplementary groups for %s\n", username)
+	suppGroups := getUserGroups(username)
+	utils.Log("Supplementary groups for %s: %v\n", username, suppGroups)
+
 	// Drop privileges and exec zellij
 	utils.Log("Dropping privileges to %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
+	
+	// Set supplementary groups BEFORE setting gid/uid
+	if len(suppGroups) > 0 {
+		utils.Log("Setting supplementary groups: %v\n", suppGroups)
+		if err := syscall.Setgroups(suppGroups); err != nil {
+			utils.LogWarn("Failed to set supplementary groups: %v\n", err)
+		}
+	}
+	
 	syscall.Setgid(pgid)
 	syscall.Setuid(puid)
 
@@ -255,19 +274,96 @@ func copyFileIfMissing(src, dst string) {
 	utils.Log("Copied %s\n", filepath.Base(src))
 }
 
-// joinServiceGroups adds the user to service groups created by init.
+// joinServiceGroups adds the user to service groups for socket access.
+// If a group with the target GID already exists (different name), uses that group.
 func joinServiceGroups(username string) {
 	servicesEnv := os.Getenv("KD_SERVICES")
 	if servicesEnv == "" {
+		utils.Log("joinServiceGroups: no services enabled\n")
 		return
 	}
+	utils.Log("joinServiceGroups: services=%s, user=%s\n", servicesEnv, username)
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil || svc.RequiresSocket == "" {
+			utils.Log("joinServiceGroups: skipping %s (no socket required)\n", svcName)
 			continue
 		}
-		exec.Command("addgroup", username, svc.Name).Run()
+
+		// First try to add to the service-named group
+		utils.Log("joinServiceGroups: trying addgroup %s %s\n", username, svc.Name)
+		cmd1 := exec.Command("addgroup", username, svc.Name)
+		if out, err := cmd1.CombinedOutput(); err == nil {
+			utils.Log("joinServiceGroups: added %s to %s\n", username, svc.Name)
+			continue
+		} else {
+			utils.Log("joinServiceGroups: failed to add %s to %s: %v, output: %s\n", username, svc.Name, err, string(out))
+		}
+
+		// If that failed, check if a group with the target GID already exists
+		gid := os.Getenv(svc.GIDEnvVar)
+		if gid == "" {
+			utils.Log("joinServiceGroups: no GID env var for %s\n", svc.Name)
+			continue
+		}
+		utils.Log("joinServiceGroups: looking up GID %s for service %s\n", gid, svc.Name)
+
+		cmd := exec.Command("getent", "group", gid)
+		out, err := cmd.Output()
+		if err != nil {
+			utils.Log("joinServiceGroups: getent group %s failed: %v\n", gid, err)
+			continue
+		}
+
+		parts := strings.SplitN(string(out), ":", 2)
+		utils.Log("joinServiceGroups: getent returned: %s\n", strings.TrimSpace(string(out)))
+		if len(parts) > 0 && parts[0] != "" && parts[0] != svc.Name {
+			// Add user to the existing group with matching GID
+			utils.Log("joinServiceGroups: adding %s to existing group %s\n", username, parts[0])
+			if err := exec.Command("addgroup", username, parts[0]).Run(); err != nil {
+				utils.Log("joinServiceGroups: failed to add %s to %s: %v\n", username, parts[0], err)
+			} else {
+				utils.Log("joinServiceGroups: successfully added %s to %s\n", username, parts[0])
+			}
+		}
 	}
+}
+
+// getUserGroups returns a list of supplementary group IDs for the given user.
+// Uses getent to read the group database.
+func getUserGroups(username string) []int {
+	var groups []int
+	
+	// Read /etc/group to find all groups the user belongs to
+	data, err := os.ReadFile("/etc/group")
+	if err != nil {
+		utils.LogWarn("Failed to read /etc/group: %v\n", err)
+		return groups
+	}
+	
+	for _, line := range strings.Split(string(data), "\n") {
+		// Format: groupname:password:GID:user1,user2,...
+		parts := strings.Split(line, ":")
+		if len(parts) < 4 {
+			continue
+		}
+		
+		gid, err := strconv.Atoi(parts[2])
+		if err != nil {
+			continue
+		}
+		
+		// Check if user is in this group
+		members := strings.Split(parts[3], ",")
+		for _, member := range members {
+			if strings.TrimSpace(member) == username {
+				groups = append(groups, gid)
+				break
+			}
+		}
+	}
+	
+	return groups
 }
 
 // initTokens merges the MCP token from login with any existing encrypted

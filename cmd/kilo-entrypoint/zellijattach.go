@@ -16,11 +16,12 @@ const initMarker = "/tmp/.kilo-initialized"
 // If the container is already initialized, it execs zellij directly.
 // Otherwise it runs the first-time user init flow.
 func runZellijAttach() error {
+	utils.Log("runZellijAttach: checking init marker at %s\n", initMarker)
 	if _, err := os.Stat(initMarker); err == nil {
-		utils.Log("Container already initialized, attaching zellij\n")
+		utils.Log("runZellijAttach: init marker found, container already initialized\n")
 		return execZellij()
 	}
-	utils.Log("First-time initialization\n")
+	utils.Log("runZellijAttach: init marker not found, running first-time initialization\n")
 	return runUserInit()
 }
 
