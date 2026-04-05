@@ -1,3 +1,9 @@
+## [2.2.1](https://github.com/mbabic84/kilo-docker/compare/v2.2.0...v2.2.1) (2026-04-05)
+
+### Bug Fixes
+
+* **zellij:** disable auto copy on select ([7b94357](https://github.com/mbabic84/kilo-docker/commit/7b94357b3607202e785c39ee0209351b9c0aef48))
+
 ## [2.2.0](https://github.com/mbabic84/kilo-docker/compare/v2.1.0...v2.2.0) (2026-04-05)
 
 ### Features
