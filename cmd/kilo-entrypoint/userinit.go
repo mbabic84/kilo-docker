@@ -141,7 +141,7 @@ func runUserInit() error {
 
 	// Run MCP config now that token env vars are set
 	utils.Log("Updating MCP config\n")
-	syncMCPConfig()
+	syncMCPConfig(homeDir)
 
 	// Prompt for Context7 token only if never configured (not stored or empty)
 	if context7TokenExists && !context7TokenEmpty {
@@ -155,7 +155,7 @@ func runUserInit() error {
 		promptContext7Token()
 		// KD_MCP_CONTEXT7_TOKEN should ONLY be set by the kilo wrapper script
 		// Re-run config to enable Context7 server now that token is set
-		syncMCPConfig()
+		syncMCPConfig(homeDir)
 	}
 
 	// Save all tokens (ainstruct PAT from login + context7 + sync tokens)
@@ -467,7 +467,7 @@ func runMCPTokens() error {
 		utils.LogWarn("failed to save tokens: %v\n", err)
 	}
 
-	if err := syncMCPConfig(); err != nil {
+	if err := syncMCPConfig(homeDir); err != nil {
 		return fmt.Errorf("failed to sync MCP config: %w", err)
 	}
 

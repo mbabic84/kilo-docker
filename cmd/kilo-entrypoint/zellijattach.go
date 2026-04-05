@@ -123,7 +123,7 @@ func execZellij() error {
 	// kilo-wrapper.sh when starting Kilo sessions. syncMCPConfig() reads
 	// tokens directly from encrypted storage, not from environment variables.
 	utils.Log("Syncing MCP config\n")
-	syncMCPConfig()
+	syncMCPConfig(homeDir)
 	
 	utils.Log("Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
 	return syscall.Exec("/usr/local/bin/zellij", []string{"zellij", "attach", "--create", "kilo-docker"}, env)

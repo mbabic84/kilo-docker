@@ -5,18 +5,24 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mbabic84/kilo-docker/pkg/constants"
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
-func syncMCPConfig() error {
+// syncMCPConfig updates the opencode.json MCP configuration based on token state.
+// If homeDir is empty, it loads from user config.
+func syncMCPConfig(homeDir string) error {
 	playwrightEnabled := os.Getenv("PLAYWRIGHT_ENABLED") == "1"
 
 	context7Set := false
 	ainstructSet := false
 
 	// Load tokens from encrypted file (source of truth)
-	homeDir, _, _, userID := loadUserConfig()
+	var userID string
+	if homeDir == "" {
+		homeDir, _, _, userID = loadUserConfig()
+	} else {
+		_, _, _, userID = loadUserConfig()
+	}
 	if homeDir != "" && userID != "" {
 		if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); err == nil {
 			if decrypted, err := decryptAES(encData, userID); err == nil {
@@ -27,7 +33,7 @@ func syncMCPConfig() error {
 		}
 	}
 
-	configPath := filepath.Join(constants.GetKiloConfigDir(), "opencode.json")
+	configPath := filepath.Join(homeDir, ".config", "kilo", "opencode.json")
 	if err := applyConfigFilter(configPath, playwrightEnabled, context7Set, ainstructSet); err != nil {
 		utils.LogWarn("config error for %s: %v\n", configPath, err)
 	}

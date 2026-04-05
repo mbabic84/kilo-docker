@@ -148,7 +148,7 @@ func main() {
 			os.Exit(1)
 		}
 	case "mcp-config":
-		if err := syncMCPConfig(); err != nil {
+		if err := syncMCPConfig(""); err != nil {
 			fmt.Fprintf(os.Stderr, "mcp-config error: %v\n", err)
 			os.Exit(1)
 		}
