@@ -1,3 +1,9 @@
+## [2.7.1](https://github.com/mbabic84/kilo-docker/compare/v2.7.0...v2.7.1) (2026-04-06)
+
+### Bug Fixes
+
+* update test expectations for 5 go install commands ([751424a](https://github.com/mbabic84/kilo-docker/commit/751424ae22944650f838a9c53fb494edc93d4e1b))
+
 ## [2.7.0](https://github.com/mbabic84/kilo-docker/compare/v2.6.0...v2.7.0) (2026-04-06)
 
 ### Features
