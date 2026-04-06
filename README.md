@@ -71,13 +71,36 @@ On first run, the binary prompts for MCP server tokens and saves them to a named
 | Option | Description |
 |--------|-------------|
 | `--once` | Run a one-time session without persistence (no volume) |
-| `--password`, `-p` | Protect volume with a password (encrypts tokens, derives volume name from password) |
+| `--volume` | Mount a volume (host_path:container_path), repeatable |
+| `--password` | Protect volume with a password (encrypts tokens, derives volume name from password) |
 | `--ainstruct` | Authenticate with Ainstruct API (volume from user_id, tokens encrypted, file sync enabled) |
 | `--mcp` | Enable MCP servers (prompts for Context7 and Ainstruct API tokens) |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--ssh` | Enable SSH agent forwarding into the container |
 | `--network <name>` | Attach to a specific Docker network |
 | `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
+
+### Volume Mounts
+
+Use `--volume` (or `-v`) to mount additional host directories or files into the container:
+
+```bash
+# Mount a single directory
+kilo-docker --volume /host/data:/container/data
+
+# Mount multiple volumes
+kilo-docker -v /host/cache:/cache -v ~/.config:/home/kd-xxx/.config
+
+# Mount with read-only access
+kilo-docker --volume /host/readonly:/container/readonly:ro
+```
+
+Volume mounts follow the same format as Docker's `-v` flag:
+- `host_path:container_path` — Standard mount
+- `host_path:container_path:ro` — Read-only mount
+- Named volumes: `volume_name:container_path`
+
+The current working directory is always mounted at the same path automatically.
 
 ### Services
 
