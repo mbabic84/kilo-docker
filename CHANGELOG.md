@@ -1,3 +1,9 @@
+## [2.7.0](https://github.com/mbabic84/kilo-docker/compare/v2.6.0...v2.7.0) (2026-04-06)
+
+### Features
+
+* add --workspace/-w flag for custom workspace path ([c78c9bd](https://github.com/mbabic84/kilo-docker/commit/c78c9bda57edba7400ff7042477a596512f3b83d))
+
 ## [2.6.0](https://github.com/mbabic84/kilo-docker/compare/v2.5.0...v2.6.0) (2026-04-06)
 
 ### Features
