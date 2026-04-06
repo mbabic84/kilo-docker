@@ -31,6 +31,9 @@ func serializeArgs(cfg config, sshEnabled bool) string {
 	for _, port := range cfg.ports {
 		sessionArgs += "--port " + port + " "
 	}
+	for _, vol := range cfg.volumes {
+		sessionArgs += "--volume " + vol + " "
+	}
 	if len(cfg.args) > 0 {
 		sessionArgs += strings.Join(cfg.args, " ") + " "
 	}
@@ -79,6 +82,9 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 		for _, vol := range svc.Volumes {
 			args = append(args, "-v", vol)
 		}
+	}
+	for _, vol := range cfg.volumes {
+		args = append(args, "-v", vol)
 	}
 	if len(cfg.enabledServices) > 0 {
 		args = append(args, "-e", "KD_SERVICES="+strings.Join(cfg.enabledServices, ","))

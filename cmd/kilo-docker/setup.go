@@ -70,6 +70,7 @@ func printHelp() {
 	var optLines []string
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--once", "Run a one-time session without persisting data (no volume)"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--port, -p <host:container>", "Map a port (host_port:container_port). Can be specified multiple times"))
+	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--volume, -v <host:container>", "Mount a volume (host_path:container_path). Can be specified multiple times"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--playwright", "Start a Playwright MCP sidecar container for browser automation"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--ssh", "Enable SSH agent forwarding into the container"))
 	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--network <name>", "Connect the container to a Docker network"))
