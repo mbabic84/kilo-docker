@@ -1,3 +1,9 @@
+## [2.5.0](https://github.com/mbabic84/kilo-docker/compare/v2.4.0...v2.5.0) (2026-04-06)
+
+### Features
+
+* add --volume flag for manual volume mounts ([8b39dc8](https://github.com/mbabic84/kilo-docker/commit/8b39dc8e74acc65fbbdc936d593ca0f958a356f2))
+
 ## [2.4.0](https://github.com/mbabic84/kilo-docker/compare/v2.3.3...v2.4.0) (2026-04-05)
 
 ### Features
