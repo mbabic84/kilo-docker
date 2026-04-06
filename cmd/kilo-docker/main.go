@@ -13,6 +13,8 @@
 //
 //	--once            One-time session (no volume)
 //	--port, -p        Map a port (host_port:container_port), repeatable
+//	--volume, -v      Mount a volume (host_path:container_path), repeatable
+//	--workspace, -w   Specify a custom workspace path (defaults to current directory)
 //	--playwright      Start Playwright MCP sidecar
 //	--ssh             Enable SSH agent forwarding
 //	--network <name>  Connect to a Docker network
@@ -57,7 +59,7 @@ func main() {
 	case "version":
 		printVersion()
 	case "networks":
-		listNetworks()
+		_ = listNetworks()
 	case "sessions":
 		handleSessions(cfg)
 	case "update":
@@ -84,17 +86,25 @@ func runContainer(cfg config) {
 	}
 
 	pwd, _ := os.Getwd()
-	containerName := deriveContainerName(pwd)
+	workspace := pwd
+	if cfg.workspace != "" {
+		workspace = cfg.workspace
+		if _, err := os.Stat(workspace); os.IsNotExist(err) {
+			utils.LogError("Workspace path does not exist: %s\n", workspace)
+			os.Exit(1)
+		}
+	}
+	containerName := deriveContainerName(workspace)
 	containerState := dockerState(containerName)
 	if cfg.once {
 		if containerState != "not_found" {
-			dockerRun("rm", "-f", containerName)
+			_, _ = dockerRun("rm", "-f", containerName)
 		}
 		containerState = "not_found"
 	} else {
 		switch containerState {
 		case "exited", "dead", "created":
-			dockerRun("rm", "-f", containerName)
+			_, _ = dockerRun("rm", "-f", containerName)
 			containerState = "not_found"
 		}
 	}
@@ -107,10 +117,10 @@ func runContainer(cfg config) {
 			utils.Log("  Existing: %s\n", storedFlags)
 			utils.Log("  Current:  %s\n", currentFlags)
 			if cfg.yes || confirmPrompt("Recreate with new flags? [y/N]: ", cfg.yes) {
-				dockerRun("rm", "-f", containerName)
+				_, _ = dockerRun("rm", "-f", containerName)
 				containerState = "not_found"
 			} else {
-				execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+				_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
 				handleSessionEnd(containerName, cfg.once)
 				return
 			}
@@ -167,12 +177,12 @@ func runContainer(cfg config) {
 	}
 
 	if !cfg.once {
-		if strings.HasPrefix(pwd, "/home/kd-") {
-			utils.LogWarn("Current directory (%s) overlaps with the container's home path.\n", pwd)
+		if strings.HasPrefix(workspace, "/home/kd-") {
+			utils.LogWarn("Current directory (%s) overlaps with the container's home path.\n", workspace)
 		}
 	}
 
-	containerArgs := buildContainerArgs(cfg, dataVolume, pwd, containerName, containerState,
+	containerArgs := buildContainerArgs(cfg, dataVolume, workspace, containerName, containerState,
 		sshAuthSock, hostEnvVars)
 
 	if sshAgentStarted {
@@ -180,15 +190,16 @@ func runContainer(cfg config) {
 	}
 
 	image := repoURL + ":latest"
-	if containerState == "running" {
-		execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+	switch containerState {
+	case "running":
+		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerName, cfg.once)
-	} else if containerState == "exited" || containerState == "created" {
-		dockerRun("start", "-d", containerName)
+	case "exited", "created":
+		_, _ = dockerRun("start", "-d", containerName)
 		time.Sleep(2 * time.Second)
-		execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerName, cfg.once)
-	} else {
+	default:
 		runArgs := buildRunArgs(containerArgs, image, cfg.args, false)
 		runArgs[1] = "-d"
 		if _, err := dockerRunDetached(runArgs...); err != nil {
@@ -196,7 +207,7 @@ func runContainer(cfg config) {
 			os.Exit(1)
 		}
 		time.Sleep(2 * time.Second)
-		execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerName, cfg.once)
 	}
 }
@@ -217,7 +228,7 @@ func buildRunArgs(containerArgs []string, image string, extraArgs []string, term
 func handleSessionEnd(containerName string, onceMode bool) {
 	resetTerminal()
 	if onceMode {
-		dockerRun("rm", "-f", containerName)
+		_, _ = dockerRun("rm", "-f", containerName)
 		utils.Log("Session '%s' ended.\n", containerName)
 		utils.Log("Container removed (--once mode).\n")
 	} else {
@@ -233,6 +244,6 @@ func confirmPrompt(message string, yes bool) bool {
 	}
 	fmt.Print(message)
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	return strings.ToLower(strings.TrimSpace(response)) == "y"
 }

@@ -63,7 +63,7 @@ func TestCleanupStaleSocketPathRemovesStaleSocket(t *testing.T) {
 		t.Fatalf("failed to create test socket: %v", err)
 	}
 	// Close the listener immediately — socket file remains but has no listener.
-	ln.Close()
+	_ = ln.Close()
 
 	cleanupStaleSocketPath(socketPath)
 
@@ -119,13 +119,13 @@ func TestSetupSSHRemovesStaleDirectory(t *testing.T) {
 
 	// Override HOME so setupSSH finds our test paths.
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+	defer func() { _ = os.Setenv("HOME", origHome) }()
 
 	// Clear SSH_AUTH_SOCK so setupSSH doesn't try to reuse a host agent.
 	origAuthSock := os.Getenv("SSH_AUTH_SOCK")
-	os.Unsetenv("SSH_AUTH_SOCK")
-	defer os.Setenv("SSH_AUTH_SOCK", origAuthSock)
+	_ = os.Unsetenv("SSH_AUTH_SOCK")
+	defer func() { _ = os.Setenv("SSH_AUTH_SOCK", origAuthSock) }()
 
 	sock, _, started := setupSSH()
 	if !started {
@@ -160,12 +160,12 @@ func TestSetupSSHCreatesSocketWhenPathMissing(t *testing.T) {
 	}
 
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+	defer func() { _ = os.Setenv("HOME", origHome) }()
 
 	origAuthSock := os.Getenv("SSH_AUTH_SOCK")
-	os.Unsetenv("SSH_AUTH_SOCK")
-	defer os.Setenv("SSH_AUTH_SOCK", origAuthSock)
+	_ = os.Unsetenv("SSH_AUTH_SOCK")
+	defer func() { _ = os.Setenv("SSH_AUTH_SOCK", origAuthSock) }()
 
 	sock, _, started := setupSSH()
 	if !started {
@@ -202,12 +202,12 @@ func TestSetupSSHReusesActiveSocket(t *testing.T) {
 	defer stopTestSSHAgent(t, agentPid)
 
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tmpDir)
+	defer func() { _ = os.Setenv("HOME", origHome) }()
 
 	origAuthSock := os.Getenv("SSH_AUTH_SOCK")
-	os.Unsetenv("SSH_AUTH_SOCK")
-	defer os.Setenv("SSH_AUTH_SOCK", origAuthSock)
+	_ = os.Unsetenv("SSH_AUTH_SOCK")
+	defer func() { _ = os.Setenv("SSH_AUTH_SOCK", origAuthSock) }()
 
 	// setupSSH should detect the active socket and reuse it.
 	sock, running, startedByUs := setupSSH()
@@ -252,9 +252,9 @@ func startTestSSHAgent(t *testing.T, socketPath string) (string, string, bool) {
 func stopTestSSHAgent(t *testing.T, pid string) {
 	t.Helper()
 	if pid != "" {
-		os.Setenv("SSH_AGENT_PID", pid)
-		exec.Command("ssh-agent", "-k").Run()
-		os.Unsetenv("SSH_AGENT_PID")
+		_ = os.Setenv("SSH_AGENT_PID", pid)
+		_ = exec.Command("ssh-agent", "-k").Run()
+		_ = os.Unsetenv("SSH_AGENT_PID")
 	}
 }
 

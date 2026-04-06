@@ -9,11 +9,11 @@ import (
 // session with zellij.
 func resetTerminal() {
 	stty := exec.Command("/bin/sh", "-c", "stty sane </dev/tty 2>/dev/null || true")
-	stty.Run()
+	_ = stty.Run()
 
 	reset := exec.Command("/bin/sh", "-c", "reset 2>/dev/null || true")
 	reset.Stdin = os.Stdin
 	reset.Stdout = os.Stdout
 	reset.Stderr = os.Stderr
-	reset.Run()
+	_ = reset.Run()
 }

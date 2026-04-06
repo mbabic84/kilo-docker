@@ -3,61 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
-	"time"
 )
-
-// backup creates a gzipped tar archive of the volume by running a detached
-// container, tar inside it, and docker cp to extract the archive to the host.
-func backup(image, volume, home, outputFile string) error {
-	container := fmt.Sprintf("kilo-backup-temp-%d", os.Getpid())
-
-	_, err := dockerRunDetached("run", "-d", "--name", container,
-		"-v", volume+":"+home+":ro", image, "tail", "-f", "/dev/null")
-	if err != nil {
-		return err
-	}
-	defer exec.Command("docker", "rm", "-f", container).Run()
-
-	time.Sleep(500 * time.Millisecond)
-
-	_, err = dockerExec(container, "", "tar", "czf", "/tmp/backup.tar.gz", "-C", home, ".")
-	if err != nil {
-		return err
-	}
-
-	_, err = dockerRun("cp", container+":/tmp/backup.tar.gz", outputFile)
-	return err
-}
-
-// restore extracts a tar.gz backup into the volume, setting ownership to the
-// host user's UID:GID.
-func restore(image, volume, home, backupFile string) error {
-	container := fmt.Sprintf("kilo-restore-temp-%d", os.Getpid())
-
-	_, err := dockerRunDetached("run", "-d", "--name", container,
-		"-v", volume+":"+home, image, "tail", "-f", "/dev/null")
-	if err != nil {
-		return err
-	}
-	defer exec.Command("docker", "rm", "-f", container).Run()
-
-	time.Sleep(500 * time.Millisecond)
-
-	_, err = dockerRun("cp", backupFile, container+":/tmp/backup.tar.gz")
-	if err != nil {
-		return err
-	}
-
-	_, err = dockerExec(container, "", "tar", "xzf", "/tmp/backup.tar.gz", "-C", home)
-	if err != nil {
-		return err
-	}
-
-	_, _ = dockerExec(container, "", "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), home)
-	return nil
-}
 
 // session represents a running or stopped kilo-docker container with its metadata.
 type session struct {
@@ -128,7 +75,7 @@ func resolveTarget(target string) (string, error) {
 	}
 
 	idx := 0
-	fmt.Sscanf(target, "%d", &idx)
+	_, _ = fmt.Sscanf(target, "%d", &idx)
 	if idx < 1 || idx > len(sessions) {
 		return "", fmt.Errorf("no session at index %s", target)
 	}

@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 )
 
 // dockerSubcommands lists recognized docker CLI subcommands. If the first
@@ -43,26 +42,6 @@ func dockerRun(args ...string) (string, error) {
 	args = ensureRunArgs(args)
 	cmd := exec.Command("docker", args...)
 	cmd.Stdin = os.Stdin
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return strings.TrimSpace(string(output)), fmt.Errorf("docker %s: %w\n%s", strings.Join(args, " "), err, string(output))
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
-// dockerRunWithStdin executes a docker command with the given input piped to
-// its stdin. Returns trimmed combined output and an error if the command fails.
-// If the first argument is not a recognized docker subcommand, "run --rm"
-// is automatically prepended. The -i flag is always added so Docker keeps
-// stdin open and the input data reaches the container process.
-func dockerRunWithStdin(input string, args ...string) (string, error) {
-	args = ensureRunArgs(args)
-	// Insert -i after "run" (or "run --rm") so Docker attaches stdin.
-	// Without -i, docker run ignores stdin entirely and the container
-	// process receives empty input regardless of cmd.Stdin.
-	args = append(args[:2], append([]string{"-i"}, args[2:]...)...)
-	cmd := exec.Command("docker", args...)
-	cmd.Stdin = strings.NewReader(input)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return strings.TrimSpace(string(output)), fmt.Errorf("docker %s: %w\n%s", strings.Join(args, " "), err, string(output))
@@ -117,29 +96,6 @@ func dockerState(container string) string {
 func containerExists(container string) bool {
 	_, err := dockerRun("inspect", container)
 	return err == nil
-}
-
-// execDocker replaces the current process with a docker command, inheriting
-// stdin, stdout, and stderr from the calling process. Used for interactive
-// docker run sessions.
-func execDocker(args ...string) error {
-	cmd := exec.Command("docker", args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-// execDockerAttach replaces the current process with a docker attach/start
-// command, inheriting stdin, stdout, and stderr. The SysProcAttr ensures
-// proper signal handling for TTY-detach (Ctrl+P Ctrl+Q).
-func execDockerAttach(args ...string) error {
-	cmd := exec.Command("docker", args...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
-	return cmd.Run()
 }
 
 // execDockerInteractive replaces the current process with a docker exec

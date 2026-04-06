@@ -28,7 +28,7 @@ func selectNetwork() (string, error) {
 	fmt.Fprintf(os.Stderr, "Select a network (number) or press Enter to use default: ")
 
 	var selection string
-	fmt.Scanln(&selection)
+	_, _ = fmt.Scanln(&selection)
 	selection = strings.TrimSpace(selection)
 
 	if selection == "" {
@@ -36,7 +36,7 @@ func selectNetwork() (string, error) {
 	}
 
 	var idx int
-	fmt.Sscanf(selection, "%d", &idx)
+	_, _ = fmt.Sscanf(selection, "%d", &idx)
 	if idx >= 1 && idx <= len(networks) {
 		return networks[idx-1], nil
 	}

@@ -33,16 +33,14 @@ func TestGetOSArchNormalization(t *testing.T) {
 
 	// Run multiple times to verify consistency
 	for i := 0; i < 5; i++ {
-		os, arch := getOSArch()
-		if os != osName {
-			t.Errorf("getOSArch() returned inconsistent osName: first=%q, subsequent=%q", osName, os)
+		currentOS, currentArch := getOSArch()
+		if currentOS != osName {
+			t.Errorf("getOSArch() returned inconsistent osName: first=%q, subsequent=%q", osName, currentOS)
 		}
-		if arch != arch {
-			t.Errorf("getOSArch() returned inconsistent arch: first=%q, subsequent=%q", arch, arch)
+		if currentArch != arch {
+			t.Errorf("getOSArch() returned inconsistent arch: first=%q, subsequent=%q", arch, currentArch)
 		}
 	}
-	// Silence unused variable warning for arch in the loop
-	_ = arch
 }
 
 func TestDownloadFileWithInvalidURL(t *testing.T) {
@@ -52,8 +50,8 @@ func TestDownloadFileWithInvalidURL(t *testing.T) {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 	tempPath := tempFile.Name()
-	tempFile.Close()
-	defer os.Remove(tempPath)
+	_ = tempFile.Close()
+	defer func() { _ = os.Remove(tempPath) }()
 
 	// Try to download from an invalid URL - both curl and wget should fail
 	err = downloadFile("http://this-domain-does-not-exist-12345.invalid/file", tempPath)
@@ -71,8 +69,8 @@ func TestDownloadFileCreatesTempFile(t *testing.T) {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 	tempPath := tempFile.Name()
-	tempFile.Close()
-	defer os.Remove(tempPath)
+	_ = tempFile.Close()
+	defer func() { _ = os.Remove(tempPath) }()
 
 	// Verify temp file exists before download
 	if _, err := os.Stat(tempPath); err != nil {
@@ -109,12 +107,12 @@ func TestHandleUpdateDetectsNotInstalled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Save original home and set temp as home
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tempDir)
-	defer os.Setenv("HOME", origHome)
+	_ = os.Setenv("HOME", tempDir)
+	defer func() { _ = os.Setenv("HOME", origHome) }()
 
 	// Check that ~/.local/bin/kilo-docker doesn't exist
 	target := filepath.Join(tempDir, ".local", "bin", "kilo-docker")

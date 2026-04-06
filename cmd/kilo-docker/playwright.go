@@ -27,15 +27,15 @@ func startPlaywright(network *string) error {
 	*network = fmt.Sprintf("kilo-playwright-%s", strings.TrimSpace(string(user)))
 
 	if _, err := dockerRun("network", "inspect", *network); err != nil {
-		dockerRun("network", "create", *network)
+		_, _ = dockerRun("network", "create", *network)
 	}
 
 	fmt.Fprintf(os.Stderr, "Pulling Playwright MCP image...\n")
-	dockerRun("pull", playwrightImage)
+	_, _ = dockerRun("pull", playwrightImage)
 
-	os.MkdirAll(".playwright-mcp", 0755)
+	_ = os.MkdirAll(".playwright-mcp", 0755)
 
-	dockerRun("rm", "-f", playwrightContainer)
+	_, _ = dockerRun("rm", "-f", playwrightContainer)
 
 	outputDir := fmt.Sprintf("/mnt/%s/.playwright-mcp", baseName)
 	_, err := dockerRunDetached("run", "-d", "--rm", "--init",
@@ -58,10 +58,10 @@ func startPlaywright(network *string) error {
 		state := dockerState(playwrightContainer)
 		if state != "running" {
 			fmt.Fprintf(os.Stderr, " container stopped.\n")
-			dockerRun("logs", playwrightContainer)
-			dockerRun("rm", "-f", playwrightContainer)
-			dockerRun("network", "rm", *network)
-			return fmt.Errorf("Playwright MCP container exited unexpectedly")
+			_, _ = dockerRun("logs", playwrightContainer)
+			_, _ = dockerRun("rm", "-f", playwrightContainer)
+			_, _ = dockerRun("network", "rm", *network)
+			return fmt.Errorf("playwright MCP container exited unexpectedly")
 		}
 
 		ready, _ := dockerExec(playwrightContainer, "", "node", "-e",
@@ -73,10 +73,10 @@ func startPlaywright(network *string) error {
 
 		if i == 30 {
 			fmt.Fprintf(os.Stderr, " timeout.\n")
-			dockerRun("logs", playwrightContainer)
-			dockerRun("rm", "-f", playwrightContainer)
-			dockerRun("network", "rm", *network)
-			return fmt.Errorf("Playwright MCP did not become ready in 30s")
+			_, _ = dockerRun("logs", playwrightContainer)
+			_, _ = dockerRun("rm", "-f", playwrightContainer)
+			_, _ = dockerRun("network", "rm", *network)
+			return fmt.Errorf("playwright MCP did not become ready in 30s")
 		}
 		time.Sleep(time.Second)
 		fmt.Fprintf(os.Stderr, ".")
@@ -87,6 +87,6 @@ func startPlaywright(network *string) error {
 
 // cleanupPlaywright removes the Playwright MCP container and its Docker network.
 func cleanupPlaywright(network string) {
-	dockerRun("rm", "-f", "playwright-mcp")
-	dockerRun("network", "rm", network)
+	_, _ = dockerRun("rm", "-f", "playwright-mcp")
+	_, _ = dockerRun("network", "rm", network)
 }

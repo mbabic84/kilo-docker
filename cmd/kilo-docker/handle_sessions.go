@@ -96,7 +96,7 @@ func handleSessions(cfg config) {
 
 		// Remove the old container (volume persists)
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Removing old container '%s'...\n", containerName)
-		dockerRun("rm", "-f", containerName)
+		_, _ = dockerRun("rm", "-f", containerName)
 
 		// Run with the original flags — this creates a fresh container
 		// attached to the same volume (user data preserved).
@@ -109,7 +109,7 @@ func handleSessions(cfg config) {
 			removed := 0
 			for _, s := range sessions {
 				if dockerState(s.Name) == "exited" {
-					dockerRun("rm", "-f", s.Name)
+					_, _ = dockerRun("rm", "-f", s.Name)
 					fmt.Fprintf(os.Stderr, "Session '%s' removed.\n", s.Name)
 					removed++
 				}
@@ -135,7 +135,7 @@ func handleSessions(cfg config) {
 			showSessions(sessions)
 			fmt.Print("Select session to remove (number or name): ")
 			var selection string
-			fmt.Scanln(&selection)
+			_, _ = fmt.Scanln(&selection)
 			if selection == "" {
 				fmt.Fprintf(os.Stderr, "Aborted.\n")
 				os.Exit(0)
@@ -148,7 +148,7 @@ func handleSessions(cfg config) {
 		}
 
 		if cleanupYes || promptConfirm("Remove session '"+containerToClean+"'? [y/N]: ", cleanupYes) {
-			dockerRun("rm", "-f", containerToClean)
+			_, _ = dockerRun("rm", "-f", containerToClean)
 			fmt.Fprintf(os.Stderr, "Session '%s' removed.\n", containerToClean)
 		} else {
 			fmt.Fprintf(os.Stderr, "Aborted.\n")
@@ -174,7 +174,7 @@ func handleSessions(cfg config) {
 	state := dockerState(containerToAttach)
 	switch state {
 	case "running":
-		execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
+		_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerToAttach, false)
 	case "exited", "created":
 		needsSSH := false
@@ -190,9 +190,9 @@ func handleSessions(cfg config) {
 				defer cleanupSSH(os.Getenv("SSH_AGENT_PID"))
 			}
 		}
-		dockerRun("start", "-d", containerToAttach)
+		_, _ = dockerRun("start", "-d", containerToAttach)
 		time.Sleep(2 * time.Second)
-		execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
+		_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerToAttach, false)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: Container '%s' is in state '%s'.\n", containerToAttach, state)
