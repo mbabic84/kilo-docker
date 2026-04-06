@@ -26,6 +26,7 @@ type config struct {
 	networkFlag     bool
 	ports           []string // Port mappings in host_port:container_port format
 	volumes         []string // Volume mounts in host_path:container_path format
+	workspace       string   // Custom workspace path (defaults to pwd)
 	command         string
 	args            []string
 	enabledServices []string // Names of enabled services from builtInServices
@@ -47,6 +48,11 @@ func parseArgs(args []string) config {
 		case "--volume", "-v":
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
 				cfg.volumes = append(cfg.volumes, args[i+1])
+				i++
+			}
+		case "--workspace", "-w":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
+				cfg.workspace = args[i+1]
 				i++
 			}
 		case "--playwright":

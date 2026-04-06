@@ -48,17 +48,21 @@ func handleBackup(cfg config) {
 
 	fmt.Fprintf(os.Stderr, "Creating backup of volume '%s' to '%s'...\n", dataVolume, backupFile)
 
-	tempDir, _ := os.MkdirTemp("", "kilo-backup-*")
-	defer os.RemoveAll(tempDir)
+	tempDir, err := os.MkdirTemp("", "kilo-backup-*")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to create temp directory: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	tempContainer := fmt.Sprintf("kilo-backup-temp-%d", os.Getpid())
-	dockerRun("run", "--rm", "-d", "--name", tempContainer, "-v", dataVolume+":/src:ro", "alpine:latest", "tail", "-f", "/dev/null")
+	_, _ = dockerRun("run", "--rm", "-d", "--name", tempContainer, "-v", dataVolume+":/src:ro", "alpine:latest", "tail", "-f", "/dev/null")
 	time.Sleep(500 * time.Millisecond)
-	dockerRun("cp", tempContainer+":/src/.", tempDir+"/src")
-	dockerRun("rm", "-f", tempContainer)
+	_, _ = dockerRun("cp", tempContainer+":/src/.", tempDir+"/src")
+	_, _ = dockerRun("rm", "-f", tempContainer)
 
-	os.MkdirAll(filepath.Dir(backupFile), 0755)
-	exec.Command("tar", "czf", backupFile, "-C", tempDir+"/src", ".").Run()
+	_ = os.MkdirAll(filepath.Dir(backupFile), 0755)
+	_ = exec.Command("tar", "czf", backupFile, "-C", tempDir+"/src", ".").Run()
 
 	fmt.Fprintf(os.Stderr, "Backup created: %s\n", backupFile)
 }
@@ -116,12 +120,12 @@ func handleRestore(cfg config) {
 				os.Exit(0)
 			}
 		}
-		dockerRun("volume", "rm", targetVolume)
+		_, _ = dockerRun("volume", "rm", targetVolume)
 	}
 
 	fmt.Fprintf(os.Stderr, "Restoring backup '%s' to volume '%s'...\n", backupFile, targetVolume)
 
-	dockerRun("volume", "create", targetVolume)
+	_, _ = dockerRun("volume", "create", targetVolume)
 
 	_, err := dockerRun("run", "--rm", "-v", targetVolume+":/dest", "-v", filepath.Dir(backupFile)+":/backup:ro", "alpine",
 		"tar", "xzf", "/backup/"+filepath.Base(backupFile), "-C", "/dest")
@@ -129,7 +133,7 @@ func handleRestore(cfg config) {
 		fmt.Fprintf(os.Stderr, "Warning: restore had issues: %v\n", err)
 	}
 
-	dockerRun("run", "--rm", "-v", targetVolume+":/dest", "alpine", "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "/dest")
+	_, _ = dockerRun("run", "--rm", "-v", targetVolume+":/dest", "alpine", "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "/dest")
 
 	fmt.Fprintf(os.Stderr, "Restore complete.\n")
 }

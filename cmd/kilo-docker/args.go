@@ -34,13 +34,16 @@ func serializeArgs(cfg config, sshEnabled bool) string {
 	for _, vol := range cfg.volumes {
 		sessionArgs += "--volume " + vol + " "
 	}
+	if cfg.workspace != "" {
+		sessionArgs += "--workspace " + cfg.workspace + " "
+	}
 	if len(cfg.args) > 0 {
 		sessionArgs += strings.Join(cfg.args, " ") + " "
 	}
 	return strings.TrimSpace(sessionArgs)
 }
 
-func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
+func buildContainerArgs(cfg config, volume, workspace, containerName, containerState,
 	sshAuthSock string, hostEnvVars map[string]string) []string {
 
 	args := []string{
@@ -48,15 +51,15 @@ func buildContainerArgs(cfg config, volume, pwd, containerName, containerState,
 		"--ipc=host",
 		"-e", "PUID=" + strconv.Itoa(os.Getuid()),
 		"-e", "PGID=" + strconv.Itoa(os.Getgid()),
-		"-v", pwd + ":" + pwd,
-		"-w", pwd,
+		"-v", workspace + ":" + workspace,
+		"-w", workspace,
 	}
 
 	if !cfg.once && volume != "" {
 		args = append(args, "-v", volume+":/home")
 	}
 
-	args = append(args, "--label", "kilo.workspace="+pwd)
+	args = append(args, "--label", "kilo.workspace="+workspace)
 
 	sessionArgs := serializeArgs(cfg, sshAuthSock != "")
 	args = append(args, "--label", "kilo.args="+sessionArgs)

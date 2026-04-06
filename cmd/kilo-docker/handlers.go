@@ -62,17 +62,17 @@ func handleUpdate() {
 			fmt.Fprintf(os.Stderr, "Error: failed to create temp file: %v\n", err)
 		} else {
 			tempPath := tempFile.Name()
-			tempFile.Close()
+			_ = tempFile.Close()
 
 			if err := downloadFile(downloadURL, tempPath); err != nil {
-				os.Remove(tempPath)
+				_ = os.Remove(tempPath)
 				fmt.Fprintf(os.Stderr, "Error: Failed to download update: %v\n", err)
 			} else {
 				if err := os.Chmod(tempPath, 0755); err != nil {
-					os.Remove(tempPath)
+					_ = os.Remove(tempPath)
 					fmt.Fprintf(os.Stderr, "Error: failed to set permissions: %v\n", err)
 				} else if err := os.Rename(tempPath, target); err != nil {
-					os.Remove(tempPath)
+					_ = os.Remove(tempPath)
 					fmt.Fprintf(os.Stderr, "Error: failed to replace binary: %v\n", err)
 				} else {
 					fmt.Fprintf(os.Stderr, "Binary updated: %s\n", target)
@@ -86,7 +86,7 @@ func handleUpdate() {
 		fmt.Fprintf(os.Stderr, "Run 'docker pull %s:latest' after starting Docker.\n", repoURL)
 	} else {
 		fmt.Fprintf(os.Stderr, "\nPulling Docker image...\n")
-		dockerRun("pull", repoURL+":latest")
+		_, _ = dockerRun("pull", repoURL+":latest")
 	}
 	fmt.Fprintf(os.Stderr, "\nUpdate complete.\n")
 }
@@ -100,10 +100,10 @@ func handleCleanup(yes bool) {
 	}
 
 	output, _ := dockerRun("ps", "-a", "--filter", "ancestor="+repoURL, "-q")
-	if output != "" {
+		if output != "" {
 		for _, id := range strings.Split(output, "\n") {
 			if id != "" {
-				dockerRun("rm", "-f", id)
+				_, _ = dockerRun("rm", "-f", id)
 			}
 		}
 	}
@@ -112,13 +112,13 @@ func handleCleanup(yes bool) {
 	user := filepath.Base(home)
 	dataVolume := "kilo-data-" + user
 	if volumeExists(dataVolume) {
-		removeVolume(dataVolume)
+		_ = removeVolume(dataVolume)
 	}
 
-	dockerRun("rmi", repoURL+":latest")
+	_, _ = dockerRun("rmi", repoURL+":latest")
 
 	target := filepath.Join(home, ".local", "bin", "kilo-docker")
-	os.Remove(target)
+	_ = os.Remove(target)
 
 	fmt.Fprintf(os.Stderr, "Cleanup complete.\n")
 }
@@ -133,7 +133,7 @@ func handleInit(cfg config) {
 
 	if volumeExists(dataVolume) {
 		if promptConfirm("Remove volume '" + dataVolume + "' and reset all configuration? [y/N]: ", cfg.yes) {
-			removeVolume(dataVolume)
+			_ = removeVolume(dataVolume)
 			fmt.Fprintf(os.Stderr, "Volume removed. You will be prompted for tokens on next run.\n")
 		}
 	} else {

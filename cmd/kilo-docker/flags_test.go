@@ -123,8 +123,8 @@ func TestPromptConfirmReadsStdin(t *testing.T) {
 	os.Stdin = r
 
 	go func() {
-		w.WriteString("y\n")
-		w.Close()
+		_, _ = w.WriteString("y\n")
+		_ = w.Close()
 	}()
 
 	result := promptConfirm("Continue? [y/N]: ", false)
@@ -146,8 +146,8 @@ func TestPromptConfirmRejectsEmpty(t *testing.T) {
 	os.Stdin = r
 
 	go func() {
-		w.WriteString("\n")
-		w.Close()
+		_, _ = w.WriteString("\n")
+		_ = w.Close()
 	}()
 
 	result := promptConfirm("Continue? [y/N]: ", false)
@@ -169,8 +169,8 @@ func TestPromptConfirmRejectsN(t *testing.T) {
 	os.Stdin = r
 
 	go func() {
-		w.WriteString("n\n")
-		w.Close()
+		_, _ = w.WriteString("n\n")
+		_ = w.Close()
 	}()
 
 	result := promptConfirm("Continue? [y/N]: ", false)
@@ -192,7 +192,7 @@ func TestIsTerminalWithPipedStdin(t *testing.T) {
 	os.Stdin = r
 
 	// Close the write end so stdin reads EOF (simulates piped input ending)
-	w.Close()
+	_ = w.Close()
 
 	// With piped stdin, isTerminal() should return false
 	if isTerminal() {

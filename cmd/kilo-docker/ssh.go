@@ -50,7 +50,7 @@ func setupSSH() (string, bool, bool) {
 	// If the socket still exists after cleanup, it's an active agent — reuse it.
 	if info, err := os.Stat(socketPath); err == nil && info.Mode()&os.ModeSocket != 0 {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Reusing existing SSH agent socket: %s\n", socketPath)
-		os.Setenv("SSH_AUTH_SOCK", socketPath)
+		_ = os.Setenv("SSH_AUTH_SOCK", socketPath)
 		loadSSHKeys(sshDir)
 		return socketPath, true, false
 	}
@@ -78,8 +78,8 @@ func setupSSH() (string, bool, bool) {
 		}
 	}
 
-	os.Setenv("SSH_AUTH_SOCK", socketPath)
-	os.Setenv("SSH_AGENT_PID", newPid)
+	_ = os.Setenv("SSH_AUTH_SOCK", socketPath)
+	_ = os.Setenv("SSH_AGENT_PID", newPid)
 	fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent started (pid=%s, socket=%s)\n", newPid, socketPath)
 	loadSSHKeys(sshDir)
 	return socketPath, true, true
@@ -97,7 +97,7 @@ func cleanupStaleSocketPath(socketPath string) {
 	}
 	if info.IsDir() {
 		fmt.Fprintf(os.Stderr, "[kilo-docker] Removing stale socket directory: %s\n", socketPath)
-		os.RemoveAll(socketPath)
+		_ = os.RemoveAll(socketPath)
 		return
 	}
 	if info.Mode()&os.ModeSocket != 0 {
@@ -107,9 +107,9 @@ func cleanupStaleSocketPath(socketPath string) {
 		conn, err := net.Dial("unix", socketPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[kilo-docker] Removing stale SSH socket: %s\n", socketPath)
-			os.Remove(socketPath)
+			_ = os.Remove(socketPath)
 		} else {
-			conn.Close()
+			_ = conn.Close()
 		}
 	}
 }
@@ -146,6 +146,6 @@ func loadSSHKeys(sshDir string) {
 // ensure the socket file is properly removed.
 func cleanupSSH(pid string) {
 	if pid != "" {
-		exec.Command("ssh-agent", "-k").Run()
+		_ = exec.Command("ssh-agent", "-k").Run()
 	}
 }
