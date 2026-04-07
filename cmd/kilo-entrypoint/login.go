@@ -230,11 +230,11 @@ utils.Log("[login] No existing PAT found, creating new one...\n")
 func runLoginInteractive() (loginResult, error) {
 	var result loginResult
 
-	utils.Log("[login] \n=== Ainstruct Authentication ===\n", utils.WithOutput())
-	utils.Log("[login] Sign in at %s\n\n", constants.AinstructBaseURL, utils.WithOutput())
+	utils.Log("[login] === Ainstruct Authentication ===\n", utils.WithOutput())
+	utils.Log("[login] Sign in at %s\n", constants.AinstructBaseURL, utils.WithOutput())
 	utils.Log("[login] Enables:\n", utils.WithOutput())
 	utils.Log("[login]   - File sync (push/pull config, commands, agents, instructions)\n", utils.WithOutput())
-	utils.Log("[login]   - MCP server tokens (stored encrypted in volume)\n\n", utils.WithOutput())
+	utils.Log("[login]   - MCP server tokens (stored encrypted in volume)\n", utils.WithOutput())
 
 	username := promptUsername()
 	password := promptPassword()
@@ -321,40 +321,40 @@ func runLoginInteractive() (loginResult, error) {
 		result.MCPToken = patToken
 	}
 
-	utils.Log("[login] \nSigned in successfully.\n", utils.WithOutput())
-	utils.Log("[login] Tokens encrypted and stored in volume.\n\n", utils.WithOutput())
+	utils.Log("[login] Signed in successfully.\n", utils.WithOutput())
+	utils.Log("[login] Tokens encrypted and stored in volume.\n", utils.WithOutput())
 
 	return result, nil
 }
 
 func promptUsername() string {
 	for {
-		fmt.Fprint(os.Stderr, "Ainstruct username: ")
+		utils.Log("[login] Ainstruct username: ", utils.WithOutput())
 		var username string
 		_, _ = fmt.Scanln(&username)
 		username = strings.TrimSpace(username)
 		if username != "" {
 			return username
 		}
-		fmt.Fprintf(os.Stderr, "Username cannot be empty.\n")
+		utils.LogWarn("[login] Username cannot be empty.\n", utils.WithOutput())
 	}
 }
 
 func promptPassword() string {
 	for {
-		fmt.Fprint(os.Stderr, "Ainstruct password: ")
+		utils.Log("[login] Ainstruct password: ", utils.WithOutput())
 		password, err := term.ReadPassword(int(os.Stdin.Fd()))
 		fmt.Println()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to read password.\n")
+			utils.LogError("[login] Failed to read password.\n")
 			os.Exit(1)
 		}
 		if len(password) == 0 {
-			fmt.Fprintf(os.Stderr, "Error: Password cannot be empty.\n")
+			utils.LogWarn("[login] Password cannot be empty.\n", utils.WithOutput())
 			continue
 		}
 		if len(password) < 4 {
-			fmt.Fprintf(os.Stderr, "Password must be at least 4 characters.\n")
+			utils.LogWarn("[login] Password must be at least 4 characters.\n", utils.WithOutput())
 			continue
 		}
 		return string(password)
@@ -364,7 +364,7 @@ func promptPassword() string {
 // promptContext7Token prompts for a Context7 API token via TTY.
 // Empty input is accepted (token is optional — Context7 MCP will be disabled).
 func promptContext7Token() string {
-	fmt.Fprint(os.Stderr, "Context7 API key (leave empty to skip): ")
+	utils.Log("[login] Context7 API key (leave empty to skip): ", utils.WithOutput())
 	var token string
 	_, _ = fmt.Scanln(&token)
 	return strings.TrimSpace(token)

@@ -21,6 +21,8 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // subcommands lists the internal subcommands handled by kilo-entrypoint.
@@ -98,7 +100,7 @@ func runPrintEnv() {
 func main() {
 	if len(os.Args) < 2 {
 		if err := runInit(); err != nil {
-			fmt.Fprintf(os.Stderr, "init error: %v\n", err)
+			utils.LogError("[main] init error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 		return
@@ -108,11 +110,11 @@ func main() {
 	binary, passthrough := resolveCommand(name)
 	if passthrough {
 		if binary == "" {
-			fmt.Fprintf(os.Stderr, "unknown subcommand or command: %s\n", name)
+			utils.LogError("[main] unknown subcommand or command: %s\n", name, utils.WithOutput())
 			os.Exit(1)
 		}
 		if err := syscall.Exec(binary, os.Args[1:], os.Environ()); err != nil {
-			fmt.Fprintf(os.Stderr, "exec %s: %v\n", name, err)
+			utils.LogError("[main] exec %s: %v\n", name, err, utils.WithOutput())
 			os.Exit(1)
 		}
 		return
@@ -121,12 +123,12 @@ func main() {
 	switch name {
 	case "ainstruct-login":
 		if err := runAinstructLogin(); err != nil {
-			fmt.Fprintf(os.Stderr, "STATUS=error\nERROR=%v\n", err)
+			utils.LogError("[main] STATUS=error\nERROR=%v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 	case "update-config":
 		if err := runUpdateConfig(); err != nil {
-			fmt.Fprintf(os.Stderr, "update-config error: %v\n", err)
+			utils.LogError("[main] update-config error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 	case "backup":
@@ -135,7 +137,7 @@ func main() {
 			outputPath = os.Args[2]
 		}
 		if err := runBackup(outputPath); err != nil {
-			fmt.Fprintf(os.Stderr, "backup error: %v\n", err)
+			utils.LogError("[main] backup error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 	case "restore":
@@ -144,19 +146,17 @@ func main() {
 			archivePath = os.Args[2]
 		}
 		if err := runRestore(archivePath); err != nil {
-			fmt.Fprintf(os.Stderr, "restore error: %v\n", err)
+			utils.LogError("[main] restore error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 	case "mcp-config":
-		// Apply MCP enabled states from env vars set by kilo-wrapper.sh
-		// This runs AFTER tokens are loaded and BEFORE kilo starts
 		if err := applyMCPEnabledFromEnv(""); err != nil {
-			fmt.Fprintf(os.Stderr, "mcp-config error: %v\n", err)
+			utils.LogError("[main] mcp-config error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 	case "mcp-tokens":
 		if err := runMCPTokens(); err != nil {
-			fmt.Fprintf(os.Stderr, "mcp-tokens error: %v\n", err)
+			utils.LogError("[main] mcp-tokens error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 	case "sync":
@@ -164,14 +164,14 @@ func main() {
 	case "resync":
 		s := NewSyncer()
 		if err := s.deleteAllDocuments(); err != nil {
-			fmt.Fprintf(os.Stderr, "resync error: %v\n", err)
+			utils.LogError("[main] resync error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 		s.pushAll()
-		fmt.Println("Resync complete.")
+		utils.Log("[main] Resync complete.\n", utils.WithOutput())
 	case "zellij-attach":
 		if err := runZellijAttach(); err != nil {
-			fmt.Fprintf(os.Stderr, "zellij-attach error: %v\n", err)
+			utils.LogError("[main] zellij-attach error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 	case "print-env":
