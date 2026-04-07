@@ -21,14 +21,14 @@ func runSyncMode() {
 	log.SetPrefix("")
 
 	logDir := constants.GetKiloConfigDir()
-	os.MkdirAll(logDir, 0o755)
+	_ = os.MkdirAll(logDir, 0o755)
 	logPath := filepath.Join(logDir, "ainstruct-sync.log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		log.Printf("[ainstruct-sync] Failed to open log file %s: %v", logPath, err)
 	} else {
 		log.SetOutput(logFile)
-		defer logFile.Close()
+		defer func() { _ = logFile.Close() }()
 	}
 
 	s := NewSyncer()

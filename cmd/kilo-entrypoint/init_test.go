@@ -38,7 +38,7 @@ func TestExpandHome(t *testing.T) {
 }
 
 func TestInstallServicesNoEnvVar(t *testing.T) {
-	os.Unsetenv("KD_SERVICES")
+	_ = os.Unsetenv("KD_SERVICES")
 	err := installServices()
 	if err != nil {
 		t.Errorf("installServices() error = %v", err)
@@ -53,8 +53,8 @@ func TestInstallServicesUnknownService(t *testing.T) {
 	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
 	defer func() { servicesMarkerPath = orig }()
 
-	os.Setenv("KD_SERVICES", "nonexistent")
-	defer os.Unsetenv("KD_SERVICES")
+	_ = os.Setenv("KD_SERVICES", "nonexistent")
+	defer func() { _ = os.Unsetenv("KD_SERVICES") }()
 
 	err := installServices()
 	if err != nil {
@@ -70,8 +70,8 @@ func TestInstallServicesDockerService(t *testing.T) {
 	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
 	defer func() { servicesMarkerPath = orig }()
 
-	os.Setenv("KD_SERVICES", "docker")
-	defer os.Unsetenv("KD_SERVICES")
+	_ = os.Setenv("KD_SERVICES", "docker")
+	defer func() { _ = os.Unsetenv("KD_SERVICES") }()
 
 	err := installServices()
 	if err != nil {
@@ -87,8 +87,8 @@ func TestInstallServicesMultipleServices(t *testing.T) {
 	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
 	defer func() { servicesMarkerPath = orig }()
 
-	os.Setenv("KD_SERVICES", "docker,gh")
-	defer os.Unsetenv("KD_SERVICES")
+	_ = os.Setenv("KD_SERVICES", "docker,gh")
+	defer func() { _ = os.Unsetenv("KD_SERVICES") }()
 
 	err := installServices()
 	if err != nil {
@@ -104,8 +104,8 @@ func TestInstallServicesMarkerSkipsReinstall(t *testing.T) {
 	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
 	defer func() { servicesMarkerPath = orig }()
 
-	os.Setenv("KD_SERVICES", "gh")
-	defer os.Unsetenv("KD_SERVICES")
+	_ = os.Setenv("KD_SERVICES", "gh")
+	defer func() { _ = os.Unsetenv("KD_SERVICES") }()
 
 	// First call should install and write marker.
 	if err := installServices(); err != nil {
@@ -135,14 +135,14 @@ func TestInstallServicesChangedServicesReinstalls(t *testing.T) {
 	defer func() { servicesMarkerPath = orig }()
 
 	// Install with "gh".
-	os.Setenv("KD_SERVICES", "gh")
+	_ = os.Setenv("KD_SERVICES", "gh")
 	if err := installServices(); err != nil {
 		t.Fatalf("first installServices() error = %v", err)
 	}
 
 	// Change to "gh,node" — should reinstall.
-	os.Setenv("KD_SERVICES", "gh,node")
-	defer os.Unsetenv("KD_SERVICES")
+	_ = os.Setenv("KD_SERVICES", "gh,node")
+	defer func() { _ = os.Unsetenv("KD_SERVICES") }()
 
 	if err := installServices(); err != nil {
 		t.Fatalf("second installServices() error = %v", err)
@@ -158,7 +158,7 @@ func TestInstallServicesChangedServicesReinstalls(t *testing.T) {
 }
 
 func TestCopyServiceConfigsNoEnvVar(t *testing.T) {
-	os.Unsetenv("KD_SERVICES")
+	_ = os.Unsetenv("KD_SERVICES")
 	err := copyServiceConfigs("/home/test")
 	if err != nil {
 		t.Errorf("copyServiceConfigs() error = %v", err)
@@ -166,8 +166,8 @@ func TestCopyServiceConfigsNoEnvVar(t *testing.T) {
 }
 
 func TestCopyServiceConfigsUnknownService(t *testing.T) {
-	os.Setenv("KD_SERVICES", "nonexistent")
-	defer os.Unsetenv("KD_SERVICES")
+	_ = os.Setenv("KD_SERVICES", "nonexistent")
+	defer func() { _ = os.Unsetenv("KD_SERVICES") }()
 
 	err := copyServiceConfigs("/home/test")
 	if err != nil {
@@ -197,8 +197,8 @@ func TestCopyServiceConfigsSkipsExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	os.Setenv("KD_SERVICES", "gh")
-	defer os.Unsetenv("KD_SERVICES")
+	_ = os.Setenv("KD_SERVICES", "gh")
+	defer func() { _ = os.Unsetenv("KD_SERVICES") }()
 
 	err := copyServiceConfigs(homeDir)
 	if err != nil {

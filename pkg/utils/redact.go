@@ -59,9 +59,7 @@ func extractIDFromMatch(match, key string) string {
 	parts := strings.Split(match, "=")
 	if len(parts) == 2 {
 		val := strings.Trim(parts[1], `"' `)
-		if strings.HasPrefix(val, "Bearer ") {
-			val = strings.TrimPrefix(val, "Bearer ")
-		}
+		val = strings.TrimPrefix(val, "Bearer ")
 		return val
 	}
 	parts = strings.Split(match, ":")

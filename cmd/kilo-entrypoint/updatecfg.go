@@ -23,13 +23,14 @@ func runUpdateConfig() error {
 	if err != nil {
 		return fmt.Errorf("failed to download config template: %w", err)
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
+		_ = resp.Body.Close()
 		return fmt.Errorf("failed to download config template: HTTP %d", resp.StatusCode)
 	}
 
 	templateData, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 	if err != nil {
 		return fmt.Errorf("failed to read template: %w", err)
 	}

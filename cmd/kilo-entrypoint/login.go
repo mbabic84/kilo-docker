@@ -104,19 +104,20 @@ func listPATs(apiURL, accessToken string) ([]patListItem, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-	utils.LogError("PAT list request failed: %v\n", err)
+		utils.LogError("PAT list request failed: %v\n", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-utils.Log("PAT list returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+		_ = resp.Body.Close()
+		utils.Log("PAT list returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 		return nil, fmt.Errorf("list PATs failed with status %d", resp.StatusCode)
 	}
 
 	var listResp patListResponse
 	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 	if err := json.Unmarshal(body, &listResp); err != nil {
 		return nil, err
 	}
@@ -140,13 +141,13 @@ utils.Log("Ensuring PAT with label: %q\n", label)
 				if pat.ExpiresAt == nil || time.Until(pat.ExpiresAt.Time) <= patRotationThreshold {
 					utils.LogWarn("Existing PAT expiring soon or no expiry, rotating\n")
 				} else {
-				utils.Log("Existing PAT still valid (expires %s), using stored token\n", pat.ExpiresAt.Time.Format("2006-01-02"))
+				utils.Log("Existing PAT still valid (expires %s), using stored token\n", pat.ExpiresAt.Format("2006-01-02"))
 					return storedToken, nil
 				}
 			} else {
-				// No stored token — must rotate to obtain the value.
-				if pat.ExpiresAt != nil {
-					utils.Log("No stored token, rotating existing PAT (expires %s)\n", pat.ExpiresAt.Time.Format("2006-01-02"))
+			// No stored token — must rotate to obtain the value.
+			if pat.ExpiresAt != nil {
+				utils.Log("No stored token, rotating existing PAT (expires %s)\n", pat.ExpiresAt.Format("2006-01-02"))
 				} else {
 					utils.Log("No stored token, rotating existing PAT (no expiry)\n")
 				}
@@ -164,19 +165,20 @@ utils.Log("Ensuring PAT with label: %q\n", label)
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-			utils.LogError("PAT rotate request failed: %v\n", err)
+				utils.LogError("PAT rotate request failed: %v\n", err)
 				return "", err
 			}
-			defer resp.Body.Close()
 
-		if resp.StatusCode != 200 {
-			body, _ := io.ReadAll(resp.Body)
-utils.Log("PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
-			return "", fmt.Errorf("rotate PAT failed with status %d", resp.StatusCode)
-		}
+			if resp.StatusCode != 200 {
+				body, _ := io.ReadAll(resp.Body)
+				_ = resp.Body.Close()
+				utils.Log("PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+				return "", fmt.Errorf("rotate PAT failed with status %d", resp.StatusCode)
+			}
 
 			var rotateResp patResponse
 			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
 			if err := json.Unmarshal(body, &rotateResp); err != nil {
 				return "", err
 			}
@@ -203,16 +205,17 @@ utils.Log("No existing PAT found, creating new one...\n")
 		utils.LogError("PAT create request failed: %v\n", err)
 		return "", err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
-utils.Log("PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+		_ = resp.Body.Close()
+		utils.Log("PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 		return "", fmt.Errorf("create PAT failed with status %d", resp.StatusCode)
 	}
 
 	var createResp patResponse
 	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 	if err := json.Unmarshal(body, &createResp); err != nil {
 		return "", err
 	}
@@ -247,9 +250,9 @@ func runLoginInteractive() (loginResult, error) {
 	if err != nil {
 		return result, fmt.Errorf("connection failed")
 	}
-	defer resp.Body.Close()
 
 	loginRespBytes, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 401 {
@@ -278,13 +281,13 @@ func runLoginInteractive() (loginResult, error) {
 	if err != nil {
 		return result, fmt.Errorf("connection failed")
 	}
-	defer profileResp.Body.Close()
+
+	profileBody, _ := io.ReadAll(profileResp.Body)
+	_ = profileResp.Body.Close()
 
 	if profileResp.StatusCode != 200 {
 		return result, fmt.Errorf("profile fetch failed with status %d", profileResp.StatusCode)
 	}
-
-	profileBody, _ := io.ReadAll(profileResp.Body)
 	var profileRespParsed profileResponse
 	if err := json.Unmarshal(profileBody, &profileRespParsed); err != nil {
 		return result, fmt.Errorf("failed to parse profile response: %w", err)
@@ -328,7 +331,7 @@ func promptUsername() string {
 	for {
 		fmt.Fprint(os.Stderr, "Ainstruct username: ")
 		var username string
-		fmt.Scanln(&username)
+		_, _ = fmt.Scanln(&username)
 		username = strings.TrimSpace(username)
 		if username != "" {
 			return username
@@ -363,7 +366,7 @@ func promptPassword() string {
 func promptContext7Token() string {
 	fmt.Fprint(os.Stderr, "Context7 API key (leave empty to skip): ")
 	var token string
-	fmt.Scanln(&token)
+	_, _ = fmt.Scanln(&token)
 	return strings.TrimSpace(token)
 }
 
@@ -405,9 +408,9 @@ func runAinstructLogin() error {
 	if err != nil {
 		return fmt.Errorf("connection failed")
 	}
-	defer resp.Body.Close()
 
 	loginResp, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 
 	switch resp.StatusCode {
 	case 200:
@@ -429,9 +432,9 @@ func runAinstructLogin() error {
 		if err != nil {
 			return fmt.Errorf("connection failed")
 		}
-		defer profileResp.Body.Close()
 
 		if profileResp.StatusCode != 200 {
+			_ = profileResp.Body.Close()
 			return fmt.Errorf("profile fetch failed with status %d", profileResp.StatusCode)
 		}
 
@@ -439,6 +442,7 @@ func runAinstructLogin() error {
 			UserID string `json:"user_id"`
 		}
 		profileBody, _ := io.ReadAll(profileResp.Body)
+		_ = profileResp.Body.Close()
 		if err := json.Unmarshal(profileBody, &profileResult); err != nil {
 			return fmt.Errorf("failed to parse profile response: %w", err)
 		}
@@ -474,7 +478,7 @@ func runAinstructLogin() error {
 				Message string `json:"message"`
 			} `json:"detail"`
 		}
-		json.Unmarshal(loginResp, &errResp)
+		_ = json.Unmarshal(loginResp, &errResp)
 		msg := errResp.Detail.Message
 		if msg == "" {
 			msg = "unknown error"

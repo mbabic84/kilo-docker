@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
@@ -37,7 +38,7 @@ func loadUserConfig() (homeDir, username, shell, userID string) {
 	}
 	utils.Log("Scanning /home for user config: %d entries\n", len(entries))
 	for _, entry := range entries {
-		if !entry.IsDir() || !filepath.HasPrefix(entry.Name(), "kd-") {
+		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "kd-") {
 			continue
 		}
 		configPath := filepath.Join(baseDir, entry.Name(), ".local/share/kilo/.user-config.json")
@@ -96,8 +97,8 @@ func execZellij() error {
 						uid, _ := strconv.Atoi(uidStr)
 						gid, _ := strconv.Atoi(gidStr)
 						utils.Log("Dropping privileges to UID=%d, GID=%d\n", uid, gid)
-						syscall.Setgid(gid)
-						syscall.Setuid(uid)
+						_ = syscall.Setgid(gid)
+						_ = syscall.Setuid(uid)
 					}
 				}
 			}
