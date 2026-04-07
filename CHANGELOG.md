@@ -1,3 +1,9 @@
+## [2.9.0](https://github.com/mbabic84/kilo-docker/compare/v2.8.2...v2.9.0) (2026-04-07)
+
+### Features
+
+* add versions step and create .versions file on release ([61993dc](https://github.com/mbabic84/kilo-docker/commit/61993dc126a82c52082a34a5381ee870671eb73d))
+
 ## [2.8.2](https://github.com/mbabic84/kilo-docker/compare/v2.8.1...v2.8.2) (2026-04-07)
 
 ### Bug Fixes
