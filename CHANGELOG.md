@@ -1,3 +1,9 @@
+## [2.13.2](https://github.com/mbabic84/kilo-docker/compare/v2.13.1...v2.13.2) (2026-04-07)
+
+### Bug Fixes
+
+* add [kilo-docker] prefix to all user-visible logs ([0862a9b](https://github.com/mbabic84/kilo-docker/commit/0862a9bfec62bc6a1b08df40d9d5114c942bc88a))
+
 ## [2.13.1](https://github.com/mbabic84/kilo-docker/compare/v2.13.0...v2.13.1) (2026-04-07)
 
 ### Bug Fixes
