@@ -1,3 +1,9 @@
+## [2.8.0](https://github.com/mbabic84/kilo-docker/compare/v2.7.2...v2.8.0) (2026-04-07)
+
+### Features
+
+* enable copy_on_select in zellij config ([752a6b2](https://github.com/mbabic84/kilo-docker/commit/752a6b2495b06b10050238931f3dc110819b9d05))
+
 ## [2.7.2](https://github.com/mbabic84/kilo-docker/compare/v2.7.1...v2.7.2) (2026-04-07)
 
 ### Bug Fixes
