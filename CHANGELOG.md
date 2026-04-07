@@ -1,3 +1,9 @@
+## [2.7.2](https://github.com/mbabic84/kilo-docker/compare/v2.7.1...v2.7.2) (2026-04-07)
+
+### Bug Fixes
+
+* check remote before copying opencode.json template ([741e90b](https://github.com/mbabic84/kilo-docker/commit/741e90bc3fa3041953778d25a5d38a18b3c2a431))
+
 ## [2.7.1](https://github.com/mbabic84/kilo-docker/compare/v2.7.0...v2.7.1) (2026-04-06)
 
 ### Bug Fixes
