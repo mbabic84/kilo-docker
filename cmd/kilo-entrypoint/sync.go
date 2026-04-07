@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
-	"github.com/mbabic84/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // runSyncMode starts the ainstruct-sync background process. It pulls the
@@ -17,26 +15,11 @@ import (
 // to a log file (~/.config/kilo/ainstruct-sync.log) to avoid interfering
 // with the Kilo TUI on stdout.
 func runSyncMode() {
-	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
-	log.SetPrefix("")
-
-	logDir := constants.GetKiloConfigDir()
-	_ = os.MkdirAll(logDir, 0o755)
-	logPath := filepath.Join(logDir, "ainstruct-sync.log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		log.Printf("[ainstruct-sync] Failed to open log file %s: %v", logPath, err)
-	} else {
-		log.SetOutput(logFile)
-		defer func() { _ = logFile.Close() }()
-	}
-
 	s := NewSyncer()
 
 	if err := s.pullCollection(); err != nil {
-		log.Printf("[ainstruct-sync] Pull failed: %v", err)
+		utils.LogError("[ainstruct-sync] Pull failed: %v\n", err)
 	} else {
-		// Push files that have never been synced (no hash entry)
 		s.pushUnsynced()
 	}
 
@@ -44,8 +27,8 @@ func runSyncMode() {
 	defer cancel()
 
 	if err := runWatcher(ctx, s); err != nil {
-		log.Printf("[ainstruct-sync] Watcher error: %v", err)
+		utils.LogError("[ainstruct-sync] Watcher error: %v\n", err)
 		os.Exit(1)
 	}
-	log.Println("[ainstruct-sync] Shutting down")
+	utils.Log("[ainstruct-sync] Shutting down\n")
 }

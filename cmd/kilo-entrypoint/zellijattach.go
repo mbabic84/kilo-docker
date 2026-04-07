@@ -17,12 +17,12 @@ const initMarker = "/tmp/.kilo-initialized"
 // If the container is already initialized, it execs zellij directly.
 // Otherwise it runs the first-time user init flow.
 func runZellijAttach() error {
-	utils.Log("runZellijAttach: checking init marker at %s\n", initMarker)
+	utils.Log("[zellijattach] runZellijAttach: checking init marker at %s\n", initMarker, utils.WithOutput())
 	if _, err := os.Stat(initMarker); err == nil {
-		utils.Log("runZellijAttach: init marker found, container already initialized\n")
+		utils.Log("[zellijattach] runZellijAttach: init marker found, container already initialized\n", utils.WithOutput())
 		return execZellij()
 	}
-	utils.Log("runZellijAttach: init marker not found, running first-time initialization\n")
+	utils.Log("[zellijattach] runZellijAttach: init marker not found, running first-time initialization\n", utils.WithOutput())
 	return runUserInit()
 }
 
@@ -33,21 +33,21 @@ func loadUserConfig() (homeDir, username, shell, userID string) {
 	baseDir := "/home"
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
-		utils.LogError("Error reading /home: %v\n", err)
+		utils.LogError("[zellijattach] Error reading /home: %v\n", err)
 		return "", "", "", ""
 	}
-	utils.Log("Scanning /home for user config: %d entries\n", len(entries))
+	utils.Log("[zellijattach] Scanning /home for user config: %d entries\n", len(entries), utils.WithOutput())
 	for _, entry := range entries {
 		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "kd-") {
 			continue
 		}
 		configPath := filepath.Join(baseDir, entry.Name(), ".local/share/kilo/.user-config.json")
-		utils.Log("Checking for user config: %s\n", configPath)
+		utils.Log("[zellijattach] Checking for user config: %s\n", configPath, utils.WithOutput())
 		if _, err := os.Stat(configPath); err == nil {
-			utils.Log("Found user config: %s\n", configPath)
+			utils.Log("[zellijattach] Found user config: %s\n", configPath, utils.WithOutput())
 			data, err := os.ReadFile(configPath)
 			if err != nil {
-				utils.LogError("Error reading user config: %v\n", err)
+				utils.LogError("[zellijattach] Error reading user config: %v\n", err)
 				continue
 			}
 			var config map[string]string
@@ -65,13 +65,13 @@ func loadUserConfig() (homeDir, username, shell, userID string) {
 					userID = uid
 				}
 				if homeDir != "" && username != "" {
-					utils.Log("Loaded user config: homeDir=%s, username=%s, shell=%s\n", homeDir, username, shell)
+					utils.Log("[zellijattach] Loaded user config: homeDir=%s, username=%s, shell=%s\n", homeDir, username, shell, utils.WithOutput())
 					return homeDir, username, shell, userID
 				}
 			}
 		}
 	}
-	utils.Log("No user config found\n")
+	utils.Log("[zellijattach] No user config found\n", utils.WithOutput())
 	return "", "", "", ""
 }
 
@@ -84,7 +84,7 @@ func execZellij() error {
 	
 	// If no user config found, we can't properly run as user
 	if homeDir == "" || username == "" {
-		utils.LogWarn("No user config found, running as root\n")
+		utils.LogWarn("[zellijattach] No user config found, running as root\n")
 	} else {
 		// Load UID/GID from config to drop privileges
 		configPath := filepath.Join(homeDir, ".local/share/kilo/.user-config.json")
@@ -96,7 +96,7 @@ func execZellij() error {
 					if gidStr, ok := config["gid"]; ok {
 						uid, _ := strconv.Atoi(uidStr)
 						gid, _ := strconv.Atoi(gidStr)
-						utils.Log("Dropping privileges to UID=%d, GID=%d\n", uid, gid)
+						utils.Log("[zellijattach] Dropping privileges to UID=%d, GID=%d\n", uid, gid, utils.WithOutput())
 						_ = syscall.Setgid(gid)
 						_ = syscall.Setuid(uid)
 					}
@@ -120,7 +120,7 @@ func execZellij() error {
 		env = appendOrReplaceEnv(env, "SHELL", shell)
 	}
 	
-	utils.Log("Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
+	utils.Log("[zellijattach] Executing zellij with HOME=%s, USER=%s\n", homeDir, username, utils.WithOutput())
 	return syscall.Exec("/usr/local/bin/zellij", []string{"zellij", "attach", "--create", "kilo-docker"}, env)
 }
 

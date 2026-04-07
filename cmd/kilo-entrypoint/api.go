@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -62,7 +61,7 @@ func (s *Syncer) forceRefreshToken() error {
 	if result.ExpiresIn > 0 {
 		s.tokenExpiry = time.Now().Unix() + result.ExpiresIn
 	}
-	log.Println("[ainstruct-sync] Token refreshed")
+	utils.Log("[ainstruct-sync] Token refreshed\n")
 	return nil
 }
 
@@ -83,20 +82,20 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
-	log.Printf("[ainstruct-sync] API %s %s => %d", method, path, resp.StatusCode)
+	utils.Log("[ainstruct-sync] API %s %s => %d\n", method, path, resp.StatusCode)
 
 	// Check for INVALID_TOKEN before the non-2xx early return so the
 	// retry path is reachable when the API returns 401 with this error.
 	var apiErr apiError
 	if json.Unmarshal(respBody, &apiErr) == nil && apiErr.Error == "INVALID_TOKEN" {
 		if s.refreshToken == "" {
-			log.Println("[ainstruct-sync] Token invalid — stopping watcher")
+			utils.LogError("[ainstruct-sync] Token invalid — stopping watcher\n")
 			s.authExpired = true
 			return nil, fmt.Errorf("INVALID_TOKEN and no refresh token")
 		}
 		// Force refresh — the server explicitly told us the token is invalid.
 		if err := s.forceRefreshToken(); err != nil {
-			log.Println("[ainstruct-sync] Token refresh failed — stopping watcher")
+			utils.LogError("[ainstruct-sync] Token refresh failed — stopping watcher\n")
 			s.authExpired = true
 			return nil, err
 		}
@@ -109,25 +108,25 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("reading retry response: %w", err)
 		}
-		log.Printf("[ainstruct-sync] API %s %s (retry) => %d", method, path, retryResp.StatusCode)
+		utils.Log("[ainstruct-sync] API %s %s (retry) => %d\n", method, path, retryResp.StatusCode)
 		// Check INVALID_TOKEN before non-2xx return for retry response too.
 		// Use a fresh variable — json.Unmarshal does not reset fields absent
 		// from the JSON, so reusing apiErr would keep the stale error value.
 		var retryTokenErr apiError
 		if json.Unmarshal(respBody, &retryTokenErr) == nil && retryTokenErr.Error == "INVALID_TOKEN" {
-			log.Println("[ainstruct-sync] Token invalid after refresh — stopping watcher")
+			utils.LogError("[ainstruct-sync] Token invalid after refresh — stopping watcher\n")
 			s.authExpired = true
 			return nil, fmt.Errorf("INVALID_TOKEN after refresh")
 		}
 		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
-			log.Printf("[ainstruct-sync] API retry error response body: %s", utils.Redact(string(respBody)))
+			utils.Log("[ainstruct-sync] API retry error response body: %s\n", utils.Redact(string(respBody)))
 			return nil, fmt.Errorf("API %s %s (retry) returned %d: %s", method, path, retryResp.StatusCode, string(respBody))
 		}
 		return respBody, nil
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Printf("[ainstruct-sync] API error response body: %s", utils.Redact(string(respBody)))
+		utils.Log("[ainstruct-sync] API error response body: %s\n", utils.Redact(string(respBody)))
 		return nil, fmt.Errorf("API %s %s returned %d: %s", method, path, resp.StatusCode, string(respBody))
 	}
 	return respBody, nil

@@ -30,7 +30,7 @@ import (
 //   - Privilege drop to the created user
 //   - Exec zellij
 func runUserInit() error {
-	utils.Log("runUserInit: starting initialization\n")
+	utils.Log("[userinit] starting initialization\n")
 
 	puidStr := os.Getenv("PUID")
 	if puidStr == "" {
@@ -43,15 +43,14 @@ func runUserInit() error {
 	puid, _ := strconv.Atoi(puidStr)
 	pgid, _ := strconv.Atoi(pgidStr)
 
-	utils.Log("runUserInit: PUID=%s, PGID=%s\n", puidStr, pgidStr)
+	utils.Log("[userinit] PUID=%s, PGID=%s\n", puidStr, pgidStr)
 
 	existingUser := findExistingUser()
 	if existingUser != "" {
-		utils.Log("Found existing user data: %s\n", existingUser)
+		utils.Log("[userinit] Found existing user data: %s\n", existingUser)
 	}
-
 	// Login
-	utils.Log("Starting Ainstruct authentication\n")
+	utils.Log("[userinit] Starting Ainstruct authentication\n", utils.WithOutput())
 	loginRes, err := runLoginInteractive()
 	if err != nil {
 		return fmt.Errorf("login failed: %w", err)
@@ -63,14 +62,14 @@ func runUserInit() error {
 		if derived != existingUser {
 			return fmt.Errorf("user mismatch: expected %s, got %s", existingUser, derived)
 		}
-		utils.Log("User verified: %s\n", derived)
+		utils.Log("[userinit] User verified: %s\n", derived)
 	}
 
 	username := deriveHomeName(userID)
 	homeDir := "/home/" + username
 
 	// Create OS user
-	utils.Log("Creating user: %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
+	utils.Log("[userinit] Creating user: %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
 	if err := createOSUser(username, puidStr, pgidStr); err != nil {
 		return fmt.Errorf("failed to create user %s: %w", username, err)
 	}
@@ -79,7 +78,7 @@ func runUserInit() error {
 	joinServiceGroups(username)
 
 	// Create home directory and config structure
-	utils.Log("Creating home directory: %s\n", homeDir)
+	utils.Log("[userinit] Creating home directory: %s\n", homeDir)
 	_ = os.MkdirAll(homeDir, 0755)
 	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/commands"), 0755)
 	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/agents"), 0755)
@@ -104,30 +103,30 @@ func runUserInit() error {
 	if _, err := os.Stat(hashFile); os.IsNotExist(err) {
 		hasRemote, checkErr := checkRemoteHasOpencode(homeDir, userID)
 		if checkErr != nil {
-			utils.LogWarn("opencode init: remote check failed (%v), falling back to template\n", checkErr)
+			utils.LogWarn("[userinit] opencode init: remote check failed (%v), falling back to template\n", checkErr)
 			copyFileIfMissing("/etc/kilo/template-opencode.json", localOpencode)
 		} else if hasRemote {
-			utils.Log("opencode init: remote has opencode.json, will sync from remote\n")
+			utils.Log("[userinit] opencode init: remote has opencode.json, will sync from remote\n")
 		} else {
-			utils.Log("opencode init: no remote opencode.json, copying template\n")
+			utils.Log("[userinit] opencode init: no remote opencode.json, copying template\n")
 			copyFileIfMissing("/etc/kilo/template-opencode.json", localOpencode)
 		}
 	} else {
-		utils.Log("opencode init: existing user, skipping (hash cache found)\n")
+		utils.Log("[userinit] opencode init: existing user, skipping (hash cache found)\n")
 	}
 
 	copyFileIfMissing("/etc/zellij/template-config.kdl", filepath.Join(homeDir, ".config/zellij/config.kdl"))
 
 	// Setup SSH known_hosts
-	utils.Log("Setting up SSH known_hosts\n")
+	utils.Log("[userinit] Setting up SSH known_hosts\n")
 	_ = setupKnownHosts(homeDir)
 
 	// Copy service configs to the new home
-	utils.Log("Copying service configs\n")
+	utils.Log("[userinit] Copying service configs\n")
 	_ = copyServiceConfigs(homeDir)
 
 	// Install user-scoped services (NVM, etc.) with HOME set to user home
-	utils.Log("Installing user-scoped services\n")
+	utils.Log("[userinit] Installing user-scoped services\n")
 	_ = installUserServices(homeDir)
 
 	// Set HOME temporarily so GetKiloConfigDir() and token paths resolve correctly
@@ -167,22 +166,22 @@ func runUserInit() error {
 		// Token exists and is set - nothing to do
 	} else if context7TokenEmpty {
 		// User explicitly disabled context7, keep it disabled
-		utils.Log("Context7 token explicitly disabled, skipping prompt\n")
+		utils.Log("[userinit] Context7 token explicitly disabled, skipping prompt\n")
 	} else {
 		// Not set (never configured), prompt user to get token
-		utils.Log("Initializing MCP tokens\n")
+		utils.Log("[userinit] Initializing MCP tokens\n")
 		promptContext7Token()
 	}
 
 	// Save all tokens (ainstruct PAT from login + context7 + sync tokens)
-	utils.Log("Saving MCP tokens\n")
+	utils.Log("[userinit] Saving MCP tokens\n")
 	if err := initTokens(homeDir, userID, loginRes); err != nil {
-		utils.LogWarn("token init failed: %v\n", err)
+		utils.LogWarn("[userinit] token init failed: %v\n", err)
 	}
 
 	// Chown SSH agent socket to the new user
 	if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
-		utils.Log("Setting SSH agent socket ownership: %s\n", sshAuthSock)
+		utils.Log("[userinit] Setting SSH agent socket ownership: %s\n", sshAuthSock)
 		_ = os.Chown(sshAuthSock, puid, pgid)
 		_ = os.Chmod(sshAuthSock, 0600)
 	}
@@ -190,13 +189,13 @@ func runUserInit() error {
 	_ = os.Setenv("HOME", savedHome)
 
 	// Mark initialized
-	utils.Log("Marking container as initialized: %s\n", initMarker)
+	utils.Log("[userinit] Marking container as initialized: %s\n", initMarker)
 	_ = os.WriteFile(initMarker, []byte("1\n"), 0644)
 
 	// Persist user configuration for re-attach
 	// Store info in a file on the volume so it survives container restarts
 	userConfigPath := filepath.Join(homeDir, ".local/share/kilo/.user-config.json")
-	utils.Log("Saving user config to: %s\n", userConfigPath)
+	utils.Log("[userinit] Saving user config to: %s\n", userConfigPath)
 	userConfig := map[string]string{
 		"homeDir": homeDir,
 		"username": username,
@@ -210,7 +209,7 @@ func runUserInit() error {
 	}
 	configJSON, _ := json.Marshal(userConfig)
 	if err := os.WriteFile(userConfigPath, configJSON, 0644); err != nil {
-		utils.LogWarn("failed to save user config: %v\n", err)
+		utils.LogWarn("[userinit] failed to save user config: %v\n", err)
 	} else {
 		redactedConfig := map[string]string{
 			"homeDir":  homeDir,
@@ -221,7 +220,7 @@ func runUserInit() error {
 			"userID":   utils.RedactID(userID),
 		}
 		redactedJSON, _ := json.Marshal(redactedConfig)
-		utils.Log("Saved user config: %s\n", string(redactedJSON))
+		utils.Log("[userinit] Saved user config: %s\n", string(redactedJSON))
 	}
 
 	// Set environment
@@ -231,22 +230,22 @@ func runUserInit() error {
 	_ = os.Setenv("SHELL", userConfig["shell"])
 
 	// Chown everything to the new user (after all root-level file writes)
-	utils.Log("Setting ownership: %s\n", homeDir)
+	utils.Log("[userinit] Setting ownership: %s\n", homeDir)
 	chownRecursive(homeDir, puid, pgid)
 
 	// Get supplementary groups for the user before dropping privileges
-	utils.Log("Getting supplementary groups for %s\n", username)
+	utils.Log("[userinit] Getting supplementary groups for %s\n", username)
 	suppGroups := getUserGroups(username)
-	utils.Log("Supplementary groups for %s: %v\n", username, suppGroups)
+	utils.Log("[userinit] Supplementary groups for %s: %v\n", username, suppGroups)
 
 	// Drop privileges and exec zellij
-	utils.Log("Dropping privileges to %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
+	utils.Log("[userinit] Dropping privileges to %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
 	
 	// Set supplementary groups BEFORE setting gid/uid
 	if len(suppGroups) > 0 {
-		utils.Log("Setting supplementary groups: %v\n", suppGroups)
+		utils.Log("[userinit] Setting supplementary groups: %v\n", suppGroups)
 		if err := syscall.Setgroups(suppGroups); err != nil {
-			utils.LogWarn("Failed to set supplementary groups: %v\n", err)
+			utils.LogWarn("[userinit] Failed to set supplementary groups: %v\n", err)
 		}
 	}
 	
@@ -254,14 +253,14 @@ func runUserInit() error {
 	_ = syscall.Setuid(puid)
 
 	// Start file sync as the user (after privilege drop so files are owned correctly)
-	utils.Log("Starting file sync\n")
+	utils.Log("[userinit] Starting file sync\n")
 	_ = startSyncWithTokens(homeDir, userID)
 
 	// Delete stale zellij sessions from previous container lifecycle
-	utils.Log("Clearing old zellij sessions\n")
+	utils.Log("[userinit] Clearing old zellij sessions\n")
 	clearZellijSessions()
 
-	utils.Log("Starting zellij\n")
+	utils.Log("[userinit] Starting zellij\n")
 	return execZellij()
 }
 
@@ -291,7 +290,7 @@ func copyFileIfMissing(src, dst string) {
 	}
 	_ = os.MkdirAll(filepath.Dir(dst), 0755)
 	_ = os.WriteFile(dst, data, 0644)
-	utils.Log("Copied %s\n", filepath.Base(src))
+	utils.Log("[userinit] Copied %s\n", filepath.Base(src))
 }
 
 // joinServiceGroups adds the user to service groups for socket access.
@@ -299,51 +298,51 @@ func copyFileIfMissing(src, dst string) {
 func joinServiceGroups(username string) {
 	servicesEnv := os.Getenv("KD_SERVICES")
 	if servicesEnv == "" {
-		utils.Log("joinServiceGroups: no services enabled\n")
+		utils.Log("[userinit] joinServiceGroups: no services enabled\n")
 		return
 	}
-	utils.Log("joinServiceGroups: services=%s, user=%s\n", servicesEnv, username)
+	utils.Log("[userinit] joinServiceGroups: services=%s, user=%s\n", servicesEnv, username)
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil || svc.RequiresSocket == "" {
-			utils.Log("joinServiceGroups: skipping %s (no socket required)\n", svcName)
+			utils.Log("[userinit] joinServiceGroups: skipping %s (no socket required)\n", svcName)
 			continue
 		}
 
 		// First try to add to the service-named group
-		utils.Log("joinServiceGroups: trying addgroup %s %s\n", username, svc.Name)
+		utils.Log("[userinit] joinServiceGroups: trying addgroup %s %s\n", username, svc.Name)
 		cmd1 := exec.Command("addgroup", username, svc.Name)
 		if out, err := cmd1.CombinedOutput(); err == nil {
-			utils.Log("joinServiceGroups: added %s to %s\n", username, svc.Name)
+			utils.Log("[userinit] joinServiceGroups: added %s to %s\n", username, svc.Name)
 			continue
 		} else {
-			utils.Log("joinServiceGroups: failed to add %s to %s: %v, output: %s\n", username, svc.Name, err, strings.TrimSpace(string(out)))
+			utils.Log("[userinit] joinServiceGroups: failed to add %s to %s: %v, output: %s\n", username, svc.Name, err, strings.TrimSpace(string(out)))
 		}
 
 		// If that failed, check if a group with the target GID already exists
 		gid := os.Getenv(svc.GIDEnvVar)
 		if gid == "" {
-			utils.Log("joinServiceGroups: no GID env var for %s\n", svc.Name)
+			utils.Log("[userinit] joinServiceGroups: no GID env var for %s\n", svc.Name)
 			continue
 		}
-		utils.Log("joinServiceGroups: looking up GID %s for service %s\n", gid, svc.Name)
+		utils.Log("[userinit] joinServiceGroups: looking up GID %s for service %s\n", gid, svc.Name)
 
 		cmd := exec.Command("getent", "group", gid)
 		out, err := cmd.Output()
 		if err != nil {
-			utils.Log("joinServiceGroups: getent group %s failed: %v\n", gid, err)
+			utils.Log("[userinit] joinServiceGroups: getent group %s failed: %v\n", gid, err)
 			continue
 		}
 
 		parts := strings.SplitN(string(out), ":", 2)
-		utils.Log("joinServiceGroups: getent returned: %s\n", strings.TrimSpace(string(out)))
+		utils.Log("[userinit] joinServiceGroups: getent returned: %s\n", strings.TrimSpace(string(out)))
 		if len(parts) > 0 && parts[0] != "" && parts[0] != svc.Name {
 			// Add user to the existing group with matching GID
-			utils.Log("joinServiceGroups: adding %s to existing group %s\n", username, parts[0])
+			utils.Log("[userinit] joinServiceGroups: adding %s to existing group %s\n", username, parts[0])
 			if err := exec.Command("addgroup", username, parts[0]).Run(); err != nil {
-				utils.Log("joinServiceGroups: failed to add %s to %s: %v\n", username, parts[0], err)
+				utils.Log("[userinit] joinServiceGroups: failed to add %s to %s: %v\n", username, parts[0], err)
 			} else {
-				utils.Log("joinServiceGroups: successfully added %s to %s\n", username, parts[0])
+				utils.Log("[userinit] joinServiceGroups: successfully added %s to %s\n", username, parts[0])
 			}
 		}
 	}
@@ -357,7 +356,7 @@ func getUserGroups(username string) []int {
 	// Read /etc/group to find all groups the user belongs to
 	data, err := os.ReadFile("/etc/group")
 	if err != nil {
-		utils.LogWarn("Failed to read /etc/group: %v\n", err)
+		utils.LogWarn("[userinit] Failed to read /etc/group: %v\n", err)
 		return groups
 	}
 	
@@ -448,7 +447,7 @@ func clearZellijSessions() {
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		utils.LogWarn("failed to delete zellij sessions: %v\n", err)
+		utils.LogWarn("[userinit] failed to delete zellij sessions: %v\n", err)
 	}
 }
 
@@ -545,18 +544,18 @@ func runMCPTokens() error {
 		}
 	}
 
-	fmt.Println("MCP Token Management")
-	fmt.Println("====================")
-	fmt.Println()
+	utils.Log("[userinit] MCP Token Management\n", utils.WithOutput())
+	utils.Log("[userinit] ====================\n", utils.WithOutput())
+	utils.Log("[userinit] \n", utils.WithOutput())
 
 	currentContext7 := "[not set]"
 	if context7Token != "" {
 		currentContext7 = maskToken(context7Token)
 	}
-	fmt.Printf("Context7 token: %s\n", currentContext7)
-	fmt.Println("  - Press Enter to keep current")
-	fmt.Println("  - Type a new token to update")
-	fmt.Println("  - Type 'clear' to disable")
+	utils.Log("[userinit] Context7 token: %s\n", currentContext7, utils.WithOutput())
+	utils.Log("[userinit]   - Press Enter to keep current\n", utils.WithOutput())
+	utils.Log("[userinit]   - Type a new token to update\n", utils.WithOutput())
+	utils.Log("[userinit]   - Type 'clear' to disable\n", utils.WithOutput())
 	fmt.Print("> ")
 
 	var input string
@@ -565,39 +564,39 @@ func runMCPTokens() error {
 
 	if input == "clear" {
 		context7Token = ""
-		fmt.Println("Context7 token disabled")
+		utils.Log("[userinit] Context7 token disabled\n", utils.WithOutput())
 	} else if input != "" {
 		context7Token = input
-		fmt.Println("Context7 token updated")
+		utils.Log("[userinit] Context7 token updated\n", utils.WithOutput())
 	}
 
 	if err := saveEncryptedTokens(homeDir, userID, context7Token, ainstructToken, syncToken, syncRefresh, syncExpiry); err != nil {
-		utils.LogWarn("failed to save tokens: %v\n", err)
+		utils.LogWarn("[userinit] failed to save tokens: %v\n", err)
 	}
 
-	fmt.Println("MCP tokens saved")
+	utils.Log("[userinit] MCP tokens saved\n", utils.WithOutput())
 	return nil
 }
 
 func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
-	utils.Log("Checking remote for opencode.json (first-time init)\n")
+	utils.Log("[userinit] checkRemote: Checking remote for opencode.json (first-time init)\n")
 
 	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
 	encData, err := os.ReadFile(encPath)
 	if err != nil {
-		utils.LogWarn("checkRemote: no encrypted tokens found: %v\n", err)
+		utils.LogWarn("[userinit] checkRemote: no encrypted tokens found: %v\n", err)
 		return false, fmt.Errorf("no encrypted tokens found: %w", err)
 	}
 
 	decrypted, err := decryptAES(encData, userID)
 	if err != nil {
-		utils.LogWarn("checkRemote: failed to decrypt tokens: %v\n", err)
+		utils.LogWarn("[userinit] checkRemote: failed to decrypt tokens: %v\n", err)
 		return false, fmt.Errorf("failed to decrypt tokens: %w", err)
 	}
 
 	_, _, syncToken, _, _, _ := parseTokenEnv(string(decrypted))
 	if syncToken == "" {
-		utils.LogWarn("checkRemote: no sync token available\n")
+		utils.LogWarn("[userinit] checkRemote: no sync token available\n")
 		return false, fmt.Errorf("no sync token available")
 	}
 
@@ -614,16 +613,16 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 	req.Header.Set("Authorization", "Bearer "+syncToken)
 
 	client := &http.Client{Timeout: 10 * time.Second}
-	utils.Log("checkRemote: GET /collections\n")
+	utils.Log("[userinit] checkRemote: GET /collections\n")
 	resp, err := client.Do(req)
 	if err != nil {
-		utils.LogWarn("checkRemote: collections request failed: %v\n", err)
+		utils.LogWarn("[userinit] checkRemote: collections request failed: %v\n", err)
 		return false, err
 	}
 
 	if resp.StatusCode != 200 {
 		_ = resp.Body.Close()
-		utils.LogWarn("checkRemote: collections API returned %d\n", resp.StatusCode)
+		utils.LogWarn("[userinit] checkRemote: collections API returned %d\n", resp.StatusCode)
 		return false, fmt.Errorf("collections API returned %d", resp.StatusCode)
 	}
 
@@ -636,7 +635,7 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		_ = resp.Body.Close()
-		utils.LogWarn("checkRemote: failed to decode collections response: %v\n", err)
+		utils.LogWarn("[userinit] checkRemote: failed to decode collections response: %v\n", err)
 		return false, err
 	}
 	_ = resp.Body.Close()
@@ -645,13 +644,13 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 	for _, c := range result.Collections {
 		if c.Name == "kilo-docker" {
 			collectionID = c.CollectionID
-			utils.Log("checkRemote: found collection %s\n", utils.RedactID(collectionID))
+			utils.Log("[userinit] checkRemote: found collection %s\n", utils.RedactID(collectionID))
 			break
 		}
 	}
 
 	if collectionID == "" {
-		utils.Log("checkRemote: no kilo-docker collection found\n")
+		utils.Log("[userinit] checkRemote: no kilo-docker collection found\n")
 		return false, nil
 	}
 
@@ -662,16 +661,16 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+syncToken)
 
-	utils.Log("checkRemote: GET /documents for collection %s\n", utils.RedactID(collectionID))
+	utils.Log("[userinit] checkRemote: GET /documents for collection %s\n", utils.RedactID(collectionID))
 	resp, err = client.Do(req)
 	if err != nil {
-		utils.LogWarn("checkRemote: documents request failed: %v\n", err)
+		utils.LogWarn("[userinit] checkRemote: documents request failed: %v\n", err)
 		return false, err
 	}
 
 	if resp.StatusCode != 200 {
 		_ = resp.Body.Close()
-		utils.LogWarn("checkRemote: documents API returned %d\n", resp.StatusCode)
+		utils.LogWarn("[userinit] checkRemote: documents API returned %d\n", resp.StatusCode)
 		return false, fmt.Errorf("documents API returned %d", resp.StatusCode)
 	}
 
@@ -685,19 +684,19 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 
 	if err := json.NewDecoder(resp.Body).Decode(&docsResult); err != nil {
 		_ = resp.Body.Close()
-		utils.LogWarn("checkRemote: failed to decode documents response: %v\n", err)
+		utils.LogWarn("[userinit] checkRemote: failed to decode documents response: %v\n", err)
 		return false, err
 	}
 	_ = resp.Body.Close()
 
 	for _, d := range docsResult.Documents {
 		if d.Metadata.LocalPath == "opencode.json" {
-			utils.Log("checkRemote: found opencode.json in remote collection\n")
+			utils.Log("[userinit] checkRemote: found opencode.json in remote collection\n")
 			return true, nil
 		}
 	}
 
-	utils.Log("checkRemote: no opencode.json in remote collection\n")
+	utils.Log("[userinit] checkRemote: no opencode.json in remote collection\n")
 	return false, nil
 }
 
