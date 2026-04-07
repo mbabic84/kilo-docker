@@ -69,7 +69,7 @@ func runHelp() {
 	fmt.Printf("  %-*s %s\n", w, "update-config", "Download config template, merge with existing config")
 	fmt.Printf("  %-*s %s\n", w, "backup [path]", "Create tar.gz of KILO_HOME (default: /tmp/backup.tar.gz)")
 	fmt.Printf("  %-*s %s\n", w, "restore [path]", "Extract tar.gz into KILO_HOME with ownership fix")
-	fmt.Printf("  %-*s %s\n", w, "mcp-config", "Apply MCP enabled states from KD_MCP_* env vars")
+		fmt.Printf("  %-*s %s\n", w, "mcp-config", "Apply MCP enabled states from encrypted token storage")
 	fmt.Printf("  %-*s %s\n", w, "mcp-tokens", "Interactive token management")
 	fmt.Printf("  %-*s %s\n", w, "sync", "Start ainstruct file watcher + REST sync")
 	fmt.Printf("  %-*s %s\n", w, "resync", "Delete all remote documents and re-push local files")
