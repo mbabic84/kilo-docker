@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +22,41 @@ func downloadFile(url, dest string) error {
 		return nil
 	}
 	return fmt.Errorf("neither curl nor wget succeeded")
+}
+
+// latestVersions holds the latest available versions from the remote.
+type latestVersions struct {
+	kiloDockerVersion string
+	kiloVersion       string
+}
+
+// getLatestVersions fetches the latest versions from the .versions file.
+func getLatestVersions() (latestVersions, error) {
+	url := "https://github.com/mbabic84/kilo-docker/releases/latest/download/default.versions"
+	resp, err := http.Get(url)
+	if err != nil {
+		return latestVersions{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return latestVersions{}, fmt.Errorf("failed to fetch versions: %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return latestVersions{}, err
+	}
+
+	versions := latestVersions{}
+	for _, line := range strings.Split(string(body), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "KILO_DOCKER_VERSION=") {
+			versions.kiloDockerVersion = strings.TrimPrefix(line, "KILO_DOCKER_VERSION=")
+		} else if strings.HasPrefix(line, "KILO_VERSION=") {
+			versions.kiloVersion = strings.TrimPrefix(line, "KILO_VERSION=")
+		}
+	}
+	return versions, nil
 }
 
 // getOSArch returns the OS and architecture for the current system.
@@ -46,6 +83,28 @@ func handleUpdate() {
 	home, _ := os.UserHomeDir()
 	target := filepath.Join(home, ".local", "bin", "kilo-docker")
 
+	latest, err := getLatestVersions()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not fetch latest version info: %v\n", err)
+		latest.kiloDockerVersion = "unknown"
+		latest.kiloVersion = "unknown"
+	}
+
+	fmt.Fprintf(os.Stderr, "kilo-docker: %s → %s\n", version, latest.kiloDockerVersion)
+	fmt.Fprintf(os.Stderr, "Kilo CLI: %s → %s\n", kiloVersion, latest.kiloVersion)
+
+	if version == latest.kiloDockerVersion {
+		fmt.Fprintf(os.Stderr, "\nAlready on latest version (%s). No update needed.\n", latest.kiloDockerVersion)
+		if !dockerDaemonRunning() {
+			fmt.Fprintf(os.Stderr, "\nWarning: Docker daemon is not running.\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Pulling Docker image...\n")
+			_, _ = dockerRun("pull", repoURL+":latest")
+		}
+		fmt.Fprintf(os.Stderr, "\nUpdate complete.\n")
+		return
+	}
+
 	// Check if installed
 	if _, err := os.Stat(target); err != nil {
 		fmt.Fprintf(os.Stderr, "kilo-docker is not installed locally.\n")
@@ -55,7 +114,7 @@ func handleUpdate() {
 		osName, arch := getOSArch()
 		downloadURL := fmt.Sprintf("https://github.com/mbabic84/kilo-docker/releases/latest/download/kilo-docker-%s-%s", osName, arch)
 
-		fmt.Fprintf(os.Stderr, "Updating kilo-docker binary...\n")
+		fmt.Fprintf(os.Stderr, "\nUpdating kilo-docker binary...\n")
 
 		tempFile, err := os.CreateTemp("", "kilo-docker-*")
 		if err != nil {
@@ -88,7 +147,7 @@ func handleUpdate() {
 		fmt.Fprintf(os.Stderr, "\nPulling Docker image...\n")
 		_, _ = dockerRun("pull", repoURL+":latest")
 	}
-	fmt.Fprintf(os.Stderr, "\nUpdate complete.\n")
+	fmt.Fprintf(os.Stderr, "\nUpdated ✓\n")
 }
 
 // handleCleanup removes all kilo-docker artifacts: containers, volumes,
