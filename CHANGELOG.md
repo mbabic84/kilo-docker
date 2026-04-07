@@ -1,3 +1,9 @@
+## [2.13.0](https://github.com/mbabic84/kilo-docker/compare/v2.12.0...v2.13.0) (2026-04-07)
+
+### Features
+
+* add context identifiers to log messages ([9f419e2](https://github.com/mbabic84/kilo-docker/commit/9f419e2f4cfe01dfe6caad4193cbae68dff62313))
+
 ## [2.12.0](https://github.com/mbabic84/kilo-docker/compare/v2.11.0...v2.12.0) (2026-04-07)
 
 ### Features

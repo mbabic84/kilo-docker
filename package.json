@@ -1,6 +1,6 @@
 {
   "name": "kilo-docker",
-  "version": "2.12.0",
+  "version": "2.13.0",
   "description": "Docker environment for Kilo CLI",
   "private": true,
   "repository": {
