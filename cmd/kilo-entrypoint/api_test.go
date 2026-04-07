@@ -26,7 +26,7 @@ func TestApiRequestSuccess(t *testing.T) {
 		if r.URL.Path == "/test" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(200)
-			json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 			return
 		}
 		w.WriteHeader(404)
@@ -52,7 +52,7 @@ func TestApiRequestSuccess(t *testing.T) {
 func TestApiRequestNon2xxError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
-		w.Write([]byte(`{"detail":"internal error"}`))
+		_, _ = w.Write([]byte(`{"detail":"internal error"}`))
 	}))
 	defer srv.Close()
 
@@ -71,7 +71,7 @@ func TestApiRequestInvalidTokenRetry(t *testing.T) {
 		switch r.URL.Path {
 		case "/auth/refresh":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"access_token":  "refreshed-access-token",
 				"refresh_token": "new-refresh",
 				"expires_in":    3600,
@@ -81,12 +81,12 @@ func TestApiRequestInvalidTokenRetry(t *testing.T) {
 			if callCount == 1 {
 				// First call: return INVALID_TOKEN
 				w.WriteHeader(401)
-				w.Write([]byte(`{"error":"INVALID_TOKEN"}`))
+				_, _ = w.Write([]byte(`{"error":"INVALID_TOKEN"}`))
 			} else {
 				// Retry: return success (token was refreshed)
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(200)
-				json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 			}
 		default:
 			w.WriteHeader(404)
@@ -119,7 +119,7 @@ func TestApiRequestInvalidTokenRetry(t *testing.T) {
 func TestApiRequestInvalidTokenNoRefresh(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(401)
-		w.Write([]byte(`{"error":"INVALID_TOKEN"}`))
+		_, _ = w.Write([]byte(`{"error":"INVALID_TOKEN"}`))
 	}))
 	defer srv.Close()
 
@@ -141,7 +141,7 @@ func TestApiRequestInvalidTokenAfterRefresh(t *testing.T) {
 		switch r.URL.Path {
 		case "/auth/refresh":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"access_token":  "new-token",
 				"refresh_token": "new-refresh",
 				"expires_in":    3600,
@@ -149,7 +149,7 @@ func TestApiRequestInvalidTokenAfterRefresh(t *testing.T) {
 		default:
 			// Always return INVALID_TOKEN
 			w.WriteHeader(401)
-			w.Write([]byte(`{"error":"INVALID_TOKEN"}`))
+			_, _ = w.Write([]byte(`{"error":"INVALID_TOKEN"}`))
 		}
 	}))
 	defer srv.Close()
@@ -173,7 +173,7 @@ func TestRefreshTokenSkipsWhenNotNeeded(t *testing.T) {
 			refreshCalled = true
 		}
 		w.WriteHeader(200)
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
 
@@ -195,7 +195,7 @@ func TestRefreshTokenTriggeredNearExpiry(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/auth/refresh" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"access_token":  "refreshed-token",
 				"refresh_token": "new-refresh",
 				"expires_in":    3600,

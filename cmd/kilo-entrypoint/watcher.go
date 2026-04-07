@@ -68,11 +68,11 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	if err != nil {
 		return fmt.Errorf("inotify_init1: %w", err)
 	}
-	defer syscall.Close(fd)
+	defer func() { _ = syscall.Close(fd) }()
 
 	watchDirs := s.syncedAbsDirs()
 	for _, dir := range watchDirs {
-		os.MkdirAll(dir, 0o755)
+		_ = os.MkdirAll(dir, 0o755)
 	}
 
 	const watchMask = unix.IN_CREATE | unix.IN_MODIFY | unix.IN_DELETE | unix.IN_MOVED_TO | unix.IN_MOVED_FROM
@@ -89,7 +89,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 
 	for _, dir := range watchDirs {
 		addWatch(dir)
-		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
@@ -225,7 +225,7 @@ func debounceLoop(ctx context.Context, s *Syncer, pending map[string]*pendingEve
 		deadlineCopy := deadline
 		mu.Unlock()
 
-		timer := time.NewTimer(deadlineCopy.Sub(time.Now()))
+		timer := time.NewTimer(time.Until(deadlineCopy))
 		select {
 		case <-ctx.Done():
 			timer.Stop()

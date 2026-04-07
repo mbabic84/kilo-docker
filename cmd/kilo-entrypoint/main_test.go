@@ -228,8 +228,8 @@ func TestEntrypointNoArgsRunsInit(t *testing.T) {
 		t.Fatalf("entrypoint with no args should not exit immediately, got exit code: %d", cmd.ProcessState.ExitCode())
 	}
 
-	cmd.Process.Kill()
-	cmd.Wait()
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
 }
 
 // findEntrypointBinary locates the pre-built kilo-entrypoint binary.

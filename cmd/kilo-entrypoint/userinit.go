@@ -80,20 +80,20 @@ func runUserInit() error {
 
 	// Create home directory and config structure
 	utils.Log("Creating home directory: %s\n", homeDir)
-	os.MkdirAll(homeDir, 0755)
-	os.MkdirAll(filepath.Join(homeDir, ".config/kilo/commands"), 0755)
-	os.MkdirAll(filepath.Join(homeDir, ".config/kilo/agents"), 0755)
-	os.MkdirAll(filepath.Join(homeDir, ".config/kilo/plugins"), 0755)
-	os.MkdirAll(filepath.Join(homeDir, ".config/kilo/skills"), 0755)
-	os.MkdirAll(filepath.Join(homeDir, ".config/kilo/tools"), 0755)
-	os.MkdirAll(filepath.Join(homeDir, ".config/kilo/rules"), 0755)
-	os.MkdirAll(filepath.Join(homeDir, ".local/share/kilo"), 0755)
-	os.MkdirAll(filepath.Join(homeDir, ".ssh"), 0700)
+	_ = os.MkdirAll(homeDir, 0755)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/commands"), 0755)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/agents"), 0755)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/plugins"), 0755)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/skills"), 0755)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/tools"), 0755)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/rules"), 0755)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".local/share/kilo"), 0755)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".ssh"), 0700)
 
 	// Create .bashrc if missing
 	bashrc := filepath.Join(homeDir, ".bashrc")
 	if _, err := os.Stat(bashrc); os.IsNotExist(err) {
-		os.WriteFile(bashrc, []byte("# ~/.bashrc\n"), 0644)
+		_ = os.WriteFile(bashrc, []byte("# ~/.bashrc\n"), 0644)
 	}
 
 	// Copy default config templates if user doesn't have them.
@@ -120,19 +120,19 @@ func runUserInit() error {
 
 	// Setup SSH known_hosts
 	utils.Log("Setting up SSH known_hosts\n")
-	setupKnownHosts(homeDir)
+	_ = setupKnownHosts(homeDir)
 
 	// Copy service configs to the new home
 	utils.Log("Copying service configs\n")
-	copyServiceConfigs(homeDir)
+	_ = copyServiceConfigs(homeDir)
 
 	// Install user-scoped services (NVM, etc.) with HOME set to user home
 	utils.Log("Installing user-scoped services\n")
-	installUserServices(homeDir)
+	_ = installUserServices(homeDir)
 
 	// Set HOME temporarily so GetKiloConfigDir() and token paths resolve correctly
 	savedHome := os.Getenv("HOME")
-	os.Setenv("HOME", homeDir)
+	_ = os.Setenv("HOME", homeDir)
 
 	// MCP token initialization and config
 	// Note: KD_MCP_* tokens should ONLY be set by the kilo wrapper script,
@@ -149,14 +149,14 @@ func runUserInit() error {
 				if c7 == "" {
 					context7TokenEmpty = true
 				}
-				if sTok != "" {
-					os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", sTok)
-				}
-				if sRef != "" {
-					os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", sRef)
-				}
+			if sTok != "" {
+				_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", sTok)
+			}
+			if sRef != "" {
+				_ = os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", sRef)
+			}
 				if sExp != "" {
-					os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", sExp)
+					_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", sExp)
 				}
 			}
 		}
@@ -183,15 +183,15 @@ func runUserInit() error {
 	// Chown SSH agent socket to the new user
 	if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
 		utils.Log("Setting SSH agent socket ownership: %s\n", sshAuthSock)
-		os.Chown(sshAuthSock, puid, pgid)
-		os.Chmod(sshAuthSock, 0600)
+		_ = os.Chown(sshAuthSock, puid, pgid)
+		_ = os.Chmod(sshAuthSock, 0600)
 	}
 
-	os.Setenv("HOME", savedHome)
+	_ = os.Setenv("HOME", savedHome)
 
 	// Mark initialized
 	utils.Log("Marking container as initialized: %s\n", initMarker)
-	os.WriteFile(initMarker, []byte("1\n"), 0644)
+	_ = os.WriteFile(initMarker, []byte("1\n"), 0644)
 
 	// Persist user configuration for re-attach
 	// Store info in a file on the volume so it survives container restarts
@@ -225,10 +225,10 @@ func runUserInit() error {
 	}
 
 	// Set environment
-	os.Setenv("HOME", homeDir)
-	os.Setenv("USER", username)
-	os.Setenv("LOGNAME", username)
-	os.Setenv("SHELL", userConfig["shell"])
+	_ = os.Setenv("HOME", homeDir)
+	_ = os.Setenv("USER", username)
+	_ = os.Setenv("LOGNAME", username)
+	_ = os.Setenv("SHELL", userConfig["shell"])
 
 	// Chown everything to the new user (after all root-level file writes)
 	utils.Log("Setting ownership: %s\n", homeDir)
@@ -250,12 +250,12 @@ func runUserInit() error {
 		}
 	}
 	
-	syscall.Setgid(pgid)
-	syscall.Setuid(puid)
+	_ = syscall.Setgid(pgid)
+	_ = syscall.Setuid(puid)
 
 	// Start file sync as the user (after privilege drop so files are owned correctly)
 	utils.Log("Starting file sync\n")
-	startSyncWithTokens(homeDir, userID)
+	_ = startSyncWithTokens(homeDir, userID)
 
 	// Delete stale zellij sessions from previous container lifecycle
 	utils.Log("Clearing old zellij sessions\n")
@@ -267,7 +267,7 @@ func runUserInit() error {
 
 // createOSUser creates an OS user with the given name and UID/GID.
 func createOSUser(username, uidStr, gidStr string) error {
-	exec.Command("deluser", username).Run()
+	_ = exec.Command("deluser", username).Run()
 	cmd := exec.Command("addgroup", "-g", gidStr, username)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("addgroup: %v: %s", err, out)
@@ -289,8 +289,8 @@ func copyFileIfMissing(src, dst string) {
 	if err != nil {
 		return
 	}
-	os.MkdirAll(filepath.Dir(dst), 0755)
-	os.WriteFile(dst, data, 0644)
+	_ = os.MkdirAll(filepath.Dir(dst), 0755)
+	_ = os.WriteFile(dst, data, 0644)
 	utils.Log("Copied %s\n", filepath.Base(src))
 }
 
@@ -501,13 +501,13 @@ func startSyncWithTokens(homeDir, userID string) error {
 
 	// Sync tokens are needed globally for file sync - set via os.Setenv
 	if syncToken != "" {
-		os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", syncToken)
+		_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", syncToken)
 	}
 	if syncRefresh != "" {
-		os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", syncRefresh)
+		_ = os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", syncRefresh)
 	}
 	if syncExpiry != "" {
-		os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", syncExpiry)
+		_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", syncExpiry)
 	}
 	// MCP tokens (context7, ainstruct) should ONLY be set by the kilo wrapper script
 	// Not here - not even for the sync subprocess
@@ -516,7 +516,7 @@ func startSyncWithTokens(homeDir, userID string) error {
 		cmd := exec.Command("kilo-entrypoint", "sync")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		cmd.Start()
+		_ = cmd.Start()
 	}()
 
 	return nil
@@ -560,7 +560,7 @@ func runMCPTokens() error {
 	fmt.Print("> ")
 
 	var input string
-	fmt.Scanln(&input)
+	_, _ = fmt.Scanln(&input)
 	input = strings.TrimSpace(input)
 
 	if input == "clear" {
@@ -620,9 +620,9 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 		utils.LogWarn("checkRemote: collections request failed: %v\n", err)
 		return false, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
+		_ = resp.Body.Close()
 		utils.LogWarn("checkRemote: collections API returned %d\n", resp.StatusCode)
 		return false, fmt.Errorf("collections API returned %d", resp.StatusCode)
 	}
@@ -635,9 +635,11 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		_ = resp.Body.Close()
 		utils.LogWarn("checkRemote: failed to decode collections response: %v\n", err)
 		return false, err
 	}
+	_ = resp.Body.Close()
 
 	var collectionID string
 	for _, c := range result.Collections {
@@ -666,9 +668,9 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 		utils.LogWarn("checkRemote: documents request failed: %v\n", err)
 		return false, err
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
+		_ = resp.Body.Close()
 		utils.LogWarn("checkRemote: documents API returned %d\n", resp.StatusCode)
 		return false, fmt.Errorf("documents API returned %d", resp.StatusCode)
 	}
@@ -682,9 +684,11 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&docsResult); err != nil {
+		_ = resp.Body.Close()
 		utils.LogWarn("checkRemote: failed to decode documents response: %v\n", err)
 		return false, err
 	}
+	_ = resp.Body.Close()
 
 	for _, d := range docsResult.Documents {
 		if d.Metadata.LocalPath == "opencode.json" {

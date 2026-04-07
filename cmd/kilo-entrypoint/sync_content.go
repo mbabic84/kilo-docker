@@ -156,7 +156,7 @@ func (s *Syncer) pushAll() {
 			continue
 		}
 		// Directory — walk recursively
-		filepath.Walk(abs, func(path string, fi os.FileInfo, err error) error {
+		_ = filepath.Walk(abs, func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
@@ -443,7 +443,7 @@ func (s *Syncer) pullCollection() error {
 			continue
 		}
 		absPath := filepath.Join(s.kiloConfigDir, relPath)
-		os.MkdirAll(filepath.Dir(absPath), 0o755)
+		_ = os.MkdirAll(filepath.Dir(absPath), 0o755)
 		if err := os.WriteFile(absPath, []byte(fullDoc.Content), 0o644); err != nil {
 			log.Printf("[ainstruct-sync] Failed to write %s: %v", relPath, err)
 			continue

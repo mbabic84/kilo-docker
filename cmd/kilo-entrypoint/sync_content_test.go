@@ -48,7 +48,7 @@ func TestFindCollectionExists(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/collections" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(collectionsResponse{
+			_ = json.NewEncoder(w).Encode(collectionsResponse{
 				Collections: []collection{
 					{CollectionID: "col-123", Name: "kilo-docker"},
 					{CollectionID: "col-other", Name: "other"},
@@ -77,7 +77,7 @@ func TestFindCollectionNotExists(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/collections" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(collectionsResponse{
+			_ = json.NewEncoder(w).Encode(collectionsResponse{
 				Collections: []collection{
 					{CollectionID: "col-other", Name: "other"},
 				},
@@ -106,7 +106,7 @@ func TestFindCollectionCachesID(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(collectionsResponse{
+		_ = json.NewEncoder(w).Encode(collectionsResponse{
 			Collections: []collection{
 				{CollectionID: "col-123", Name: "kilo-docker"},
 			},
@@ -137,10 +137,10 @@ func TestEnsureCollectionCreatesNew(t *testing.T) {
 		switch {
 		case r.Method == "GET" && r.URL.Path == "/collections":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(collectionsResponse{Collections: []collection{}})
+			_ = json.NewEncoder(w).Encode(collectionsResponse{Collections: []collection{}})
 		case r.Method == "POST" && r.URL.Path == "/collections":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"collection_id": "new-col-456"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"collection_id": "new-col-456"})
 		default:
 			w.WriteHeader(404)
 		}
@@ -160,7 +160,7 @@ func TestEnsureCollectionReusesExisting(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "GET" && r.URL.Path == "/collections" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(collectionsResponse{
+			_ = json.NewEncoder(w).Encode(collectionsResponse{
 				Collections: []collection{
 					{CollectionID: "existing-789", Name: "kilo-docker"},
 				},
@@ -185,11 +185,11 @@ func TestEnsureCollectionNoIDInResponse(t *testing.T) {
 		switch {
 		case r.Method == "GET" && r.URL.Path == "/collections":
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(collectionsResponse{Collections: []collection{}})
+			_ = json.NewEncoder(w).Encode(collectionsResponse{Collections: []collection{}})
 		case r.Method == "POST" && r.URL.Path == "/collections":
 			// Return response without collection_id
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{"name": "kilo-docker"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"name": "kilo-docker"})
 		default:
 			w.WriteHeader(404)
 		}

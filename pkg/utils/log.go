@@ -44,7 +44,7 @@ func logToFile(format string, args ...interface{}) {
 	defer logMutex.Unlock()
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(f, "[%s] %s\n", timestamp, msg)
+	_, _ = fmt.Fprintf(f, "[%s] %s\n", timestamp, msg)
 }
 
 // Log prints a message to stderr with [kilo-docker] prefix and logs to file.

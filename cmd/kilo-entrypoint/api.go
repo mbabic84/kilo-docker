@@ -42,15 +42,16 @@ func (s *Syncer) forceRefreshToken() error {
 	if err != nil {
 		return fmt.Errorf("token refresh request failed: %w", err)
 	}
-	defer resp.Body.Close()
 	var result struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 		ExpiresIn    int64  `json:"expires_in"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		_ = resp.Body.Close()
 		return fmt.Errorf("token refresh decode failed: %w", err)
 	}
+	_ = resp.Body.Close()
 	if result.AccessToken == "" {
 		return fmt.Errorf("token refresh returned empty access token")
 	}
@@ -77,8 +78,8 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 	respBody, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
@@ -103,8 +104,8 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 		if retryErr != nil {
 			return nil, retryErr
 		}
-		defer retryResp.Body.Close()
 		respBody, err = io.ReadAll(retryResp.Body)
+		_ = retryResp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("reading retry response: %w", err)
 		}

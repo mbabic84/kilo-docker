@@ -37,12 +37,12 @@ func runInit() error {
 
 		if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
 			if info, err := os.Stat(sshAuthSock); err == nil && info.Mode()&os.ModeSocket != 0 {
-				if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
-					utils.LogWarn("SSH socket not accessible: %v\n", err)
-				} else {
-					conn.Close()
-					utils.Log("SSH agent socket ready: %s\n", sshAuthSock)
-				}
+if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
+				utils.LogWarn("SSH socket not accessible: %v\n", err)
+			} else {
+				_ = conn.Close()
+				utils.Log("SSH agent socket ready: %s\n", sshAuthSock)
+			}
 			} else {
 				utils.LogWarn("SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
 			}
@@ -168,7 +168,7 @@ func compareVersions(v1, v2 string) int {
 func promptYesNo(question string) bool {
 	fmt.Fprintf(os.Stderr, "%s [y/N]: ", question)
 	var answer string
-	fmt.Scanln(&answer)
+	_, _ = fmt.Scanln(&answer)
 	return strings.ToLower(strings.TrimSpace(answer)) == "y"
 }
 
@@ -269,13 +269,13 @@ func copyServiceConfigs(home string) error {
 			if err != nil {
 				continue
 			}
-			defer src.Close()
-			f, err := os.Create(dst)
-			if err != nil {
-				continue
-			}
-			defer f.Close()
-			io.Copy(f, src)
+		defer func() { _ = src.Close() }()
+		f, err := os.Create(dst)
+		if err != nil {
+			continue
+		}
+		defer func() { _ = f.Close() }()
+		_, _ = io.Copy(f, src)
 		}
 	}
 	return nil
@@ -331,25 +331,25 @@ func setupServiceGroups() error {
 // for GitHub, GitLab, and Bitbucket, avoiding interactive host key prompts.
 func setupKnownHosts(home string) error {
 	sshDir := filepath.Join(home, ".ssh")
-	os.MkdirAll(sshDir, 0700)
+	_ = os.MkdirAll(sshDir, 0700)
 
 	knownHosts := filepath.Join(sshDir, "known_hosts")
 	f, err := os.OpenFile(knownHosts, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	cmd := exec.Command("ssh-keyscan", "-H", "github.com", "gitlab.com", "bitbucket.com")
 	cmd.Stdout = f
 	cmd.Stderr = io.Discard
-	cmd.Run()
+	_ = cmd.Run()
 	return nil
 }
 
 // chownRecursive changes ownership of path and its contents to uid:gid.
 func chownRecursive(path string, uid, gid int) {
-	filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -365,7 +365,7 @@ func chownRecursive(path string, uid, gid int) {
 			if int(stat.Uid) == uid && int(stat.Gid) == gid {
 				return nil
 			}
-			os.Chown(p, uid, gid)
+			_ = os.Chown(p, uid, gid)
 		}
 		return nil
 	})

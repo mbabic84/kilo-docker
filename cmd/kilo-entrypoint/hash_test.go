@@ -64,9 +64,9 @@ func TestHashSetUpdate(t *testing.T) {
 func TestHashSetMultiple(t *testing.T) {
 	s := newTestSyncerWithHashDir(t)
 
-	s.hashSet("rules/a.md", "aaa")
-	s.hashSet("rules/b.md", "bbb")
-	s.hashSet("commands/c.md", "ccc")
+	_ = s.hashSet("rules/a.md", "aaa")
+	_ = s.hashSet("rules/b.md", "bbb")
+	_ = s.hashSet("commands/c.md", "ccc")
 
 	if got := s.hashGet("rules/a.md"); got != "aaa" {
 		t.Errorf("a.md: got %q, want aaa", got)
@@ -82,8 +82,8 @@ func TestHashSetMultiple(t *testing.T) {
 func TestHashDelete(t *testing.T) {
 	s := newTestSyncerWithHashDir(t)
 
-	s.hashSet("rules/test.md", "abc123")
-	s.hashSet("rules/other.md", "xyz789")
+	_ = s.hashSet("rules/test.md", "abc123")
+	_ = s.hashSet("rules/other.md", "xyz789")
 
 	if err := s.hashDelete("rules/test.md"); err != nil {
 		t.Fatalf("hashDelete failed: %v", err)
@@ -112,9 +112,9 @@ func TestHashSetErrorOnReadOnlyDir(t *testing.T) {
 
 	// Make the hash directory read-only
 	hashDir := filepath.Dir(s.hashFile)
-	os.MkdirAll(hashDir, 0o755)
-	os.Chmod(hashDir, 0o555)
-	defer os.Chmod(hashDir, 0o755)
+	_ = os.MkdirAll(hashDir, 0o755)
+	_ = os.Chmod(hashDir, 0o555)
+	defer func() { _ = os.Chmod(hashDir, 0o755) }()
 
 	err := s.hashSet("test.md", "abc")
 	if err == nil {
@@ -127,12 +127,12 @@ func TestHashDeleteErrorOnReadOnlyDir(t *testing.T) {
 	s := newTestSyncerWithHashDir(t)
 
 	// Create a hash file first
-	s.hashSet("test.md", "abc")
+	_ = s.hashSet("test.md", "abc")
 
 	// Make the hash directory read-only
 	hashDir := filepath.Dir(s.hashFile)
-	os.Chmod(hashDir, 0o555)
-	defer os.Chmod(hashDir, 0o755)
+	_ = os.Chmod(hashDir, 0o555)
+	defer func() { _ = os.Chmod(hashDir, 0o755) }()
 
 	err := s.hashDelete("test.md")
 	if err == nil {
