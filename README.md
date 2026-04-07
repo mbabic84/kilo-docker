@@ -2,23 +2,14 @@
 
 Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cli) - enabling portable, zero-install execution on remote hosts.
 
-## Image Variants
-
-| Image | Base | Size | Description |
-|-------|------|------|-------------|
-| `ghcr.io/mbabic84/kilo-docker:latest` | Alpine | ~202 MB | Lightweight base with `git`, `openssh-client`, `ripgrep`, and `libstdc++` |
-
 ## Features
 
 - **Non-root user** - Runs as `kilo` user with dynamic `PUID`/`PGID` mapping to match host user
 - **Persistent database** - SQLite database and auth state survive container restarts via named volume
 - **Token persistence** - MCP server tokens are prompted once and saved in the volume
-- **Volume encryption** - `--password` flag encrypts tokens and derives a non-discoverable volume name
-- **Ainstruct auth** - `--ainstruct` flag authenticates with the Ainstruct API to derive volume name from user_id
-- **Ainstruct file sync** - `--ainstruct` flag enables automatic push/pull sync of config files, commands, agents, and instructions via the Ainstruct API
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
-- **Built-in services** - Extensible service system with `--docker` and more (see [Services](#services))
+- **Built-in services** - Extensible service system with `--docker`, `--go`, `--node`, and more (see [Services](#services))
 
 ## Quick Start
 
@@ -71,14 +62,14 @@ On first run, the binary prompts for MCP server tokens and saves them to a named
 | Option | Description |
 |--------|-------------|
 | `--once` | Run a one-time session without persistence (no volume) |
-| `--volume` | Mount a volume (host_path:container_path), repeatable |
-| `--password` | Protect volume with a password (encrypts tokens, derives volume name from password) |
-| `--ainstruct` | Authenticate with Ainstruct API (volume from user_id, tokens encrypted, file sync enabled) |
-| `--mcp` | Enable MCP servers (prompts for Context7 and Ainstruct API tokens) |
+| `--volume`, `-v` | Mount a volume (host_path:container_path), repeatable |
+| `--workspace`, `-w` | Set custom workspace path (default: current directory) |
+| `--port`, `-p` | Map port (host_port:container_port), repeatable |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--ssh` | Enable SSH agent forwarding into the container |
 | `--network <name>` | Attach to a specific Docker network |
 | `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
+| `--version` | Print kilo-docker version |
 
 ### Volume Mounts
 
@@ -105,12 +96,14 @@ The current working directory is always mounted at the same path automatically.
 ### Services
 
 | Service | Description |
-|---------|-------------|
+|--------|-------------|
 | `--docker` | Mount Docker socket for container management from within Kilo |
-| `--go` | Install Go 1.26.1 (latest stable) for development |
+| `--go` | Install Go (latest stable) for development |
 | `--node` | Install Node.js LTS for development |
 | `--gh` | Install GitHub CLI for interacting with GitHub |
 | `--uv` | Install uv for fast Python package management |
+| `--nvm` | Install NVM (Node Version Manager) for managing Node.js versions |
+| `--python` | Install Python 3 for general purpose use |
 
 ## One-Time Sessions
 
@@ -121,65 +114,6 @@ kilo-docker --once
 ```
 
 This is useful for CI pipelines, ephemeral environments, or when you don't want to leave any state on the host.
-
-## Volume Encryption
-
-Use `--password` (or `-p`) to protect your volume on shared hosts. This applies two layers of protection:
-
-1. **Non-discoverable volume name** — The volume name is derived from the SHA-256 hash of your password (e.g., `kilo-a3f2b1c9d4e5`). Other users on the host cannot find or target your volume via `docker volume ls`.
-
-2. **Encrypted tokens** — API tokens are encrypted with AES-256-CBC (PBKDF2 key derivation) before being stored in the volume. Plaintext tokens never touch the disk.
-
-```bash
-# Start with encryption
-kilo-docker --password
-
-# Reset encrypted volume
-kilo-docker --password init
-```
-
-On first run, you are prompted for a volume password and then for API tokens. Subsequent runs only ask for the volume password.
-
-Without `--password`, the volume name is `kilo-data-<username>` and tokens are stored in plaintext (original behavior).
-
-> **Note:** `--once` and `--password` are mutually exclusive. `--once` creates no volume, so there is nothing to encrypt.
-
-## Ainstruct
-
-[Ainstruct](https://ainstruct-dev.kralicinora.cz) provides document storage, semantic search, and configuration sync for Kilo. The web UI lets you manage collections, documents, and API keys.
-
-Use `--ainstruct` to authenticate and enable integration:
-
-```bash
-kilo-docker --ainstruct
-```
-
-On first run, you are prompted for your Ainstruct username and password. The binary authenticates via the API and obtains your `user_id`.
-
-### Volume encryption
-
-The `user_id` is used to derive a non-discoverable volume name and encryption key. MCP server tokens are stored encrypted (AES-256-CBC with PBKDF2) in the volume — plaintext tokens never touch the disk.
-
-### File sync
-
-Configuration files are automatically synced to and from the Ainstruct API:
-
-**Synced files:**
-- `~/.config/kilo/opencode.json` — Kilo configuration
-- `~/.config/kilo/rules/*.md` — Instruction files
-- `~/.config/kilo/commands/*.md` — Custom slash commands (markdown with YAML frontmatter)
-- `~/.config/kilo/agents/*.md` — Custom agent definitions (markdown with YAML frontmatter)
-- `~/.config/kilo/plugins/*.{js,ts}` — Plugins (JavaScript/TypeScript hook modules)
-- `~/.config/kilo/skills/*/SKILL.md` — Agent skills (per-skill directories with optional `scripts/`, `references/`, `assets/`)
-- `~/.config/kilo/tools/*.{js,ts}` — Custom tools (JavaScript/TypeScript tool definitions)
-
-**Push (local → API):** A Go-based file watcher detects local changes via inotify with a per-file 5-second debounce. Each file has an independent timer that resets on every change — the file is synced only after 5 seconds with no further modifications.
-
-**Pull (API → local):** On container startup, the sync state file (`~/.config/kilo/.ainstruct-hashes`) is compared against the API's `content_hash` values. Only changed or new files are downloaded. Unchanged files are skipped without any API calls.
-
-**Token refresh:** JWT access tokens are refreshed automatically before API calls when within 60 seconds of expiry.
-
-The sync engine runs as a subcommand of `kilo-entrypoint` inside the container — no `bash`, `inotify-tools`, `curl`, or `jq` runtime dependencies. It uses native Linux inotify via `golang.org/x/sys/unix` and communicates with the Ainstruct API using Go's `net/http` stdlib.
 
 ## Browser Automation
 
@@ -239,13 +173,8 @@ The host binary uses a named Docker volume mounted at `/home`. Inside the contai
 - Instruction files (`.config/kilo/rules/*.md`)
 - Session state and snapshots
 - Cache
-- Ainstruct sync state (`.config/kilo/.ainstruct-hashes`) — when using `--ainstruct`
 
 **Default mode** — Volume name: `kilo-data-<username>`. Tokens stored in plaintext.
-
-**Encrypted mode** (`--password`) — Volume name: `kilo-<hash>` (derived from password). Tokens stored as AES-256-CBC ciphertext.
-
-**Ainstruct mode** (`--ainstruct`) — Volume name: `kilo-<hash>` (derived from Ainstruct user_id). Tokens stored as AES-256-CBC ciphertext.
 
 The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, image, and installed binary).
 
@@ -257,7 +186,7 @@ When a new Kilo Docker image adds MCP servers or config changes, run:
 kilo-docker update-config
 ```
 
-This downloads the latest `opencode.json` template from the repository and merges it with your existing config. New servers are added, existing customizations are preserved. Run `kilo-docker --password update-config` for encrypted volumes.
+This downloads the latest `opencode.json` template from the repository and merges it with your existing config. New servers are added, existing customizations are preserved.
 
 ## Backup and Restore
 
@@ -275,8 +204,6 @@ kilo-docker restore ~/my-kilo-backup.tar.gz
 ```
 
 Backups are portable tar.gz archives containing all volume data. The restore command validates the archive and preserves file ownership (UID 1000).
-
-> **Note:** Encrypted volumes (`--password`) require the same password for backup and restore. Backups from encrypted volumes are standard tar.gz files (the encryption applies only to tokens at rest, not the backup archive itself).
 
 ## Session Management
 
@@ -326,16 +253,6 @@ ssh remote-host 'curl -fsSL -o ~/.local/bin/kilo-docker https://github.com/mbabi
 ```
 
 > Tokens are prompted interactively on first run via the TTY.
-
-### Shared Hosts
-
-On shared hosts where other users have Docker access, use `--password` to protect your volume and tokens:
-
-```bash
-ssh remote-host 'kilo-docker --password'
-```
-
-This ensures other users cannot discover your volume or read your API tokens.
 
 ### SSH Alias for Convenience
 

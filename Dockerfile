@@ -23,7 +23,7 @@ FROM alpine:latest
 
 ARG AINSTRUCT_BASE_URL=https://ainstruct-dev.kralicinora.cz
 
-RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client ripgrep curl tar xz sudo \
+RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client ripgrep curl tar xz sudo jq \
     && curl -fsSL https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz -o /tmp/zellij.tar.gz \
     && tar xzf /tmp/zellij.tar.gz -C /usr/local/bin && rm -rf /tmp/zellij.tar.gz && chmod +x /usr/local/bin/zellij \
     && echo "ALL ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/nopasswd \
