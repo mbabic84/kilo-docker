@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mbabic84/kilo-docker/pkg/constants"
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
@@ -96,7 +98,24 @@ func runUserInit() error {
 
 	// Copy default config templates if user doesn't have them.
 	// Templates use 'template-' prefix to avoid being read as system configs.
-	copyFileIfMissing("/etc/kilo/template-opencode.json", filepath.Join(homeDir, ".config/kilo/opencode.json"))
+	hashFile := filepath.Join(homeDir, ".config/kilo/.ainstruct-hashes")
+	localOpencode := filepath.Join(homeDir, ".config/kilo/opencode.json")
+
+	if _, err := os.Stat(hashFile); os.IsNotExist(err) {
+		hasRemote, checkErr := checkRemoteHasOpencode(homeDir, userID)
+		if checkErr != nil {
+			utils.LogWarn("opencode init: remote check failed (%v), falling back to template\n", checkErr)
+			copyFileIfMissing("/etc/kilo/template-opencode.json", localOpencode)
+		} else if hasRemote {
+			utils.Log("opencode init: remote has opencode.json, will sync from remote\n")
+		} else {
+			utils.Log("opencode init: no remote opencode.json, copying template\n")
+			copyFileIfMissing("/etc/kilo/template-opencode.json", localOpencode)
+		}
+	} else {
+		utils.Log("opencode init: existing user, skipping (hash cache found)\n")
+	}
+
 	copyFileIfMissing("/etc/zellij/template-config.kdl", filepath.Join(homeDir, ".config/zellij/config.kdl"))
 
 	// Setup SSH known_hosts
@@ -558,6 +577,124 @@ func runMCPTokens() error {
 
 	fmt.Println("MCP tokens saved")
 	return nil
+}
+
+func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
+	utils.Log("Checking remote for opencode.json (first-time init)\n")
+
+	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
+	encData, err := os.ReadFile(encPath)
+	if err != nil {
+		utils.LogWarn("checkRemote: no encrypted tokens found: %v\n", err)
+		return false, fmt.Errorf("no encrypted tokens found: %w", err)
+	}
+
+	decrypted, err := decryptAES(encData, userID)
+	if err != nil {
+		utils.LogWarn("checkRemote: failed to decrypt tokens: %v\n", err)
+		return false, fmt.Errorf("failed to decrypt tokens: %w", err)
+	}
+
+	_, _, syncToken, _, _, _ := parseTokenEnv(string(decrypted))
+	if syncToken == "" {
+		utils.LogWarn("checkRemote: no sync token available\n")
+		return false, fmt.Errorf("no sync token available")
+	}
+
+	baseURL := os.Getenv("KD_AINSTRUCT_BASE_URL")
+	if baseURL == "" {
+		baseURL = constants.AinstructBaseURL
+	}
+
+	collectionsURL := baseURL + "/api/v1/collections"
+	req, err := http.NewRequest("GET", collectionsURL, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+syncToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	utils.Log("checkRemote: GET /collections\n")
+	resp, err := client.Do(req)
+	if err != nil {
+		utils.LogWarn("checkRemote: collections request failed: %v\n", err)
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.LogWarn("checkRemote: collections API returned %d\n", resp.StatusCode)
+		return false, fmt.Errorf("collections API returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Collections []struct {
+			CollectionID string `json:"collection_id"`
+			Name         string `json:"name"`
+		} `json:"collections"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		utils.LogWarn("checkRemote: failed to decode collections response: %v\n", err)
+		return false, err
+	}
+
+	var collectionID string
+	for _, c := range result.Collections {
+		if c.Name == "kilo-docker" {
+			collectionID = c.CollectionID
+			utils.Log("checkRemote: found collection %s\n", utils.RedactID(collectionID))
+			break
+		}
+	}
+
+	if collectionID == "" {
+		utils.Log("checkRemote: no kilo-docker collection found\n")
+		return false, nil
+	}
+
+	docsURL := baseURL + "/api/v1/documents?collection_id=" + collectionID
+	req, err = http.NewRequest("GET", docsURL, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+syncToken)
+
+	utils.Log("checkRemote: GET /documents for collection %s\n", utils.RedactID(collectionID))
+	resp, err = client.Do(req)
+	if err != nil {
+		utils.LogWarn("checkRemote: documents request failed: %v\n", err)
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		utils.LogWarn("checkRemote: documents API returned %d\n", resp.StatusCode)
+		return false, fmt.Errorf("documents API returned %d", resp.StatusCode)
+	}
+
+	var docsResult struct {
+		Documents []struct {
+			Metadata struct {
+				LocalPath string `json:"local_path"`
+			} `json:"metadata"`
+		} `json:"documents"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&docsResult); err != nil {
+		utils.LogWarn("checkRemote: failed to decode documents response: %v\n", err)
+		return false, err
+	}
+
+	for _, d := range docsResult.Documents {
+		if d.Metadata.LocalPath == "opencode.json" {
+			utils.Log("checkRemote: found opencode.json in remote collection\n")
+			return true, nil
+		}
+	}
+
+	utils.Log("checkRemote: no opencode.json in remote collection\n")
+	return false, nil
 }
 
 func maskToken(token string) string {
