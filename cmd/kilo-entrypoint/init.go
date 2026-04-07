@@ -166,7 +166,7 @@ func compareVersions(v1, v2 string) int {
 
 // promptYesNo prompts the user with a question and returns true if they answered yes.
 func promptYesNo(question string) bool {
-	fmt.Fprintf(os.Stderr, "%s [y/N]: ", question)
+	utils.Log("[init] %s [y/N]: ", question, utils.WithOutput())
 	var answer string
 	_, _ = fmt.Scanln(&answer)
 	return strings.ToLower(strings.TrimSpace(answer)) == "y"

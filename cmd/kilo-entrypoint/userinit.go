@@ -556,7 +556,7 @@ func runMCPTokens() error {
 	utils.Log("[userinit]   - Press Enter to keep current\n", utils.WithOutput())
 	utils.Log("[userinit]   - Type a new token to update\n", utils.WithOutput())
 	utils.Log("[userinit]   - Type 'clear' to disable\n", utils.WithOutput())
-	fmt.Print("> ")
+	utils.Log("[userinit] > ", utils.WithOutput())
 
 	var input string
 	_, _ = fmt.Scanln(&input)
