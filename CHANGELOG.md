@@ -1,3 +1,9 @@
+## [2.10.2](https://github.com/mbabic84/kilo-docker/compare/v2.10.1...v2.10.2) (2026-04-07)
+
+### Bug Fixes
+
+* ainstruct sync not watching individual files and missing new files on startup ([d658f66](https://github.com/mbabic84/kilo-docker/commit/d658f66ceda775fcaba1737c215fc0ef663e13d3))
+
 ## [2.10.1](https://github.com/mbabic84/kilo-docker/compare/v2.10.0...v2.10.1) (2026-04-07)
 
 ### Bug Fixes
