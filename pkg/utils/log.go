@@ -16,6 +16,12 @@ var (
 	logMutex    sync.Mutex
 )
 
+type LogOpt func(*bool)
+
+func WithOutput() LogOpt {
+	return func(b *bool) { *b = true }
+}
+
 // getLogFile opens the log file for writing, creating it if necessary.
 // The log file is stored in ~/.config/kilo/kilo-docker.log to persist across container recreations.
 func getLogFile() *os.File {
@@ -47,16 +53,29 @@ func logToFile(format string, args ...interface{}) {
 	_, _ = fmt.Fprintf(f, "[%s] %s\n", timestamp, msg)
 }
 
-// Log prints a message to stderr with [kilo-docker] prefix and logs to file.
+// Log prints a message to file, and optionally to stderr.
+// By default, logs to file only. Use WithOutput() to also write to stderr.
 func Log(format string, args ...interface{}) {
+	output := false
+	logArgs := make([]interface{}, 0, len(args))
+	for _, arg := range args {
+		if opt, ok := arg.(LogOpt); ok {
+			opt(&output)
+		} else {
+			logArgs = append(logArgs, arg)
+		}
+	}
+
 	var msg string
-	if len(args) > 0 {
-		msg = fmt.Sprintf("[kilo-docker] "+format, args...)
+	if len(logArgs) > 0 {
+		msg = fmt.Sprintf("[kilo-docker] "+format, logArgs...)
 	} else {
 		msg = fmt.Sprintf("[kilo-docker] %s", format)
 	}
-	fmt.Fprint(os.Stderr, msg)
-	logToFile("[LOG] "+format, args...)
+	if output {
+		fmt.Fprint(os.Stderr, msg)
+	}
+	logToFile("[LOG] "+format, logArgs...)
 }
 
 // LogError prints an error message to stderr with [kilo-docker] prefix and logs to file.
