@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 	"golang.org/x/sys/unix"
 )
 
@@ -63,6 +63,22 @@ const debounceInterval = 5 * time.Second
 // directories. It detects CREATE, MODIFY, DELETE, and MOVED events,
 // debounces them for 5 seconds to avoid syncing intermediate states,
 // and triggers syncFile or deleteByPath on the Syncer.
+// shouldWatchDir returns true if the directory should be watched.
+// Excludes hidden dirs, node_modules, .git, and log files.
+func shouldWatchDir(path string) bool {
+	base := filepath.Base(path)
+	// Skip hidden directories
+	if strings.HasPrefix(base, ".") {
+		return false
+	}
+	// Skip common non-sync directories
+	switch base {
+	case "node_modules", "vendor", "__pycache__", "dist", "build":
+		return false
+	}
+	return true
+}
+
 func runWatcher(ctx context.Context, s *Syncer) error {
 	fd, err := unix.InotifyInit1(unix.IN_CLOEXEC)
 	if err != nil {
@@ -71,35 +87,56 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	defer func() { _ = syscall.Close(fd) }()
 
 	watchDirs := s.syncedAbsDirs()
+	watchFiles := s.syncedAbsFiles()
 	for _, dir := range watchDirs {
 		_ = os.MkdirAll(dir, 0o755)
 	}
 
 	const watchMask = unix.IN_CREATE | unix.IN_MODIFY | unix.IN_DELETE | unix.IN_MOVED_TO | unix.IN_MOVED_FROM
 
-	wdToDir := make(map[int32]string)
-	addWatch := func(dir string) {
+	// wdToPath maps watch descriptors to their paths.
+	// For directories, this is the directory path.
+	// For files, this is the full file path.
+	wdToPath := make(map[int32]string)
+
+	addDirWatch := func(dir string) {
 		wd, err := unix.InotifyAddWatch(fd, dir, watchMask)
 		if err != nil {
-			log.Printf("[ainstruct-sync] Failed to watch %s: %v", dir, err)
+			utils.Log("[ainstruct-sync] Failed to watch dir %s: %v\n", dir, err)
 			return
 		}
-		wdToDir[int32(wd)] = dir
+		wdToPath[int32(wd)] = dir
 	}
 
+	addFileWatch := func(file string) {
+		wd, err := unix.InotifyAddWatch(fd, file, watchMask)
+		if err != nil {
+			utils.Log("[ainstruct-sync] Failed to watch file %s: %v\n", file, err)
+			return
+		}
+		wdToPath[int32(wd)] = file
+	}
+
+	// Watch directories recursively
 	for _, dir := range watchDirs {
-		addWatch(dir)
+		addDirWatch(dir)
 		_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
-			if info.IsDir() && path != dir {
-				addWatch(path)
+			if info.IsDir() && path != dir && shouldWatchDir(path) {
+				addDirWatch(path)
 			}
 			return nil
 		})
 	}
-	log.Println("[ainstruct-sync] Watcher started")
+
+	// Watch individual files (like opencode.json)
+	for _, file := range watchFiles {
+		addFileWatch(file)
+	}
+
+	utils.Log("[ainstruct-sync] Watcher started, watching %d paths\n", len(wdToPath))
 	buf := make([]byte, 4096)
 	pending := make(map[string]*pendingEvent)
 	var pendingMu sync.Mutex
@@ -134,11 +171,20 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 		events := parseInotifyEvents(buf[:n], n)
 		pendingMu.Lock()
 		for _, ev := range events {
-			dir := wdToDir[ev.wd]
-			if dir == "" {
+			watchedPath := wdToPath[ev.wd]
+			if watchedPath == "" {
 				continue
 			}
-			fullPath := filepath.Join(dir, ev.name)
+
+			// Determine full path:
+			// - For directory watches: watchedPath is dir, ev.name is filename
+			// - For file watches: watchedPath is full file path, ev.name is empty
+			var fullPath string
+			if ev.name != "" {
+				fullPath = filepath.Join(watchedPath, ev.name)
+			} else {
+				fullPath = watchedPath
+			}
 
 			// Only sync files that are whitelisted via syncPaths.
 			relPath := strings.TrimPrefix(fullPath, s.kiloConfigDir+"/")
@@ -146,15 +192,15 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 				continue
 			}
 
-		if ev.mask&unix.IN_ISDIR != 0 {
-			// Directory events (create/modify/delete/move) are not syncable
-			// files. For new directories under any watched dir, add a watch
-			// so we track future file changes inside them, then skip the event.
-			if ev.mask&unix.IN_CREATE != 0 {
-				addWatch(fullPath)
+			if ev.mask&unix.IN_ISDIR != 0 {
+				// Directory events (create/modify/delete/move) are not syncable
+				// files. For new directories under any watched dir, add a watch
+				// so we track future file changes inside them, then skip the event.
+				if ev.mask&unix.IN_CREATE != 0 && shouldWatchDir(fullPath) {
+					addDirWatch(fullPath)
+				}
+				continue
 			}
-			continue
-		}
 
 			var eventType string
 			if ev.mask&(unix.IN_DELETE|unix.IN_MOVED_FROM) != 0 {
@@ -163,6 +209,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 				eventType = "MODIFY"
 			}
 
+			utils.Log("[ainstruct-sync] Queueing %s event for: %s\n", eventType, relPath)
 			if p, ok := pending[fullPath]; ok {
 				p.lastEventAt = time.Now()
 				p.eventType = eventType
@@ -243,15 +290,18 @@ func debounceLoop(ctx context.Context, s *Syncer, pending map[string]*pendingEve
 // remote collection if it was modified, or deletes it remotely if it was removed.
 func processFile(s *Syncer, fullPath, eventType string) {
 	relPath := strings.TrimPrefix(fullPath, s.kiloConfigDir+"/")
+	utils.Log("[ainstruct-sync] Processing %s event for: %s\n", eventType, relPath)
 	if eventType == "DELETE" {
 		if err := s.deleteByPath(relPath); err != nil && !s.authExpired {
-			log.Printf("[ainstruct-sync] Delete error for %s: %v", relPath, err)
+			utils.LogError("[ainstruct-sync] Delete error for %s: %v\n", relPath, err)
 		}
 	} else {
 		if _, err := os.Stat(fullPath); err == nil {
 			if err := s.syncFile(fullPath); err != nil && !s.authExpired {
-				log.Printf("[ainstruct-sync] Sync error for %s: %v", relPath, err)
+				utils.LogError("[ainstruct-sync] Sync error for %s: %v\n", relPath, err)
 			}
+		} else {
+			utils.Log("[ainstruct-sync] File not found, skipping: %s\n", relPath)
 		}
 	}
 }

@@ -127,20 +127,36 @@ func (s *Syncer) isSyncedPath(relPath string) bool {
 
 // syncedAbsDirs returns the absolute paths of all whitelisted sync directories
 // that exist on disk. Used by the watcher to know which directories to monitor.
+// Note: Does NOT include the root config dir to avoid watching log files, etc.
 func (s *Syncer) syncedAbsDirs() []string {
-	dirs := []string{s.kiloConfigDir}
+	var dirs []string
 	for _, sp := range s.syncPaths {
 		abs := filepath.Join(s.kiloConfigDir, sp)
 		if info, err := os.Stat(abs); err == nil && info.IsDir() {
 			dirs = append(dirs, abs)
+		} else if err != nil {
+			utils.Log("[ainstruct-sync] Directory not found: %s (err=%v)\n", abs, err)
 		}
 	}
 	return dirs
 }
 
+// syncedAbsFiles returns the absolute paths of all whitelisted sync files
+// (not directories) that exist on disk. Used by the watcher to monitor
+// individual files like opencode.json.
+func (s *Syncer) syncedAbsFiles() []string {
+	var files []string
+	for _, sp := range s.syncPaths {
+		abs := filepath.Join(s.kiloConfigDir, sp)
+		if info, err := os.Stat(abs); err == nil && !info.IsDir() {
+			files = append(files, abs)
+		}
+	}
+	return files
+}
+
 // pushAll walks whitelisted directories and pushes every existing file
-// to the API. Called once at startup to ensure local files are present
-// in the remote collection (the watcher only reacts to changes).
+// to the API. Used by the resync command after clearing the remote collection.
 func (s *Syncer) pushAll() {
 	for _, sp := range s.syncPaths {
 		abs := filepath.Join(s.kiloConfigDir, sp)
@@ -169,6 +185,58 @@ func (s *Syncer) pushAll() {
 			return nil
 		})
 	}
+}
+
+// pushUnsynced walks whitelisted directories and pushes only files that
+// have never been synced (no hash entry). This is called on startup to
+// catch files that were created while sync was not running.
+func (s *Syncer) pushUnsynced() {
+	utils.Log("[ainstruct-sync] Checking for unsynced files...\n")
+	var syncCount int
+	for _, sp := range s.syncPaths {
+		abs := filepath.Join(s.kiloConfigDir, sp)
+		info, err := os.Stat(abs)
+		if err != nil {
+			continue
+		}
+		if !info.IsDir() {
+			// Single file (e.g. opencode.json)
+			if s.isUnsynced(abs) {
+				if err := s.syncFile(abs); err != nil && !s.authExpired {
+					log.Printf("[ainstruct-sync] Initial push error for %s: %v", sp, err)
+				} else {
+					syncCount++
+				}
+			}
+			continue
+		}
+		// Directory — walk recursively
+		_ = filepath.Walk(abs, func(path string, fi os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if fi.IsDir() {
+				return nil
+			}
+			if s.isUnsynced(path) {
+				if err := s.syncFile(path); err != nil && !s.authExpired {
+					log.Printf("[ainstruct-sync] Initial push error for %s: %v", path, err)
+				} else {
+					syncCount++
+				}
+			}
+			return nil
+		})
+	}
+	if syncCount > 0 {
+		utils.Log("[ainstruct-sync] Synced %d unsynced file(s)\n", syncCount)
+	}
+}
+
+// isUnsynced returns true if the file has never been synced (no hash entry).
+func (s *Syncer) isUnsynced(absPath string) bool {
+	relPath := strings.TrimPrefix(absPath, s.kiloConfigDir+"/")
+	return s.hashGet(relPath) == ""
 }
 
 type collection struct {
