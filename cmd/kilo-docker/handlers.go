@@ -97,11 +97,7 @@ func handleUpdate() {
 		fmt.Fprintf(os.Stderr, "\nAlready on latest version (%s). No update needed.\n", latest.kiloDockerVersion)
 		if !dockerDaemonRunning() {
 			fmt.Fprintf(os.Stderr, "\nWarning: Docker daemon is not running.\n")
-		} else {
-			fmt.Fprintf(os.Stderr, "Pulling Docker image...\n")
-			_, _ = dockerRun("pull", repoURL+":latest")
 		}
-		fmt.Fprintf(os.Stderr, "\nUpdate complete.\n")
 		return
 	}
 
