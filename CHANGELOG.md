@@ -1,3 +1,9 @@
+## [2.8.2](https://github.com/mbabic84/kilo-docker/compare/v2.8.1...v2.8.2) (2026-04-07)
+
+### Bug Fixes
+
+* resolve all linting errors and remove dead code ([ba019ff](https://github.com/mbabic84/kilo-docker/commit/ba019ffc4cc92e56f41d5e56f911c41efb0b8e0e))
+
 ## [2.8.1](https://github.com/mbabic84/kilo-docker/compare/v2.8.0...v2.8.1) (2026-04-07)
 
 ### Bug Fixes
