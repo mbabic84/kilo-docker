@@ -1,3 +1,9 @@
+## [2.12.0](https://github.com/mbabic84/kilo-docker/compare/v2.11.0...v2.12.0) (2026-04-07)
+
+### Features
+
+* add file-only logging option with WithOutput() ([11a77a1](https://github.com/mbabic84/kilo-docker/commit/11a77a19729a4358124805b97ed089af804df4b2))
+
 ## [2.11.0](https://github.com/mbabic84/kilo-docker/compare/v2.10.2...v2.11.0) (2026-04-07)
 
 ### Features
