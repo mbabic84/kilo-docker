@@ -1,3 +1,9 @@
+## [2.10.1](https://github.com/mbabic84/kilo-docker/compare/v2.10.0...v2.10.1) (2026-04-07)
+
+### Bug Fixes
+
+* skip docker pull when already on latest version ([3978793](https://github.com/mbabic84/kilo-docker/commit/397879397e296f00f8246d80c6a8efc8a512a8cf))
+
 ## [2.10.0](https://github.com/mbabic84/kilo-docker/compare/v2.9.0...v2.10.0) (2026-04-07)
 
 ### Features
