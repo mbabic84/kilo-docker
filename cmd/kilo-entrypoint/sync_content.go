@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -135,7 +134,7 @@ func (s *Syncer) syncedAbsDirs() []string {
 		if info, err := os.Stat(abs); err == nil && info.IsDir() {
 			dirs = append(dirs, abs)
 		} else if err != nil {
-			utils.Log("[ainstruct-sync] Directory not found: %s (err=%v)\n", abs, err)
+			utils.Log("[ainstruct-sync] Directory not found: %s (err=%v)\n", abs, err, utils.WithOutput())
 		}
 	}
 	return dirs
@@ -167,7 +166,7 @@ func (s *Syncer) pushAll() {
 		if !info.IsDir() {
 			// Single file (e.g. opencode.json)
 			if err := s.syncFile(abs); err != nil && !s.authExpired {
-				log.Printf("[ainstruct-sync] Initial push error for %s: %v", sp, err)
+				utils.LogError("[ainstruct-sync] Initial push error for %s: %v\n", sp, err)
 			}
 			continue
 		}
@@ -180,7 +179,7 @@ func (s *Syncer) pushAll() {
 				return nil
 			}
 			if err := s.syncFile(path); err != nil && !s.authExpired {
-				log.Printf("[ainstruct-sync] Initial push error for %s: %v", path, err)
+				utils.LogError("[ainstruct-sync] Initial push error for %s: %v\n", path, err)
 			}
 			return nil
 		})
@@ -191,7 +190,7 @@ func (s *Syncer) pushAll() {
 // have never been synced (no hash entry). This is called on startup to
 // catch files that were created while sync was not running.
 func (s *Syncer) pushUnsynced() {
-	utils.Log("[ainstruct-sync] Checking for unsynced files...\n")
+	utils.Log("[ainstruct-sync] Checking for unsynced files...\n", utils.WithOutput())
 	var syncCount int
 	for _, sp := range s.syncPaths {
 		abs := filepath.Join(s.kiloConfigDir, sp)
@@ -201,35 +200,35 @@ func (s *Syncer) pushUnsynced() {
 		}
 		if !info.IsDir() {
 			// Single file (e.g. opencode.json)
-			if s.isUnsynced(abs) {
-				if err := s.syncFile(abs); err != nil && !s.authExpired {
-					log.Printf("[ainstruct-sync] Initial push error for %s: %v", sp, err)
-				} else {
-					syncCount++
-				}
+		if s.isUnsynced(abs) {
+			if err := s.syncFile(abs); err != nil && !s.authExpired {
+				utils.LogError("[ainstruct-sync] Initial push error for %s: %v\n", sp, err)
+			} else {
+				syncCount++
 			}
-			continue
 		}
-		// Directory — walk recursively
-		_ = filepath.Walk(abs, func(path string, fi os.FileInfo, err error) error {
-			if err != nil {
-				return nil
-			}
-			if fi.IsDir() {
-				return nil
-			}
-			if s.isUnsynced(path) {
-				if err := s.syncFile(path); err != nil && !s.authExpired {
-					log.Printf("[ainstruct-sync] Initial push error for %s: %v", path, err)
-				} else {
-					syncCount++
-				}
-			}
+		continue
+	}
+	// Directory — walk recursively
+	_ = filepath.Walk(abs, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
 			return nil
-		})
+		}
+		if fi.IsDir() {
+			return nil
+		}
+		if s.isUnsynced(path) {
+			if err := s.syncFile(path); err != nil && !s.authExpired {
+				utils.LogError("[ainstruct-sync] Initial push error for %s: %v\n", path, err)
+			} else {
+				syncCount++
+			}
+		}
+		return nil
+	})
 	}
 	if syncCount > 0 {
-		utils.Log("[ainstruct-sync] Synced %d unsynced file(s)\n", syncCount)
+		utils.Log("[ainstruct-sync] Synced %d unsynced file(s)\n", syncCount, utils.WithOutput())
 	}
 }
 
@@ -283,7 +282,7 @@ func (s *Syncer) ensureCollection() error {
 		return err
 	}
 	if found {
-		log.Printf("[ainstruct-sync] Collection ready: %s", utils.RedactID(s.collectionID))
+		utils.Log("[ainstruct-sync] Collection ready: %s\n", utils.RedactID(s.collectionID))
 		return nil
 	}
 	body := map[string]string{"name": collectionName}
@@ -291,7 +290,7 @@ func (s *Syncer) ensureCollection() error {
 	if err != nil {
 		return fmt.Errorf("creating collection: %w", err)
 	}
-	log.Printf("[ainstruct-sync] POST /collections response: %s", utils.Redact(string(data)))
+	utils.Log("[ainstruct-sync] POST /collections response: %s\n", utils.Redact(string(data)))
 	var created struct {
 		CollectionID string `json:"collection_id"`
 	}
@@ -302,7 +301,7 @@ func (s *Syncer) ensureCollection() error {
 	if s.collectionID == "" {
 		return fmt.Errorf("failed to initialize collection — no collection_id in response")
 	}
-	log.Printf("[ainstruct-sync] Collection ready: %s", utils.RedactID(s.collectionID))
+	utils.Log("[ainstruct-sync] Collection ready: %s\n", utils.RedactID(s.collectionID))
 	return nil
 }
 
@@ -385,10 +384,10 @@ func (s *Syncer) syncFile(absPath string) error {
 		}
 		if result.ContentHash != "" {
 			if err := s.hashSet(relPath, result.ContentHash); err != nil {
-				log.Printf("[ainstruct-sync] Warning: hash update failed for %s: %v", relPath, err)
+				utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
 			}
 		}
-		log.Printf("[ainstruct-sync] Updated: %s", relPath)
+		utils.Log("[ainstruct-sync] Updated: %s\n", relPath)
 	} else {
 		body := map[string]any{
 			"title":         title,
@@ -412,10 +411,10 @@ func (s *Syncer) syncFile(absPath string) error {
 		}
 		if result.ContentHash != "" {
 			if err := s.hashSet(relPath, result.ContentHash); err != nil {
-				log.Printf("[ainstruct-sync] Warning: hash update failed for %s: %v", relPath, err)
+				utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
 			}
 		}
-		log.Printf("[ainstruct-sync] Created: %s", relPath)
+		utils.Log("[ainstruct-sync] Created: %s\n", relPath)
 	}
 	return nil
 }
@@ -442,9 +441,9 @@ func (s *Syncer) deleteByPath(relPath string) error {
 			return fmt.Errorf("auth expired")
 		}
 		if err := s.hashDelete(relPath); err != nil {
-			log.Printf("[ainstruct-sync] Warning: hash delete failed for %s: %v", relPath, err)
+			utils.LogWarn("[ainstruct-sync] Warning: hash delete failed for %s: %v\n", relPath, err)
 		}
-		log.Printf("[ainstruct-sync] Deleted: %s", relPath)
+		utils.Log("[ainstruct-sync] Deleted: %s\n", relPath)
 	}
 	return nil
 }
@@ -458,68 +457,68 @@ func (s *Syncer) pullCollection() error {
 		return err
 	}
 	if !found {
-		log.Println("[ainstruct-sync] No existing collection — nothing to pull")
+		utils.Log("[ainstruct-sync] No existing collection — nothing to pull\n")
 		return nil
 	}
-	log.Printf("[ainstruct-sync] Pulling documents from collection %s", utils.RedactID(s.collectionID))
+	utils.Log("[ainstruct-sync] Pulling documents from collection %s\n", utils.RedactID(s.collectionID))
 	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
 	if err != nil {
 		return fmt.Errorf("listing documents: %w", err)
 	}
-	log.Printf("[ainstruct-sync] Pull: GET /documents response: %s", utils.Redact(string(data)))
+	utils.Log("[ainstruct-sync] Pull: GET /documents response: %s\n", utils.Redact(string(data)))
 	var dr documentsResponse
 	if err := json.Unmarshal(data, &dr); err != nil {
 		return fmt.Errorf("parsing documents response: %w (body: %s)", err, string(data))
 	}
 	if len(dr.Documents) == 0 {
-		log.Println("[ainstruct-sync] Collection is empty — nothing to pull")
+		utils.Log("[ainstruct-sync] Collection is empty — nothing to pull\n")
 		return nil
 	}
-	log.Printf("[ainstruct-sync] Pull: processing %d documents", len(dr.Documents))
+	utils.Log("[ainstruct-sync] Pull: processing %d documents\n", len(dr.Documents))
 	for i, doc := range dr.Documents {
 		relPath := doc.Metadata.LocalPath
-		log.Printf("[ainstruct-sync] Pull: doc[%d] id=%s relPath=%q contentHash=%s", i, utils.RedactID(doc.DocumentID), relPath, doc.ContentHash)
+		utils.Log("[ainstruct-sync] Pull: doc[%d] id=%s relPath=%q contentHash=%s\n", i, utils.RedactID(doc.DocumentID), relPath, doc.ContentHash)
 		if relPath == "" {
-			log.Printf("[ainstruct-sync] Pull: doc[%d] skipped — empty relPath", i)
+			utils.Log("[ainstruct-sync] Pull: doc[%d] skipped — empty relPath\n", i)
 			continue
 		}
 		if !s.isSyncedPath(relPath) {
-			log.Printf("[ainstruct-sync] Pull: doc[%d] %s skipped — not a synced path", i, relPath)
+			utils.Log("[ainstruct-sync] Pull: doc[%d] %s skipped — not a synced path\n", i, relPath)
 			continue
 		}
 		apiHash := doc.ContentHash
 		storedHash := s.hashGet(relPath)
 		if storedHash == apiHash {
-			log.Printf("[ainstruct-sync] Pull: doc[%d] %s skipped — hash match (local=%q api=%q)", i, relPath, storedHash, apiHash)
+			utils.Log("[ainstruct-sync] Pull: doc[%d] %s skipped — hash match (local=%q api=%q)\n", i, relPath, storedHash, apiHash)
 			continue
 		}
-		log.Printf("[ainstruct-sync] Pull: doc[%d] %s fetching (localHash=%q apiHash=%q authExpired=%v)", i, relPath, storedHash, apiHash, s.authExpired)
+		utils.Log("[ainstruct-sync] Pull: doc[%d] %s fetching (localHash=%q apiHash=%q authExpired=%v)\n", i, relPath, storedHash, apiHash, s.authExpired)
 		docData, err := s.apiRequest("GET", "/documents/"+doc.DocumentID, nil)
 		if err != nil {
-			log.Printf("[ainstruct-sync] Failed to pull %s: %v", relPath, err)
+			utils.LogError("[ainstruct-sync] Failed to pull %s: %v\n", relPath, err)
 			continue
 		}
 		var fullDoc struct {
 			Content string `json:"content"`
 		}
 		if err := json.Unmarshal(docData, &fullDoc); err != nil {
-			log.Printf("[ainstruct-sync] Failed to parse %s: %v (body: %s)", relPath, err, string(docData))
+			utils.LogError("[ainstruct-sync] Failed to parse %s: %v (body: %s)\n", relPath, err, string(docData))
 			continue
 		}
 		if fullDoc.Content == "" {
-			log.Printf("[ainstruct-sync] Pull: doc[%d] %s skipped — empty content after fetch", i, relPath)
+			utils.Log("[ainstruct-sync] Pull: doc[%d] %s skipped — empty content after fetch\n", i, relPath)
 			continue
 		}
 		absPath := filepath.Join(s.kiloConfigDir, relPath)
 		_ = os.MkdirAll(filepath.Dir(absPath), 0o755)
 		if err := os.WriteFile(absPath, []byte(fullDoc.Content), 0o644); err != nil {
-			log.Printf("[ainstruct-sync] Failed to write %s: %v", relPath, err)
+			utils.LogError("[ainstruct-sync] Failed to write %s: %v\n", relPath, err)
 			continue
 		}
 		if err := s.hashSet(relPath, apiHash); err != nil {
-			log.Printf("[ainstruct-sync] Warning: hash update failed for %s: %v", relPath, err)
+			utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
 		}
-		log.Printf("[ainstruct-sync] Pulled: %s", relPath)
+		utils.Log("[ainstruct-sync] Pulled: %s\n", relPath)
 	}
 	return nil
 }
@@ -532,7 +531,7 @@ func (s *Syncer) deleteAllDocuments() error {
 		return err
 	}
 	if !found {
-		fmt.Println("No collection found — nothing to delete")
+		utils.Log("[ainstruct-sync] No collection found — nothing to delete\n", utils.WithOutput())
 		return nil
 	}
 	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
@@ -544,17 +543,17 @@ func (s *Syncer) deleteAllDocuments() error {
 		return fmt.Errorf("parsing documents response: %w", err)
 	}
 	if len(dr.Documents) == 0 {
-		fmt.Println("Collection is empty — nothing to delete")
+		utils.Log("[ainstruct-sync] Collection is empty — nothing to delete\n", utils.WithOutput())
 		return nil
 	}
-	fmt.Printf("Deleting %d documents from collection %s...\n", len(dr.Documents), utils.RedactID(s.collectionID))
+	utils.Log("[ainstruct-sync] Deleting %d documents from collection %s...\n", len(dr.Documents), utils.RedactID(s.collectionID), utils.WithOutput())
 	for _, doc := range dr.Documents {
 		if _, err := s.apiRequest("DELETE", "/documents/"+doc.DocumentID, nil); err != nil {
-			fmt.Fprintf(os.Stderr, "  Failed to delete %s (%s): %v\n", doc.Metadata.LocalPath, utils.RedactID(doc.DocumentID), err)
+			utils.LogError("[ainstruct-sync] Failed to delete %s (%s): %v\n", doc.Metadata.LocalPath, utils.RedactID(doc.DocumentID), err)
 			continue
 		}
-		fmt.Printf("  Deleted: %s\n", doc.Metadata.LocalPath)
+		utils.Log("[ainstruct-sync] Deleted: %s\n", doc.Metadata.LocalPath, utils.WithOutput())
 	}
-	fmt.Println("Done. Restart the container to re-sync with correct paths.")
+	utils.Log("[ainstruct-sync] Done. Restart the container to re-sync with correct paths.\n", utils.WithOutput())
 	return nil
 }

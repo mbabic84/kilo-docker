@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/mbabic84/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // runUpdateConfig downloads the latest opencode.json template from the
@@ -58,7 +59,7 @@ func runUpdateConfig() error {
 		if err := os.Rename(tmpPath, configPath); err != nil {
 			return err
 		}
-		fmt.Println("Config merged. Existing customizations preserved, new servers added.")
+		utils.Log("[updatecfg] Config merged. Existing customizations preserved, new servers added.\n", utils.WithOutput())
 	} else {
 		if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 			return err
@@ -66,7 +67,7 @@ func runUpdateConfig() error {
 		if err := os.WriteFile(configPath, templateData, 0644); err != nil {
 			return err
 		}
-		fmt.Println("Config created from template.")
+		utils.Log("[updatecfg] Config created from template.\n", utils.WithOutput())
 	}
 	return nil
 }

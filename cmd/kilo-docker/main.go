@@ -50,7 +50,7 @@ func main() {
 
 	// Warn if running in non-interactive mode without -y flag
 	if !isTerminal() && !cfg.yes {
-		utils.LogWarn("Running in non-interactive mode (non-TTY). Use -y to auto-confirm prompts.\n")
+		utils.LogWarn("[kilo-docker] Running in non-interactive mode (non-TTY). Use -y to auto-confirm prompts.\n")
 	}
 
 	switch cfg.command {
@@ -81,7 +81,7 @@ func main() {
 
 func runContainer(cfg config) {
 	if !dockerDaemonRunning() {
-		utils.LogError("Docker daemon is not running.\n")
+		utils.LogError("[kilo-docker] Docker daemon is not running.\n")
 		os.Exit(1)
 	}
 
@@ -90,7 +90,7 @@ func runContainer(cfg config) {
 	if cfg.workspace != "" {
 		workspace = cfg.workspace
 		if _, err := os.Stat(workspace); os.IsNotExist(err) {
-			utils.LogError("Workspace path does not exist: %s\n", workspace)
+			utils.LogError("[kilo-docker] Workspace path does not exist: %s\n", workspace)
 			os.Exit(1)
 		}
 	}
@@ -113,9 +113,9 @@ func runContainer(cfg config) {
 		currentFlags := serializeArgs(cfg, cfg.ssh)
 		storedFlags := getContainerLabel(containerName, "kilo.args")
 		if currentFlags != storedFlags {
-			utils.Log("Existing session uses different flags.\n")
-			utils.Log("  Existing: %s\n", storedFlags)
-			utils.Log("  Current:  %s\n", currentFlags)
+			utils.Log("[kilo-docker] Existing session uses different flags.\n", utils.WithOutput())
+			utils.Log("[kilo-docker]   Existing: %s\n", storedFlags, utils.WithOutput())
+			utils.Log("[kilo-docker]   Current:  %s\n", currentFlags, utils.WithOutput())
 			if cfg.yes || confirmPrompt("Recreate with new flags? [y/N]: ", cfg.yes) {
 				_, _ = dockerRun("rm", "-f", containerName)
 				containerState = "not_found"
@@ -178,7 +178,7 @@ func runContainer(cfg config) {
 
 	if !cfg.once {
 		if strings.HasPrefix(workspace, "/home/kd-") {
-			utils.LogWarn("Current directory (%s) overlaps with the container's home path.\n", workspace)
+			utils.LogWarn("[kilo-docker] Current directory (%s) overlaps with the container's home path.\n", workspace)
 		}
 	}
 
@@ -229,17 +229,17 @@ func handleSessionEnd(containerName string, onceMode bool) {
 	resetTerminal()
 	if onceMode {
 		_, _ = dockerRun("rm", "-f", containerName)
-		utils.Log("Session '%s' ended.\n", containerName)
-		utils.Log("Container removed (--once mode).\n")
+		utils.Log("[kilo-docker] Session '%s' ended.\n", containerName, utils.WithOutput())
+		utils.Log("[kilo-docker] Container removed (--once mode).\n", utils.WithOutput())
 	} else {
-		utils.Log("Detached from session '%s'.\n", containerName)
-		utils.Log("To re-attach, run: kilo-docker sessions %s\n", containerName)
+		utils.Log("[kilo-docker] Detached from session '%s'.\n", containerName, utils.WithOutput())
+		utils.Log("[kilo-docker] To re-attach, run: kilo-docker sessions %s\n", containerName, utils.WithOutput())
 	}
 }
 
 func confirmPrompt(message string, yes bool) bool {
 	if yes {
-		utils.Log("%sy\n", message)
+		utils.Log("%sy\n", message, utils.WithOutput())
 		return true
 	}
 	fmt.Print(message)

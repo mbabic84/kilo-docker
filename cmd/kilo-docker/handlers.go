@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // downloadFile downloads a file from url to dest, trying curl first then wget.
@@ -85,72 +87,70 @@ func handleUpdate() {
 
 	latest, err := getLatestVersions()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not fetch latest version info: %v\n", err)
+		utils.LogWarn("[kilo-docker] Warning: could not fetch latest version info: %v\n", err)
 		latest.kiloDockerVersion = "unknown"
 		latest.kiloVersion = "unknown"
 	}
 
-	fmt.Fprintf(os.Stderr, "kilo-docker: %s → %s\n", version, latest.kiloDockerVersion)
-	fmt.Fprintf(os.Stderr, "Kilo CLI: %s → %s\n", kiloVersion, latest.kiloVersion)
+	utils.Log("[kilo-docker] kilo-docker: %s → %s\n", version, latest.kiloDockerVersion, utils.WithOutput())
+	utils.Log("[kilo-docker] Kilo CLI: %s → %s\n", kiloVersion, latest.kiloVersion, utils.WithOutput())
 
 	if version == latest.kiloDockerVersion {
-		fmt.Fprintf(os.Stderr, "\nAlready on latest version (%s). No update needed.\n", latest.kiloDockerVersion)
+		utils.Log("[kilo-docker] \nAlready on latest version (%s). No update needed.\n", latest.kiloDockerVersion, utils.WithOutput())
 		if !dockerDaemonRunning() {
-			fmt.Fprintf(os.Stderr, "\nWarning: Docker daemon is not running.\n")
+			utils.LogWarn("\nWarning: Docker daemon is not running.\n")
 		}
 		return
 	}
 
-	// Check if installed
 	if _, err := os.Stat(target); err != nil {
-		fmt.Fprintf(os.Stderr, "kilo-docker is not installed locally.\n")
-		fmt.Fprintf(os.Stderr, "Run the install script first: curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/install.sh | sh\n")
+		utils.Log("[kilo-docker] kilo-docker is not installed locally.\n", utils.WithOutput())
+		utils.Log("[kilo-docker] Run the install script first: curl -fsSL https://raw.githubusercontent.com/mbabic84/kilo-docker/main/scripts/install.sh | sh\n", utils.WithOutput())
 	} else {
-		// Download latest binary from GitHub releases
 		osName, arch := getOSArch()
 		downloadURL := fmt.Sprintf("https://github.com/mbabic84/kilo-docker/releases/latest/download/kilo-docker-%s-%s", osName, arch)
 
-		fmt.Fprintf(os.Stderr, "\nUpdating kilo-docker binary...\n")
+		utils.Log("[kilo-docker] \nUpdating kilo-docker binary...\n", utils.WithOutput())
 
 		tempFile, err := os.CreateTemp("", "kilo-docker-*")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: failed to create temp file: %v\n", err)
+			utils.LogError("[kilo-docker] Error: failed to create temp file: %v\n", err)
 		} else {
 			tempPath := tempFile.Name()
 			_ = tempFile.Close()
 
 			if err := downloadFile(downloadURL, tempPath); err != nil {
 				_ = os.Remove(tempPath)
-				fmt.Fprintf(os.Stderr, "Error: Failed to download update: %v\n", err)
+				utils.LogError("[kilo-docker] Error: Failed to download update: %v\n", err)
 			} else {
 				if err := os.Chmod(tempPath, 0755); err != nil {
 					_ = os.Remove(tempPath)
-					fmt.Fprintf(os.Stderr, "Error: failed to set permissions: %v\n", err)
+					utils.LogError("[kilo-docker] Error: failed to set permissions: %v\n", err)
 				} else if err := os.Rename(tempPath, target); err != nil {
 					_ = os.Remove(tempPath)
-					fmt.Fprintf(os.Stderr, "Error: failed to replace binary: %v\n", err)
+					utils.LogError("[kilo-docker] Error: failed to replace binary: %v\n", err)
 				} else {
-					fmt.Fprintf(os.Stderr, "Binary updated: %s\n", target)
+					utils.Log("[kilo-docker] Binary updated: %s\n", target, utils.WithOutput())
 				}
 			}
 		}
 	}
 
 	if !dockerDaemonRunning() {
-		fmt.Fprintf(os.Stderr, "\nWarning: Docker daemon is not running. Skipping image pull.\n")
-		fmt.Fprintf(os.Stderr, "Run 'docker pull %s:latest' after starting Docker.\n", repoURL)
+		utils.LogWarn("[kilo-docker] Warning: Docker daemon is not running. Skipping image pull.\n")
+		utils.Log("[kilo-docker] Run 'docker pull %s:latest' after starting Docker.\n", repoURL, utils.WithOutput())
 	} else {
-		fmt.Fprintf(os.Stderr, "\nPulling Docker image...\n")
+		utils.Log("[kilo-docker] \nPulling Docker image...\n", utils.WithOutput())
 		_, _ = dockerRun("pull", repoURL+":latest")
 	}
-	fmt.Fprintf(os.Stderr, "\nUpdated ✓\n")
+	utils.Log("[kilo-docker] \nUpdated ✓\n", utils.WithOutput())
 }
 
 // handleCleanup removes all kilo-docker artifacts: containers, volumes,
 // Docker images, and the installed script.
 func handleCleanup(yes bool) {
 	if !promptConfirm("Remove volume, containers, and images for kilo-docker? [y/N]: ", yes) {
-		fmt.Fprintf(os.Stderr, "Aborted.\n")
+		utils.Log("[kilo-docker] Aborted.\n", utils.WithOutput())
 		return
 	}
 
@@ -175,24 +175,24 @@ func handleCleanup(yes bool) {
 	target := filepath.Join(home, ".local", "bin", "kilo-docker")
 	_ = os.Remove(target)
 
-	fmt.Fprintf(os.Stderr, "Cleanup complete.\n")
+	utils.Log("[kilo-docker] Cleanup complete.\n", utils.WithOutput())
 }
 
 // handleInit resets the data volume, prompting for confirmation.
 func handleInit(cfg config) {
 	dataVolume := resolveVolume(cfg)
 	if dataVolume == "" {
-		fmt.Fprintf(os.Stderr, "Nothing to reset in --once mode.\n")
+		utils.Log("[kilo-docker] Nothing to reset in --once mode.\n", utils.WithOutput())
 		os.Exit(0)
 	}
 
 	if volumeExists(dataVolume) {
 		if promptConfirm("Remove volume '" + dataVolume + "' and reset all configuration? [y/N]: ", cfg.yes) {
 			_ = removeVolume(dataVolume)
-			fmt.Fprintf(os.Stderr, "Volume removed. You will be prompted for tokens on next run.\n")
+			utils.Log("[kilo-docker] Volume removed. You will be prompted for tokens on next run.\n", utils.WithOutput())
 		}
 	} else {
-		fmt.Fprintf(os.Stderr, "No existing volume found.\n")
+		utils.Log("[kilo-docker] No existing volume found.\n", utils.WithOutput())
 	}
 }
 
@@ -201,16 +201,16 @@ func handleInit(cfg config) {
 func handleUpdateConfig(cfg config) {
 	dataVolume := resolveVolume(cfg)
 	if dataVolume == "" {
-		fmt.Fprintf(os.Stderr, "Nothing to update in --once mode.\n")
+		utils.Log("[kilo-docker] Nothing to update in --once mode.\n", utils.WithOutput())
 		os.Exit(0)
 	}
 
 	if !volumeExists(dataVolume) {
-		fmt.Fprintf(os.Stderr, "No existing volume found. Run kilo-docker first to create one.\n")
+		utils.Log("[kilo-docker] No existing volume found. Run kilo-docker first to create one.\n", utils.WithOutput())
 		os.Exit(1)
 	}
 
-	fmt.Fprintf(os.Stderr, "Updating opencode.json from repository template...\n")
+	utils.Log("[kilo-docker] Updating opencode.json from repository template...\n", utils.WithOutput())
 
 	_, err := dockerRun(
 		"-v", dataVolume+":"+kiloHome,
@@ -219,7 +219,7 @@ func handleUpdateConfig(cfg config) {
 		"update-config",
 	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		utils.LogError("[kilo-docker] Error: %v\n", err)
 		os.Exit(1)
 	}
 }

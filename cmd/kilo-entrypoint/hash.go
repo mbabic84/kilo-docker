@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // hashGet retrieves the cached content hash for a relative file path.
@@ -54,7 +55,7 @@ func (s *Syncer) hashSet(relPath, hash string) error {
 		lines = append(lines, prefix+hash)
 	}
 	if err := os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
-		log.Printf("[ainstruct-sync] Failed to write hash file %s: %v", s.hashFile, err)
+		utils.LogWarn("[ainstruct-sync] Failed to write hash file %s: %v\n", s.hashFile, err)
 		return fmt.Errorf("writing hash file: %w", err)
 	}
 	return nil
@@ -78,7 +79,7 @@ func (s *Syncer) hashDelete(relPath string) error {
 		lines = append(lines, line)
 	}
 	if err := os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
-		log.Printf("[ainstruct-sync] Failed to write hash file %s: %v", s.hashFile, err)
+		utils.LogWarn("[ainstruct-sync] Failed to write hash file %s: %v\n", s.hashFile, err)
 		return fmt.Errorf("writing hash file: %w", err)
 	}
 	return nil

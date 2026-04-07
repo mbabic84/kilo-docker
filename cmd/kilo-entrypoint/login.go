@@ -104,14 +104,14 @@ func listPATs(apiURL, accessToken string) ([]patListItem, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		utils.LogError("PAT list request failed: %v\n", err)
+		utils.LogError("[login] PAT list request failed: %v\n", err)
 		return nil, err
 	}
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		utils.Log("PAT list returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+		utils.Log("[login] PAT list returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 		return nil, fmt.Errorf("list PATs failed with status %d", resp.StatusCode)
 	}
 
@@ -126,7 +126,7 @@ func listPATs(apiURL, accessToken string) ([]patListItem, error) {
 }
 
 func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
-utils.Log("Ensuring PAT with label: %q\n", label)
+utils.Log("[login] Ensuring PAT with label: %q\n", label)
 	pats, err := listPATs(apiURL, accessToken)
 	if err != nil {
 		return "", err
@@ -139,17 +139,17 @@ utils.Log("Ensuring PAT with label: %q\n", label)
 			// rotation needed.
 			if storedToken != "" {
 				if pat.ExpiresAt == nil || time.Until(pat.ExpiresAt.Time) <= patRotationThreshold {
-					utils.LogWarn("Existing PAT expiring soon or no expiry, rotating\n")
+					utils.LogWarn("[login] Existing PAT expiring soon or no expiry, rotating\n")
 				} else {
-				utils.Log("Existing PAT still valid (expires %s), using stored token\n", pat.ExpiresAt.Format("2006-01-02"))
+				utils.Log("[login] Existing PAT still valid (expires %s), using stored token\n", pat.ExpiresAt.Format("2006-01-02"))
 					return storedToken, nil
 				}
 			} else {
 			// No stored token — must rotate to obtain the value.
 			if pat.ExpiresAt != nil {
-				utils.Log("No stored token, rotating existing PAT (expires %s)\n", pat.ExpiresAt.Format("2006-01-02"))
+				utils.Log("[login] No stored token, rotating existing PAT (expires %s)\n", pat.ExpiresAt.Format("2006-01-02"))
 				} else {
-					utils.Log("No stored token, rotating existing PAT (no expiry)\n")
+					utils.Log("[login] No stored token, rotating existing PAT (no expiry)\n")
 				}
 			}
 			rotateReq := map[string]interface{}{
@@ -165,14 +165,14 @@ utils.Log("Ensuring PAT with label: %q\n", label)
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				utils.LogError("PAT rotate request failed: %v\n", err)
+				utils.LogError("[login] PAT rotate request failed: %v\n", err)
 				return "", err
 			}
 
 			if resp.StatusCode != 200 {
 				body, _ := io.ReadAll(resp.Body)
 				_ = resp.Body.Close()
-				utils.Log("PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+				utils.Log("[login] PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 				return "", fmt.Errorf("rotate PAT failed with status %d", resp.StatusCode)
 			}
 
@@ -182,12 +182,12 @@ utils.Log("Ensuring PAT with label: %q\n", label)
 			if err := json.Unmarshal(body, &rotateResp); err != nil {
 				return "", err
 			}
-			utils.Log("PAT rotated successfully (id=%s)\n", rotateResp.PatID)
+			utils.Log("[login] PAT rotated successfully (id=%s)\n", rotateResp.PatID)
 			return rotateResp.Token, nil
 		}
 	}
 
-utils.Log("No existing PAT found, creating new one...\n")
+utils.Log("[login] No existing PAT found, creating new one...\n")
 	createReq := map[string]interface{}{
 		"label":           label,
 		"expires_in_days": 30,
@@ -202,14 +202,14 @@ utils.Log("No existing PAT found, creating new one...\n")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		utils.LogError("PAT create request failed: %v\n", err)
+			utils.LogError("[login] PAT create request failed: %v\n", err)
 		return "", err
 	}
 
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		utils.Log("PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+			utils.Log("[login] PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
 		return "", fmt.Errorf("create PAT failed with status %d", resp.StatusCode)
 	}
 
@@ -219,7 +219,7 @@ utils.Log("No existing PAT found, creating new one...\n")
 	if err := json.Unmarshal(body, &createResp); err != nil {
 		return "", err
 	}
-	utils.Log("PAT created successfully (id=%s)\n", createResp.PatID)
+	utils.Log("[login] PAT created successfully (id=%s)\n", createResp.PatID)
 	return createResp.Token, nil
 }
 
@@ -230,11 +230,11 @@ utils.Log("No existing PAT found, creating new one...\n")
 func runLoginInteractive() (loginResult, error) {
 	var result loginResult
 
-	fmt.Fprintf(os.Stderr, "\n=== Ainstruct Authentication ===\n")
-	fmt.Fprintf(os.Stderr, "Sign in at %s\n\n", constants.AinstructBaseURL)
-	fmt.Fprintf(os.Stderr, "Enables:\n")
-	fmt.Fprintf(os.Stderr, "  - File sync (push/pull config, commands, agents, instructions)\n")
-	fmt.Fprintf(os.Stderr, "  - MCP server tokens (stored encrypted in volume)\n\n")
+	utils.Log("[login] \n=== Ainstruct Authentication ===\n", utils.WithOutput())
+	utils.Log("[login] Sign in at %s\n\n", constants.AinstructBaseURL, utils.WithOutput())
+	utils.Log("[login] Enables:\n", utils.WithOutput())
+	utils.Log("[login]   - File sync (push/pull config, commands, agents, instructions)\n", utils.WithOutput())
+	utils.Log("[login]   - MCP server tokens (stored encrypted in volume)\n\n", utils.WithOutput())
 
 	username := promptUsername()
 	password := promptPassword()
@@ -315,14 +315,14 @@ func runLoginInteractive() (loginResult, error) {
 	patLabel := buildPATLabel()
 	patToken, patErr := ensurePAT(constants.AinstructAPIBaseURL, loginResp.AccessToken, patLabel, storedAinstruct)
 	if patErr != nil {
-		fmt.Fprintf(os.Stderr, "\nWarning: Failed to create Ainstruct MCP token: %v\n", patErr)
-		fmt.Fprintf(os.Stderr, "Ainstruct MCP server will be disabled.\n")
+		utils.LogWarn("[login] Warning: Failed to create Ainstruct MCP token: %v\n", patErr)
+		utils.Log("[login] Ainstruct MCP server will be disabled.\n", utils.WithOutput())
 	} else if patToken != "" {
 		result.MCPToken = patToken
 	}
 
-	fmt.Fprintf(os.Stderr, "\nSigned in successfully.\n")
-	fmt.Fprintf(os.Stderr, "Tokens encrypted and stored in volume.\n\n")
+	utils.Log("[login] \nSigned in successfully.\n", utils.WithOutput())
+	utils.Log("[login] Tokens encrypted and stored in volume.\n\n", utils.WithOutput())
 
 	return result, nil
 }
