@@ -46,6 +46,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get versions
+        id: versions
+        if: ${{ steps.release.outputs.new_release_published == 'true' }}
+        run: |
+          echo "kilo_docker_version=${{ steps.release.outputs.new_release_version }}" >> $GITHUB_OUTPUT
+          echo "kilo_version=$(grep -oP 'ARG KILO_VERSION=\K[0-9.]+' Dockerfile)" >> $GITHUB_OUTPUT
+
       - name: Set up Go
         if: ${{ steps.release.outputs.new_release_published == 'true' }}
         uses: actions/setup-go@v6
@@ -57,13 +64,11 @@ jobs:
         if: ${{ steps.release.outputs.new_release_published == 'true' }}
         run: |
           set -e
-          VERSION="${{ steps.release.outputs.new_release_version }}"
-          KILO_VERSION=$(grep -oP 'ARG KILO_VERSION=\K[0-9.]+' Dockerfile)
           for OS_ARCH in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
             OS="${OS_ARCH%%-*}"
             ARCH="${OS_ARCH##*-}"
             CGO_ENABLED=0 GOOS=$OS GOARCH=$ARCH go build \
-              -ldflags="-s -w -X main.version=${VERSION} -X main.kiloVersion=${KILO_VERSION}" \
+              -ldflags="-s -w -X main.version=v${{ steps.versions.outputs.kilo_docker_version }} -X main.kiloVersion=${{ steps.versions.outputs.kilo_version }}" \
               -o "kilo-docker-${OS_ARCH}" \
               ./cmd/kilo-docker
           done
@@ -71,11 +76,14 @@ jobs:
       - name: Upload binaries to release
         if: ${{ steps.release.outputs.new_release_published == 'true' }}
         run: |
+          echo "KILO_DOCKER_VERSION=v${{ steps.versions.outputs.kilo_docker_version }}" > .versions
+          echo "KILO_VERSION=${{ steps.versions.outputs.kilo_version }}" >> .versions
           gh release upload "v${{ steps.release.outputs.new_release_version }}" \
             kilo-docker-linux-amd64 \
             kilo-docker-linux-arm64 \
             kilo-docker-darwin-amd64 \
-            kilo-docker-darwin-arm64
+            kilo-docker-darwin-arm64 \
+            .versions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
