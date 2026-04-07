@@ -29,7 +29,7 @@ func dockerDaemonRunning() bool {
 
 func promptConfirm(message string, yes bool) bool {
 	if yes {
-		utils.Log("%sy\n", message)
+		utils.Log("[kilo-docker] %sy\n", message, utils.WithOutput())
 		return true
 	}
 	fmt.Print(message)
