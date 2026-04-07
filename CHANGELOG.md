@@ -1,3 +1,9 @@
+## [2.13.1](https://github.com/mbabic84/kilo-docker/compare/v2.13.0...v2.13.1) (2026-04-07)
+
+### Bug Fixes
+
+* add missing context prefix to setup.go log ([6e45100](https://github.com/mbabic84/kilo-docker/commit/6e45100d30efc2ce57151be5c3184da5ea425bde))
+
 ## [2.13.0](https://github.com/mbabic84/kilo-docker/compare/v2.12.0...v2.13.0) (2026-04-07)
 
 ### Features
