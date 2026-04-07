@@ -1,3 +1,9 @@
+## [2.8.1](https://github.com/mbabic84/kilo-docker/compare/v2.8.0...v2.8.1) (2026-04-07)
+
+### Bug Fixes
+
+* make mcp-config read tokens from encrypted storage only ([79c6473](https://github.com/mbabic84/kilo-docker/commit/79c64739be988487036fbc6e7847bde2a1349bf9))
+
 ## [2.8.0](https://github.com/mbabic84/kilo-docker/compare/v2.7.2...v2.8.0) (2026-04-07)
 
 ### Features
