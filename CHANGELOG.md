@@ -1,3 +1,9 @@
+## [2.10.0](https://github.com/mbabic84/kilo-docker/compare/v2.9.0...v2.10.0) (2026-04-07)
+
+### Features
+
+* add version status to update command ([8cd0496](https://github.com/mbabic84/kilo-docker/commit/8cd04963702916eb14a2d93dcfa40de2dabb8d5d))
+
 ## [2.9.0](https://github.com/mbabic84/kilo-docker/compare/v2.8.2...v2.9.0) (2026-04-07)
 
 ### Features
