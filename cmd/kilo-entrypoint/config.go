@@ -8,49 +8,68 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
-// applyMCPEnabledFromEnv updates opencode.json MCP enabled states based on environment variables.
-// This function should be called AFTER the kilo wrapper script has set KD_MCP_* tokens as env vars.
+// applyMCPEnabledFromEnv updates opencode.json MCP enabled states by reading tokens
+// from encrypted storage. It does NOT read from environment variables for security - 
+// tokens are only available in env vars during the Kilo session managed by kilo-wrapper.sh.
 //
-// NOTE: There is a known issue where Kilo CLI 7.1.20 does not respect the enabled field in
-// container environments (works fine on host). See docs/MCP_ENABLED_KNOWN_ISSUE.md for details.
-// Users must manually enable MCPs via Ctrl+P until this is fixed upstream.
-// It enables/disables MCP servers according to whether their respective tokens are present:
-//   - context7: enabled if KD_MCP_CONTEXT7_TOKEN is non-empty
-//   - ainstruct: enabled if KD_MCP_AINSTRUCT_TOKEN is non-empty
-//   - playwright: enabled if PLAYWRIGHT_ENABLED == "1"
-// The homeDir parameter can be empty - if so, it will be auto-detected via loadUserConfig().
+// This function reads tokens directly from the encrypted file to determine which MCP
+// servers should be enabled, ensuring consistent behavior whether called during startup
+// or manually.
 func applyMCPEnabledFromEnv(homeDir string) error {
 	utils.Log("[MCP Config] Starting MCP enabled state application\n")
 
-	// Determine enabled states from environment variables (set by kilo-wrapper.sh)
-	playwrightEnabled := os.Getenv("PLAYWRIGHT_ENABLED") == "1"
-	context7Token := os.Getenv("KD_MCP_CONTEXT7_TOKEN")
-	context7Enabled := context7Token != ""
-	context7TokenLen := len(context7Token)
-
-	ainstructToken := os.Getenv("KD_MCP_AINSTRUCT_TOKEN")
-	ainstructEnabled := ainstructToken != ""
-	aintTokenLen := len(ainstructToken)
-
-	// Log what we found (token lengths only, not actual values)
-	utils.Log("[MCP Config] Environment check - PLAYWRIGHT_ENABLED=%v, KD_MCP_CONTEXT7_TOKEN=[%d chars], KD_MCP_AINSTRUCT_TOKEN=[%d chars]\n",
-		playwrightEnabled, context7TokenLen, aintTokenLen)
-	utils.Log("[MCP Config] Determined enabled states - playwright=%v, context7=%v, ainstruct=%v\n",
-		playwrightEnabled, context7Enabled, ainstructEnabled)
-
-	// Auto-detect homeDir if not provided
+	// Auto-detect homeDir
 	if homeDir == "" {
 		utils.Log("[MCP Config] homeDir not provided, auto-detecting via loadUserConfig()\n")
 		homeDir, _, _, _ = loadUserConfig()
 		if homeDir != "" {
 			utils.Log("[MCP Config] Auto-detected homeDir: %s\n", homeDir)
-		} else {
-			utils.LogWarn("[MCP Config] Failed to auto-detect homeDir, skipping MCP config update\n")
 		}
-	} else {
-		utils.Log("[MCP Config] Using provided homeDir: %s\n", homeDir)
 	}
 
+	// Determine enabled states
+	// playwright is controlled by env var (not stored in encrypted tokens)
+	playwrightEnabled := os.Getenv("PLAYWRIGHT_ENABLED") == "1"
+
+	// context7 and ainstruct tokens are read from encrypted storage only
+	var context7Token, ainstructToken string
+
+	if homeDir != "" {
+		// We need userID to decrypt
+		_, _, _, userID := loadUserConfig()
+		if userID != "" {
+			if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); err == nil {
+				if decrypted, err := decryptAES(encData, userID); err == nil {
+					c7, aInst, _, _, _, _ := parseTokenEnv(string(decrypted))
+					context7Token = c7
+					ainstructToken = aInst
+					utils.Log("[MCP Config] Loaded tokens from encrypted storage\n")
+				} else {
+					utils.Log("[MCP Config] Failed to decrypt token file: %v\n", err)
+				}
+			} else {
+				utils.Log("[MCP Config] No encrypted token file found: %v\n", err)
+			}
+		} else {
+			utils.Log("[MCP Config] No userID available to decrypt tokens\n")
+		}
+	} else {
+		utils.Log("[MCP Config] No homeDir available to load encrypted tokens\n")
+	}
+
+	context7Enabled := context7Token != ""
+	context7TokenLen := len(context7Token)
+
+	ainstructEnabled := ainstructToken != ""
+	aintTokenLen := len(ainstructToken)
+
+	// Log what we found (token lengths only, not actual values)
+	utils.Log("[MCP Config] Environment check - PLAYWRIGHT_ENABLED=%v, context7=[%d chars], ainstruct=[%d chars]\n",
+		playwrightEnabled, context7TokenLen, aintTokenLen)
+	utils.Log("[MCP Config] Determined enabled states - playwright=%v, context7=%v, ainstruct=%v\n",
+		playwrightEnabled, context7Enabled, ainstructEnabled)
+
+	// Check if we have homeDir for config update
 	if homeDir == "" {
 		utils.LogWarn("[MCP Config] No homeDir available, cannot update MCP config\n")
 		return nil
