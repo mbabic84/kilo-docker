@@ -35,6 +35,9 @@ func runSyncMode() {
 
 	if err := s.pullCollection(); err != nil {
 		log.Printf("[ainstruct-sync] Pull failed: %v", err)
+	} else {
+		// Push files that have never been synced (no hash entry)
+		s.pushUnsynced()
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
