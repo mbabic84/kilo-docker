@@ -71,9 +71,9 @@ func Log(format string, args ...interface{}) {
 
 	var msg string
 	if len(logArgs) > 0 {
-		msg = fmt.Sprintf("[kilo-docker] "+format, logArgs...)
+		msg = fmt.Sprintf(format, logArgs...)
 	} else {
-		msg = fmt.Sprintf("[kilo-docker] %s", format)
+		msg = format
 	}
 	if output {
 		fmt.Fprint(os.Stderr, msg)
@@ -98,9 +98,9 @@ func LogError(format string, args ...interface{}) {
 
 	var msg string
 	if len(logArgs) > 0 {
-		msg = fmt.Sprintf("[kilo-docker] Error: "+format, logArgs...)
+		msg = fmt.Sprintf("Error: "+format, logArgs...)
 	} else {
-		msg = fmt.Sprintf("[kilo-docker] Error: %s", format)
+		msg = fmt.Sprintf("Error: %s", format)
 	}
 	if output {
 		fmt.Fprint(os.Stderr, msg)
@@ -125,9 +125,9 @@ func LogWarn(format string, args ...interface{}) {
 
 	var msg string
 	if len(logArgs) > 0 {
-		msg = fmt.Sprintf("[kilo-docker] Warning: "+format, logArgs...)
+		msg = fmt.Sprintf("Warning: "+format, logArgs...)
 	} else {
-		msg = fmt.Sprintf("[kilo-docker] Warning: %s", format)
+		msg = fmt.Sprintf("Warning: %s", format)
 	}
 	if output {
 		fmt.Fprint(os.Stderr, msg)

@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // handleSessions lists, attaches to, recreates, or cleans up kilo-docker sessions.
@@ -91,11 +93,11 @@ func handleSessions(cfg config) {
 				fmt.Fprintf(os.Stderr, "Current directory: %s\n", originalDir)
 				os.Exit(1)
 			}
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Recreating session in workspace: %s\n", targetSession.Workspace)
+			utils.Log("[kilo-docker] Recreating session in workspace: %s\n", targetSession.Workspace, utils.WithOutput())
 		}
 
 		// Remove the old container (volume persists)
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Removing old container '%s'...\n", containerName)
+		utils.Log("[kilo-docker] Removing old container '%s'...\n", containerName, utils.WithOutput())
 		_, _ = dockerRun("rm", "-f", containerName)
 
 		// Run with the original flags — this creates a fresh container

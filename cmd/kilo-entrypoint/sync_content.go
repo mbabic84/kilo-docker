@@ -134,7 +134,7 @@ func (s *Syncer) syncedAbsDirs() []string {
 		if info, err := os.Stat(abs); err == nil && info.IsDir() {
 			dirs = append(dirs, abs)
 		} else if err != nil {
-			utils.Log("[ainstruct-sync] Directory not found: %s (err=%v)\n", abs, err, utils.WithOutput())
+			utils.Log("[ainstruct-sync] Directory not found: %s (err=%v)\n", abs, err)
 		}
 	}
 	return dirs
@@ -190,7 +190,7 @@ func (s *Syncer) pushAll() {
 // have never been synced (no hash entry). This is called on startup to
 // catch files that were created while sync was not running.
 func (s *Syncer) pushUnsynced() {
-	utils.Log("[ainstruct-sync] Checking for unsynced files...\n", utils.WithOutput())
+	utils.Log("[ainstruct-sync] Checking for unsynced files...\n")
 	var syncCount int
 	for _, sp := range s.syncPaths {
 		abs := filepath.Join(s.kiloConfigDir, sp)
@@ -228,7 +228,7 @@ func (s *Syncer) pushUnsynced() {
 	})
 	}
 	if syncCount > 0 {
-		utils.Log("[ainstruct-sync] Synced %d unsynced file(s)\n", syncCount, utils.WithOutput())
+		utils.Log("[ainstruct-sync] Synced %d unsynced file(s)\n", syncCount)
 	}
 }
 
@@ -531,7 +531,7 @@ func (s *Syncer) deleteAllDocuments() error {
 		return err
 	}
 	if !found {
-		utils.Log("[ainstruct-sync] No collection found — nothing to delete\n", utils.WithOutput())
+		utils.Log("[ainstruct-sync] No collection found — nothing to delete\n")
 		return nil
 	}
 	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
@@ -543,17 +543,17 @@ func (s *Syncer) deleteAllDocuments() error {
 		return fmt.Errorf("parsing documents response: %w", err)
 	}
 	if len(dr.Documents) == 0 {
-		utils.Log("[ainstruct-sync] Collection is empty — nothing to delete\n", utils.WithOutput())
+		utils.Log("[ainstruct-sync] Collection is empty — nothing to delete\n")
 		return nil
 	}
-	utils.Log("[ainstruct-sync] Deleting %d documents from collection %s...\n", len(dr.Documents), utils.RedactID(s.collectionID), utils.WithOutput())
+	utils.Log("[ainstruct-sync] Deleting %d documents from collection %s...\n", len(dr.Documents), utils.RedactID(s.collectionID))
 	for _, doc := range dr.Documents {
 		if _, err := s.apiRequest("DELETE", "/documents/"+doc.DocumentID, nil); err != nil {
 			utils.LogError("[ainstruct-sync] Failed to delete %s (%s): %v\n", doc.Metadata.LocalPath, utils.RedactID(doc.DocumentID), err)
 			continue
 		}
-		utils.Log("[ainstruct-sync] Deleted: %s\n", doc.Metadata.LocalPath, utils.WithOutput())
+		utils.Log("[ainstruct-sync] Deleted: %s\n", doc.Metadata.LocalPath)
 	}
-	utils.Log("[ainstruct-sync] Done. Restart the container to re-sync with correct paths.\n", utils.WithOutput())
+	utils.Log("[ainstruct-sync] Done. Restart the container to re-sync with correct paths.\n")
 	return nil
 }
