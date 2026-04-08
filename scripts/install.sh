@@ -39,3 +39,37 @@ if command -v docker >/dev/null 2>&1; then
   echo "Pulling Docker image..."
   docker pull ghcr.io/mbabic84/kilo-docker:latest 2>/dev/null || true
 fi
+
+echo ""
+echo "kilo-docker installed successfully to: $TARGET"
+echo ""
+
+# Check if ~/.local/bin is in PATH
+if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
+  echo "WARNING: $INSTALL_DIR is not in your PATH."
+  echo ""
+  echo "To fix this, add the following line to your shell profile:"
+  echo ""
+
+  # Detect shell and suggest appropriate config file
+  case "${SHELL:-}" in
+    */zsh)
+      echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+      echo ""
+      echo "Then reload your shell with: source ~/.zshrc"
+      ;;
+    */bash)
+      echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+      echo ""
+      echo "Then reload your shell with: source ~/.bashrc"
+      ;;
+    *)
+      echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+      echo ""
+      echo "Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.) and reload your shell."
+      ;;
+  esac
+  echo ""
+fi
+
+echo "Run 'kilo-docker --help' to get started."
