@@ -48,27 +48,35 @@ echo ""
 if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
   echo "WARNING: $INSTALL_DIR is not in your PATH."
   echo ""
-  echo "To fix this, add the following line to your shell profile:"
-  echo ""
 
-  # Detect shell and suggest appropriate config file
-  case "${SHELL:-}" in
-    */zsh)
-      echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
-      echo ""
-      echo "Then reload your shell with: source ~/.zshrc"
-      ;;
-    */bash)
-      echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
-      echo ""
-      echo "Then reload your shell with: source ~/.bashrc"
-      ;;
-    *)
-      echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
-      echo ""
-      echo "Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.) and reload your shell."
-      ;;
-  esac
+  # Check if ~/.profile already has the PATH definition
+  PROFILE_PATH="$HOME/.profile"
+  if [ -f "$PROFILE_PATH" ] && grep -q '\.local/bin' "$PROFILE_PATH" 2>/dev/null; then
+    echo "Found PATH configuration in ~/.profile."
+    echo "Simply close and reopen your terminal to use kilo-docker."
+  else
+    echo "To fix this, add the following line to your shell profile:"
+    echo ""
+
+    # Detect shell and suggest appropriate config file
+    case "${SHELL:-}" in
+      */zsh)
+        echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+        echo ""
+        echo "Then reload your shell with: source ~/.zshrc"
+        ;;
+      */bash)
+        echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+        echo ""
+        echo "Then reload your shell with: source ~/.bashrc"
+        ;;
+      *)
+        echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+        echo ""
+        echo "Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.) and reload your shell."
+        ;;
+    esac
+  fi
   echo ""
 fi
 
