@@ -1,3 +1,9 @@
+## [2.15.0](https://github.com/mbabic84/kilo-docker/compare/v2.14.5...v2.15.0) (2026-04-08)
+
+### Features
+
+* add sync ls and sync rm subcommands ([4256b39](https://github.com/mbabic84/kilo-docker/commit/4256b39296e571a688fcb1ee8b3a0198c2ba0b9c))
+
 ## [2.14.5](https://github.com/mbabic84/kilo-docker/compare/v2.14.4...v2.14.5) (2026-04-08)
 
 ### Bug Fixes
