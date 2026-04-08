@@ -133,27 +133,19 @@ func runUserInit() error {
 	savedHome := os.Getenv("HOME")
 	_ = os.Setenv("HOME", homeDir)
 
-	// MCP token initialization and config
-	// Note: KD_MCP_* tokens should ONLY be set by the kilo wrapper script,
-	// not globally. Load stored encrypted tokens to check if context7 is configured.
-	// Note: KD_MCP_CONTEXT7_TOKEN should ONLY be set by the kilo wrapper script
-	var context7TokenExists bool
-	var context7TokenEmpty bool
+	// Load encrypted tokens to get sync tokens for file sync
+	// MCP tokens (context7, ainstruct) are managed via 'kilo-entrypoint mcp-tokens' command
 	tokenFilePath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
 	if _, encErr := os.Stat(tokenFilePath); encErr == nil {
 		if encData, readErr := os.ReadFile(tokenFilePath); readErr == nil {
 			if decrypted, decErr := decryptAES(encData, userID); decErr == nil {
-				c7, _, sTok, sRef, sExp, _ := parseTokenEnv(string(decrypted))
-				context7TokenExists = true
-				if c7 == "" {
-					context7TokenEmpty = true
+				_, _, sTok, sRef, sExp, _ := parseTokenEnv(string(decrypted))
+				if sTok != "" {
+					_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", sTok)
 				}
-			if sTok != "" {
-				_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", sTok)
-			}
-			if sRef != "" {
-				_ = os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", sRef)
-			}
+				if sRef != "" {
+					_ = os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", sRef)
+				}
 				if sExp != "" {
 					_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", sExp)
 				}
@@ -161,17 +153,8 @@ func runUserInit() error {
 		}
 	}
 
-	// Prompt for Context7 token only if never configured (not stored or empty)
-	if context7TokenExists && !context7TokenEmpty {
-		// Token exists and is set - nothing to do
-	} else if context7TokenEmpty {
-		// User explicitly disabled context7, keep it disabled
-		utils.Log("[userinit] Context7 token explicitly disabled, skipping prompt\n")
-	} else {
-		// Not set (never configured), prompt user to get token
-		utils.Log("[userinit] Initializing MCP tokens\n")
-		promptContext7Token()
-	}
+	// MCP tokens are managed via 'kilo-entrypoint mcp-tokens' command
+	// No longer prompted during initialization
 
 	// Save all tokens (ainstruct PAT from login + context7 + sync tokens)
 	utils.Log("[userinit] Saving MCP tokens\n")

@@ -37,8 +37,6 @@ Then run from any directory:
 kilo-docker
 ```
 
-On first run, the binary prompts for MCP server tokens and saves them to a named Docker volume. Subsequent runs reuse the saved tokens.
-
 ## Commands
 
 | Command | Description |
@@ -238,10 +236,10 @@ When attaching to a session, `kilo-docker` detects the container state: if runni
 | Server | Description | Auth |
 |--------|-------------|------|
 | `context7` | Library documentation lookup | Bearer token |
-| `ainstruct` | Document storage and semantic search | Bearer token |
+| `ainstruct` | Document storage and semantic search | Bearer token (auto-created) |
 | `playwright` | Browser automation (screenshots, navigation) | None (local sidecar) |
 
-`context7` and `ainstruct` require Bearer token authentication. Tokens are prompted on first run and stored in the named volume for subsequent runs.
+`context7` requires a Bearer token. Use `kilo-entrypoint mcp-tokens` to manage tokens interactively.
 
 `playwright` is only available when using the `--playwright` flag. It runs as a separate container on a shared Docker network with no authentication required.
 
@@ -252,7 +250,7 @@ When attaching to a session, `kilo-docker` detects the container state: if runni
 ssh remote-host 'curl -fsSL -o ~/.local/bin/kilo-docker https://github.com/mbabic84/kilo-docker/releases/latest/download/kilo-docker-linux-amd64 && chmod +x ~/.local/bin/kilo-docker && ~/.local/bin/kilo-docker'
 ```
 
-> Tokens are prompted interactively on first run via the TTY.
+> Use `kilo-entrypoint mcp-tokens` to manage MCP server tokens.
 
 ### SSH Alias for Convenience
 
