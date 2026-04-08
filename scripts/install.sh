@@ -80,4 +80,4 @@ if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
   echo ""
 fi
 
-echo "Run 'kilo-docker --help' to get started."
+echo "Run 'kilo-docker help' to get started."
