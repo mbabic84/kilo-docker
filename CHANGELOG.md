@@ -1,3 +1,9 @@
+## [2.14.5](https://github.com/mbabic84/kilo-docker/compare/v2.14.4...v2.14.5) (2026-04-08)
+
+### Bug Fixes
+
+* remove MCP token prompt from initialization steps ([399f213](https://github.com/mbabic84/kilo-docker/commit/399f213d626a776d2d4aa420d140fd36687c1a60))
+
 ## [2.14.4](https://github.com/mbabic84/kilo-docker/compare/v2.14.3...v2.14.4) (2026-04-08)
 
 ### Bug Fixes
