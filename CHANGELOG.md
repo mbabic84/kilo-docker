@@ -1,3 +1,9 @@
+## [2.14.2](https://github.com/mbabic84/kilo-docker/compare/v2.14.1...v2.14.2) (2026-04-08)
+
+### Bug Fixes
+
+* add PATH warning to install script ([ab8f384](https://github.com/mbabic84/kilo-docker/commit/ab8f384f3d5368caf396f12f16b431ab8bf4a9fd))
+
 ## [2.14.1](https://github.com/mbabic84/kilo-docker/compare/v2.14.0...v2.14.1) (2026-04-08)
 
 ### Bug Fixes
