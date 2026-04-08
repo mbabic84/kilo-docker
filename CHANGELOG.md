@@ -1,3 +1,9 @@
+## [2.14.1](https://github.com/mbabic84/kilo-docker/compare/v2.14.0...v2.14.1) (2026-04-08)
+
+### Bug Fixes
+
+* correct logging prefixes and visibility ([f8438c6](https://github.com/mbabic84/kilo-docker/commit/f8438c698421a1c0a5bcf8515fd1393708579ac7))
+
 ## [2.14.0](https://github.com/mbabic84/kilo-docker/compare/v2.13.2...v2.14.0) (2026-04-08)
 
 ### Features
