@@ -74,6 +74,8 @@ func runHelp() {
 		fmt.Printf("  %-*s %s\n", w, "mcp-config", "Apply MCP enabled states from encrypted token storage")
 	fmt.Printf("  %-*s %s\n", w, "mcp-tokens", "Interactive token management")
 	fmt.Printf("  %-*s %s\n", w, "sync", "Start ainstruct file watcher + REST sync")
+	fmt.Printf("  %-*s %s\n", w, "sync ls", "List all ainstruct sync files")
+	fmt.Printf("  %-*s %s\n", w, "sync rm <file>", "Remove a specific sync file (local and remote)")
 	fmt.Printf("  %-*s %s\n", w, "resync", "Delete all remote documents and re-push local files")
 	fmt.Printf("  %-*s %s\n", w, "zellij-attach", "Attach to existing zellij session")
 	fmt.Printf("  %-*s %s\n", w, "print-env", "Print export statements for current tokens")
@@ -160,7 +162,32 @@ func main() {
 			os.Exit(1)
 		}
 	case "sync":
-		runSyncMode()
+		if len(os.Args) < 3 {
+			runSyncMode()
+			return
+		}
+		switch os.Args[2] {
+		case "ls":
+			s := NewSyncer()
+			humanReadable := len(os.Args) > 3 && os.Args[3] == "-h"
+			if err := s.listSyncFiles(humanReadable); err != nil {
+				utils.LogError("[main] sync ls error: %v\n", err, utils.WithOutput())
+				os.Exit(1)
+			}
+		case "rm":
+			if len(os.Args) < 4 {
+				utils.LogError("[main] sync rm requires a file argument\n", utils.WithOutput())
+				os.Exit(1)
+			}
+			s := NewSyncer()
+			if err := s.removeSyncFile(os.Args[3]); err != nil {
+				utils.LogError("[main] sync rm error: %v\n", err, utils.WithOutput())
+				os.Exit(1)
+			}
+		default:
+			utils.LogError("[main] unknown sync subcommand: %s\n", os.Args[2], utils.WithOutput())
+			os.Exit(1)
+		}
 	case "resync":
 		s := NewSyncer()
 		if err := s.deleteAllDocuments(); err != nil {

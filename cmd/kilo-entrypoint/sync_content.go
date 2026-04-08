@@ -448,6 +448,129 @@ func (s *Syncer) deleteByPath(relPath string) error {
 	return nil
 }
 
+// listSyncFiles lists all ainstruct sync files with their metadata
+func (s *Syncer) listSyncFiles(humanReadable bool) error {
+	if err := s.ensureCollection(); err != nil {
+		return err
+	}
+
+	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
+	if err != nil {
+		return fmt.Errorf("listing documents: %w", err)
+	}
+
+	var dr documentsResponse
+	if err := json.Unmarshal(data, &dr); err != nil {
+		return fmt.Errorf("parsing documents response: %w (body: %s)", err, string(data))
+	}
+
+	if len(dr.Documents) == 0 {
+		logSyncOutput("No sync files found\n")
+		return nil
+	}
+
+	logSyncOutput("%-50s %-12s %-20s\n", "FILE", "SIZE", "MODIFIED")
+	logSyncOutput("%-50s %-12s %-20s\n", "----", "----", "--------")
+
+	for _, doc := range dr.Documents {
+		if doc.Metadata.LocalPath == "" {
+			continue
+		}
+		if !s.isSyncedPath(doc.Metadata.LocalPath) {
+			continue
+		}
+		
+		// Try to get file info for size and modification time
+		size := "-"
+		modTime := "-"
+		
+		absPath := filepath.Join(s.kiloConfigDir, doc.Metadata.LocalPath)
+		if info, err := os.Stat(absPath); err == nil {
+			if humanReadable {
+				size = formatFileSize(info.Size())
+			} else {
+				size = fmt.Sprintf("%d B", info.Size())
+			}
+			modTime = info.ModTime().Format("2006-01-02 15:04")
+		}
+		
+		logSyncOutput("%-50s %-12s %-20s\n", doc.Metadata.LocalPath, size, modTime)
+	}
+
+	return nil
+}
+
+// formatFileSize converts a size in bytes to a human-readable format
+func formatFileSize(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+func logSyncOutput(format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	utils.Log("[ainstruct-sync] "+msg, utils.WithOutput())
+}
+
+// removeSyncFile removes a specific sync file (both local and remote copies)
+func (s *Syncer) removeSyncFile(filePath string) error {
+	if filePath == "" {
+		return fmt.Errorf("file path cannot be empty")
+	}
+	
+	// Make path relative to kilo config dir if it's absolute
+	relPath := filePath
+	if filepath.IsAbs(filePath) {
+		relPath = strings.TrimPrefix(filePath, s.kiloConfigDir+"/")
+		if relPath == filePath {
+			// Not actually under kilo config dir
+			return fmt.Errorf("file %s is not under kilo config directory", filePath)
+		}
+	}
+	
+	// Check if file is in sync paths
+	if !s.isSyncedPath(relPath) {
+		return fmt.Errorf("file %s is not a synced path", relPath)
+	}
+	
+	// Prompt for confirmation
+	logSyncOutput("Are you sure you want to remove '%s'? This will delete both local and remote copies. [y/N] ", relPath)
+	var response string
+	if _, err := fmt.Scanln(&response); err != nil {
+		return fmt.Errorf("failed to read input: %w", err)
+	}
+	if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
+		logSyncOutput("Removal cancelled\n")
+		return nil
+	}
+	
+	// Remove local file
+	absPath := filepath.Join(s.kiloConfigDir, relPath)
+	if err := os.Remove(absPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove local file: %w", err)
+	}
+	
+	// Remove remote document
+	if err := s.deleteByPath(relPath); err != nil {
+		return fmt.Errorf("failed to remove remote file: %w", err)
+	}
+	
+	// Remove hash entry
+	if err := s.hashDelete(relPath); err != nil {
+		utils.LogWarn("[ainstruct-sync] Warning: hash delete failed for %s: %v\n", relPath, err)
+	}
+	
+	logSyncOutput("Removed '%s'\n", relPath)
+	return nil
+}
+
 // pullCollection downloads all documents from the remote collection and
 // writes them to local paths, skipping files whose hash matches the remote.
 // On first run (no collection), it returns nil with no action.

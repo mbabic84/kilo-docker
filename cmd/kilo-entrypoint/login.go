@@ -361,14 +361,7 @@ func promptPassword() string {
 	}
 }
 
-// promptContext7Token prompts for a Context7 API token via TTY.
-// Empty input is accepted (token is optional — Context7 MCP will be disabled).
-func promptContext7Token() string {
-	utils.Log("[kilo-docker] Context7 API key (leave empty to skip): ", utils.WithOutput())
-	var token string
-	_, _ = fmt.Scanln(&token)
-	return strings.TrimSpace(token)
-}
+
 
 func buildPATLabel() string {
 	username := os.Getenv("PAT_USERNAME")
