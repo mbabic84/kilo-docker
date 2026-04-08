@@ -1,3 +1,9 @@
+## [2.14.4](https://github.com/mbabic84/kilo-docker/compare/v2.14.3...v2.14.4) (2026-04-08)
+
+### Bug Fixes
+
+* remove --help and --version flags, use subcommands instead ([5e2662c](https://github.com/mbabic84/kilo-docker/commit/5e2662c1741d9967f11f6ab13c480c7ad7fda173))
+
 ## [2.14.3](https://github.com/mbabic84/kilo-docker/compare/v2.14.2...v2.14.3) (2026-04-08)
 
 ### Bug Fixes
