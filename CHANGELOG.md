@@ -1,3 +1,9 @@
+## [2.14.3](https://github.com/mbabic84/kilo-docker/compare/v2.14.2...v2.14.3) (2026-04-08)
+
+### Bug Fixes
+
+* detect .profile PATH configuration in install script ([937b303](https://github.com/mbabic84/kilo-docker/commit/937b3030b1d30c41d1b87b24629cc9b052aa18aa))
+
 ## [2.14.2](https://github.com/mbabic84/kilo-docker/compare/v2.14.1...v2.14.2) (2026-04-08)
 
 ### Bug Fixes
