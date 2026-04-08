@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -67,9 +66,6 @@ func parseArgs(args []string) config {
 				cfg.network = args[i+1]
 				i++
 			}
-		case "--version":
-			fmt.Println(version)
-			os.Exit(0)
 		default:
 			matched := false
 			for _, svc := range services.BuiltInServices {
