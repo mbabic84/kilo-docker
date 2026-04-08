@@ -50,7 +50,7 @@ func runUserInit() error {
 		utils.Log("[userinit] Found existing user data: %s\n", existingUser)
 	}
 	// Login
-	utils.Log("[userinit] Starting Ainstruct authentication\n", utils.WithOutput())
+	utils.Log("[kilo-docker] Starting Ainstruct authentication\n", utils.WithOutput())
 	loginRes, err := runLoginInteractive()
 	if err != nil {
 		return fmt.Errorf("login failed: %w", err)
@@ -544,19 +544,19 @@ func runMCPTokens() error {
 		}
 	}
 
-	utils.Log("[userinit] MCP Token Management\n", utils.WithOutput())
-	utils.Log("[userinit] ====================\n", utils.WithOutput())
-	utils.Log("[userinit] \n", utils.WithOutput())
+	utils.Log("[kilo-docker] MCP Token Management\n", utils.WithOutput())
+	utils.Log("[kilo-docker] ====================\n", utils.WithOutput())
+	utils.Log("[kilo-docker] \n", utils.WithOutput())
 
 	currentContext7 := "[not set]"
 	if context7Token != "" {
 		currentContext7 = maskToken(context7Token)
 	}
-	utils.Log("[userinit] Context7 token: %s\n", currentContext7, utils.WithOutput())
-	utils.Log("[userinit]   - Press Enter to keep current\n", utils.WithOutput())
-	utils.Log("[userinit]   - Type a new token to update\n", utils.WithOutput())
-	utils.Log("[userinit]   - Type 'clear' to disable\n", utils.WithOutput())
-	utils.Log("[userinit] > ", utils.WithOutput())
+	utils.Log("[kilo-docker] Context7 token: %s\n", currentContext7, utils.WithOutput())
+	utils.Log("[kilo-docker]   - Press Enter to keep current\n", utils.WithOutput())
+	utils.Log("[kilo-docker]   - Type a new token to update\n", utils.WithOutput())
+	utils.Log("[kilo-docker]   - Type 'clear' to disable\n", utils.WithOutput())
+	utils.Log("[kilo-docker] > ", utils.WithOutput())
 
 	var input string
 	_, _ = fmt.Scanln(&input)
@@ -564,17 +564,17 @@ func runMCPTokens() error {
 
 	if input == "clear" {
 		context7Token = ""
-		utils.Log("[userinit] Context7 token disabled\n", utils.WithOutput())
+		utils.Log("[kilo-docker] Context7 token disabled\n", utils.WithOutput())
 	} else if input != "" {
 		context7Token = input
-		utils.Log("[userinit] Context7 token updated\n", utils.WithOutput())
+		utils.Log("[kilo-docker] Context7 token updated\n", utils.WithOutput())
 	}
 
 	if err := saveEncryptedTokens(homeDir, userID, context7Token, ainstructToken, syncToken, syncRefresh, syncExpiry); err != nil {
 		utils.LogWarn("[userinit] failed to save tokens: %v\n", err)
 	}
 
-	utils.Log("[userinit] MCP tokens saved\n", utils.WithOutput())
+	utils.Log("[kilo-docker] MCP tokens saved\n", utils.WithOutput())
 	return nil
 }
 

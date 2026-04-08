@@ -102,7 +102,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	addDirWatch := func(dir string) {
 		wd, err := unix.InotifyAddWatch(fd, dir, watchMask)
 		if err != nil {
-			utils.Log("[ainstruct-sync] Failed to watch dir %s: %v\n", dir, err, utils.WithOutput())
+			utils.Log("[ainstruct-sync] Failed to watch dir %s: %v\n", dir, err)
 			return
 		}
 		wdToPath[int32(wd)] = dir
@@ -111,7 +111,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	addFileWatch := func(file string) {
 		wd, err := unix.InotifyAddWatch(fd, file, watchMask)
 		if err != nil {
-			utils.Log("[ainstruct-sync] Failed to watch file %s: %v\n", file, err, utils.WithOutput())
+			utils.Log("[ainstruct-sync] Failed to watch file %s: %v\n", file, err)
 			return
 		}
 		wdToPath[int32(wd)] = file
@@ -136,7 +136,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 		addFileWatch(file)
 	}
 
-	utils.Log("[ainstruct-sync] Watcher started, watching %d paths\n", len(wdToPath), utils.WithOutput())
+	utils.Log("[ainstruct-sync] Watcher started, watching %d paths\n", len(wdToPath))
 	buf := make([]byte, 4096)
 	pending := make(map[string]*pendingEvent)
 	var pendingMu sync.Mutex
@@ -209,7 +209,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 				eventType = "MODIFY"
 			}
 
-			utils.Log("[ainstruct-sync] Queueing %s event for: %s\n", eventType, relPath, utils.WithOutput())
+			utils.Log("[ainstruct-sync] Queueing %s event for: %s\n", eventType, relPath)
 			if p, ok := pending[fullPath]; ok {
 				p.lastEventAt = time.Now()
 				p.eventType = eventType

@@ -24,9 +24,9 @@ import (
 // User creation, home directory, and privilege drop are handled by
 // runUserInit() when docker exec calls kilo-entrypoint zellij-attach.
 func runInit() error {
-utils.Log("[init] Container initializing\n", utils.WithOutput())
+utils.Log("[init] Container initializing\n")
 	if os.Getuid() == 0 {
-		utils.Log("[init] Running as root (UID=0)\n", utils.WithOutput())
+		utils.Log("[init] Running as root (UID=0)\n")
 		if err := installServices(); err != nil {
 			utils.LogWarn("[init] service installation error: %v\n", err)
 		}
@@ -37,11 +37,11 @@ utils.Log("[init] Container initializing\n", utils.WithOutput())
 
 		if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
 			if info, err := os.Stat(sshAuthSock); err == nil && info.Mode()&os.ModeSocket != 0 {
- if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
+			if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
 					utils.LogWarn("[init] SSH socket not accessible: %v\n", err)
 				} else {
 					_ = conn.Close()
-					utils.Log("[init] SSH agent socket ready: %s\n", sshAuthSock, utils.WithOutput())
+					utils.Log("[init] SSH agent socket ready: %s\n", sshAuthSock)
 				}
 			} else {
 				utils.LogWarn("[init] SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
@@ -60,7 +60,7 @@ utils.Log("[init] Container initializing\n", utils.WithOutput())
 
 	if len(os.Args) <= 1 {
 		// Keep container alive — zellij is started via docker exec from the host.
-		utils.Log("[init] Init complete, waiting for exec\n", utils.WithOutput())
+		utils.Log("[init] Init complete, waiting for exec\n")
 		return syscall.Exec("/bin/sleep", []string{"sleep", "infinity"}, os.Environ())
 	}
 
@@ -90,11 +90,11 @@ func installServices() error {
 	}
 
 	if existing, err := os.ReadFile(servicesMarkerPath); err == nil && strings.TrimSpace(string(existing)) == servicesEnv {
-		utils.Log("[init] KD_SERVICES=%s (already installed)\n", servicesEnv, utils.WithOutput())
+		utils.Log("[init] KD_SERVICES=%s (already installed)\n", servicesEnv)
 		return nil
 	}
 
-	utils.Log("[init] Installing system-scoped services: %s\n", servicesEnv, utils.WithOutput())
+	utils.Log("[init] Installing system-scoped services: %s\n", servicesEnv)
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil {
@@ -108,7 +108,7 @@ func installServices() error {
 			if err := runInstallCmd(installCmd); err != nil {
 				utils.LogWarn("[init] Installing %s: error: %v\n", svc.Name, err)
 			} else {
-				utils.Log("[init] Installing %s: ok\n", svc.Name, utils.WithOutput())
+				utils.Log("[init] Installing %s: ok\n", svc.Name)
 			}
 		}
 	}
@@ -166,7 +166,7 @@ func compareVersions(v1, v2 string) int {
 
 // promptYesNo prompts the user with a question and returns true if they answered yes.
 func promptYesNo(question string) bool {
-	utils.Log("[init] %s [y/N]: ", question, utils.WithOutput())
+	utils.Log("[kilo-docker] %s [y/N]: ", question, utils.WithOutput())
 	var answer string
 	_, _ = fmt.Scanln(&answer)
 	return strings.ToLower(strings.TrimSpace(answer)) == "y"
@@ -191,7 +191,7 @@ func installUserServices(homeDir string) error {
 	}
 
 	if len(userServices) > 0 {
-		utils.Log("[init] Installing user-scoped services: %s\n", strings.Join(userServices, ", "), utils.WithOutput())
+		utils.Log("[init] Installing user-scoped services: %s\n", strings.Join(userServices, ", "))
 	}
 
 	for _, svcName := range strings.Split(servicesEnv, ",") {
@@ -210,20 +210,20 @@ func installUserServices(homeDir string) error {
 
 			if currentVer != "" && latestVer != "" {
 				if compareVersions(currentVer, latestVer) < 0 {
-					utils.Log("[init] Updating %s: %s -> %s\n", svc.Name, currentVer, latestVer, utils.WithOutput())
+					utils.Log("[init] Updating %s: %s -> %s\n", svc.Name, currentVer, latestVer)
 					if !promptYesNo(fmt.Sprintf("Update %s?", svc.Name)) {
-						utils.Log("[init] Skipping %s update\n", svc.Name, utils.WithOutput())
+						utils.Log("[init] Skipping %s update\n", svc.Name)
 						continue
 					}
 				} else {
-					utils.Log("[init] Skipping %s: already at latest version (%s)\n", svc.Name, currentVer, utils.WithOutput())
+					utils.Log("[init] Skipping %s: already at latest version (%s)\n", svc.Name, currentVer)
 					continue
 				}
 			} else {
 				if currentVer == "" && latestVer != "" {
-					utils.Log("[init] Installing %s (current: none, latest: %s)\n", svc.Name, latestVer, utils.WithOutput())
+					utils.Log("[init] Installing %s (current: none, latest: %s)\n", svc.Name, latestVer)
 				} else {
-					utils.Log("[init] Installing %s\n", svc.Name, utils.WithOutput())
+					utils.Log("[init] Installing %s\n", svc.Name)
 				}
 			}
 
@@ -234,7 +234,7 @@ func installUserServices(homeDir string) error {
 			if err := c.Run(); err != nil {
 				utils.LogWarn("[init] Installing %s: error: %v\n", svc.Name, err)
 			} else {
-				utils.Log("[init] Installing %s: ok\n", svc.Name, utils.WithOutput())
+				utils.Log("[init] Installing %s: ok\n", svc.Name)
 			}
 		}
 	}
@@ -294,34 +294,34 @@ func expandHome(path, home string) string {
 func setupServiceGroups() error {
 	servicesEnv := os.Getenv("KD_SERVICES")
 	if servicesEnv == "" {
-		utils.Log("[init] setupServiceGroups: no services enabled\n", utils.WithOutput())
+		utils.Log("[init] setupServiceGroups: no services enabled\n")
 		return nil
 	}
-	utils.Log("[init] setupServiceGroups: services=%s\n", servicesEnv, utils.WithOutput())
+	utils.Log("[init] setupServiceGroups: services=%s\n", servicesEnv)
 
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil || svc.RequiresSocket == "" {
-			utils.Log("[init] setupServiceGroups: skipping %s (no socket required)\n", svcName, utils.WithOutput())
+			utils.Log("[init] setupServiceGroups: skipping %s (no socket required)\n", svcName)
 			continue
 		}
 		gid := os.Getenv(svc.GIDEnvVar)
 		if gid == "" {
-			utils.Log("[init] setupServiceGroups: skipping %s (no GID env var)\n", svcName, utils.WithOutput())
+			utils.Log("[init] setupServiceGroups: skipping %s (no GID env var)\n", svcName)
 			continue
 		}
-		utils.Log("[init] setupServiceGroups: creating group %s with GID %s\n", svc.Name, gid, utils.WithOutput())
+		utils.Log("[init] setupServiceGroups: creating group %s with GID %s\n", svc.Name, gid)
 		// Try to create the group; if it fails (e.g., GID already exists),
 		// joinServiceGroups will handle adding the user to the existing group.
 		cmd := exec.Command("addgroup", "-g", gid, svc.Name)
 		if err := cmd.Run(); err != nil {
-			utils.Log("[init] setupServiceGroups: failed to create group %s (GID %s): %v\n", svc.Name, gid, err, utils.WithOutput())
+			utils.Log("[init] setupServiceGroups: failed to create group %s (GID %s): %v\n", svc.Name, gid, err)
 			// Check what group already has this GID
 			if out, err := exec.Command("getent", "group", gid).Output(); err == nil {
-				utils.Log("[init] setupServiceGroups: GID %s already assigned to: %s\n", gid, strings.TrimSpace(string(out)), utils.WithOutput())
+				utils.Log("[init] setupServiceGroups: GID %s already assigned to: %s\n", gid, strings.TrimSpace(string(out)))
 			}
 		} else {
-			utils.Log("[init] setupServiceGroups: created group %s with GID %s\n", svc.Name, gid, utils.WithOutput())
+			utils.Log("[init] setupServiceGroups: created group %s with GID %s\n", svc.Name, gid)
 		}
 	}
 	return nil

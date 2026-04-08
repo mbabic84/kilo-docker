@@ -168,7 +168,7 @@ func main() {
 			os.Exit(1)
 		}
 		s.pushAll()
-		utils.Log("[main] Resync complete.\n", utils.WithOutput())
+		utils.Log("[main] Resync complete.\n")
 	case "zellij-attach":
 		if err := runZellijAttach(); err != nil {
 			utils.LogError("[main] zellij-attach error: %v\n", err, utils.WithOutput())

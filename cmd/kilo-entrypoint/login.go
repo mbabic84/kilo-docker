@@ -230,11 +230,11 @@ utils.Log("[login] No existing PAT found, creating new one...\n")
 func runLoginInteractive() (loginResult, error) {
 	var result loginResult
 
-	utils.Log("[login] === Ainstruct Authentication ===\n", utils.WithOutput())
-	utils.Log("[login] Sign in at %s\n", constants.AinstructBaseURL, utils.WithOutput())
-	utils.Log("[login] Enables:\n", utils.WithOutput())
-	utils.Log("[login]   - File sync (push/pull config, commands, agents, instructions)\n", utils.WithOutput())
-	utils.Log("[login]   - MCP server tokens (stored encrypted in volume)\n", utils.WithOutput())
+	utils.Log("[kilo-docker] === Ainstruct Authentication ===\n", utils.WithOutput())
+	utils.Log("[kilo-docker] Sign in at %s\n", constants.AinstructBaseURL, utils.WithOutput())
+	utils.Log("[kilo-docker] Enables:\n", utils.WithOutput())
+	utils.Log("[kilo-docker]   - File sync (push/pull config, commands, agents, instructions)\n", utils.WithOutput())
+	utils.Log("[kilo-docker]   - MCP server tokens (stored encrypted in volume)\n", utils.WithOutput())
 
 	username := promptUsername()
 	password := promptPassword()
@@ -316,33 +316,33 @@ func runLoginInteractive() (loginResult, error) {
 	patToken, patErr := ensurePAT(constants.AinstructAPIBaseURL, loginResp.AccessToken, patLabel, storedAinstruct)
 	if patErr != nil {
 		utils.LogWarn("[login] Warning: Failed to create Ainstruct MCP token: %v\n", patErr)
-		utils.Log("[login] Ainstruct MCP server will be disabled.\n", utils.WithOutput())
+		utils.Log("[kilo-docker] Ainstruct MCP server will be disabled.\n", utils.WithOutput())
 	} else if patToken != "" {
 		result.MCPToken = patToken
 	}
 
-	utils.Log("[login] Signed in successfully.\n", utils.WithOutput())
-	utils.Log("[login] Tokens encrypted and stored in volume.\n", utils.WithOutput())
+	utils.Log("[kilo-docker] Signed in successfully.\n", utils.WithOutput())
+	utils.Log("[kilo-docker] Tokens encrypted and stored in volume.\n", utils.WithOutput())
 
 	return result, nil
 }
 
 func promptUsername() string {
 	for {
-		utils.Log("[login] Ainstruct username: ", utils.WithOutput())
+		utils.Log("[kilo-docker] Ainstruct username: ", utils.WithOutput())
 		var username string
 		_, _ = fmt.Scanln(&username)
 		username = strings.TrimSpace(username)
 		if username != "" {
 			return username
 		}
-		utils.LogWarn("[login] Username cannot be empty.\n", utils.WithOutput())
+		utils.LogWarn("[login] Username cannot be empty.\n")
 	}
 }
 
 func promptPassword() string {
 	for {
-		utils.Log("[login] Ainstruct password: ", utils.WithOutput())
+		utils.Log("[kilo-docker] Ainstruct password: ", utils.WithOutput())
 		password, err := term.ReadPassword(int(os.Stdin.Fd()))
 		fmt.Println()
 		if err != nil {
@@ -350,11 +350,11 @@ func promptPassword() string {
 			os.Exit(1)
 		}
 		if len(password) == 0 {
-			utils.LogWarn("[login] Password cannot be empty.\n", utils.WithOutput())
+			utils.LogWarn("[login] Password cannot be empty.\n")
 			continue
 		}
 		if len(password) < 4 {
-			utils.LogWarn("[login] Password must be at least 4 characters.\n", utils.WithOutput())
+			utils.LogWarn("[login] Password must be at least 4 characters.\n")
 			continue
 		}
 		return string(password)
@@ -364,7 +364,7 @@ func promptPassword() string {
 // promptContext7Token prompts for a Context7 API token via TTY.
 // Empty input is accepted (token is optional — Context7 MCP will be disabled).
 func promptContext7Token() string {
-	utils.Log("[login] Context7 API key (leave empty to skip): ", utils.WithOutput())
+	utils.Log("[kilo-docker] Context7 API key (leave empty to skip): ", utils.WithOutput())
 	var token string
 	_, _ = fmt.Scanln(&token)
 	return strings.TrimSpace(token)

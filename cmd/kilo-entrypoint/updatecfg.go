@@ -59,7 +59,7 @@ func runUpdateConfig() error {
 		if err := os.Rename(tmpPath, configPath); err != nil {
 			return err
 		}
-		utils.Log("[updatecfg] Config merged. Existing customizations preserved, new servers added.\n", utils.WithOutput())
+		utils.Log("[updatecfg] Config merged. Existing customizations preserved, new servers added.\n")
 	} else {
 		if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
 			return err
@@ -67,7 +67,7 @@ func runUpdateConfig() error {
 		if err := os.WriteFile(configPath, templateData, 0644); err != nil {
 			return err
 		}
-		utils.Log("[updatecfg] Config created from template.\n", utils.WithOutput())
+		utils.Log("[updatecfg] Config created from template.\n")
 	}
 	return nil
 }

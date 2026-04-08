@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -9,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mbabic84/kilo-docker/pkg/constants"
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 // setupSSH detects or starts an SSH agent for key forwarding. Returns
@@ -30,17 +30,17 @@ func setupSSH() (string, bool, bool) {
 	if sshAuthSock != "" {
 		if info, err := os.Stat(sshAuthSock); err == nil {
 			if info.Mode()&os.ModeSocket != 0 {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Reusing existing SSH agent: %s\n", sshAuthSock)
+				utils.Log("[kilo-docker] Reusing existing SSH agent: %s\n", sshAuthSock, utils.WithOutput())
 				loadSSHKeys(sshDir)
 				return sshAuthSock, true, false
 			}
 		}
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
+		utils.LogWarn("[kilo-docker] Warning: SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
 	}
 
 	// Ensure the socket directory exists (persistent across restarts).
 	if err := os.MkdirAll(socketDir, 0700); err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to create socket dir %s: %v\n", socketDir, err)
+		utils.LogWarn("[kilo-docker] Warning: failed to create socket dir %s: %v\n", socketDir, err)
 		return "", false, false
 	}
 
@@ -49,7 +49,7 @@ func setupSSH() (string, bool, bool) {
 
 	// If the socket still exists after cleanup, it's an active agent — reuse it.
 	if info, err := os.Stat(socketPath); err == nil && info.Mode()&os.ModeSocket != 0 {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Reusing existing SSH agent socket: %s\n", socketPath)
+		utils.Log("[kilo-docker] Reusing existing SSH agent socket: %s\n", socketPath, utils.WithOutput())
 		_ = os.Setenv("SSH_AUTH_SOCK", socketPath)
 		loadSSHKeys(sshDir)
 		return socketPath, true, false
@@ -59,9 +59,9 @@ func setupSSH() (string, bool, bool) {
 	// path is always valid, even after the container is restarted.
 	output, err := exec.Command("ssh-agent", "-a", socketPath).CombinedOutput()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to start ssh-agent: %v\n", err)
+		utils.LogWarn("[kilo-docker] Warning: failed to start ssh-agent: %v\n", err)
 		if len(output) > 0 {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] ssh-agent output: %s\n", strings.TrimSpace(string(output)))
+			utils.LogWarn("[kilo-docker] ssh-agent output: %s\n", strings.TrimSpace(string(output)))
 		}
 		return "", false, false
 	}
@@ -80,7 +80,7 @@ func setupSSH() (string, bool, bool) {
 
 	_ = os.Setenv("SSH_AUTH_SOCK", socketPath)
 	_ = os.Setenv("SSH_AGENT_PID", newPid)
-	fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent started (pid=%s, socket=%s)\n", newPid, socketPath)
+	utils.Log("[kilo-docker] SSH agent started (pid=%s, socket=%s)\n", newPid, socketPath, utils.WithOutput())
 	loadSSHKeys(sshDir)
 	return socketPath, true, true
 }
@@ -96,7 +96,7 @@ func cleanupStaleSocketPath(socketPath string) {
 		return
 	}
 	if info.IsDir() {
-		fmt.Fprintf(os.Stderr, "[kilo-docker] Removing stale socket directory: %s\n", socketPath)
+		utils.Log("[kilo-docker] Removing stale socket directory: %s\n", socketPath)
 		_ = os.RemoveAll(socketPath)
 		return
 	}
@@ -106,7 +106,7 @@ func cleanupStaleSocketPath(socketPath string) {
 		// it's safe to remove.
 		conn, err := net.Dial("unix", socketPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "[kilo-docker] Removing stale SSH socket: %s\n", socketPath)
+			utils.Log("[kilo-docker] Removing stale SSH socket: %s\n", socketPath)
 			_ = os.Remove(socketPath)
 		} else {
 			_ = conn.Close()
@@ -134,9 +134,9 @@ func loadSSHKeys(sshDir string) {
 		}
 		if strings.Contains(string(data), "PRIVATE KEY") {
 			if out, err := exec.Command("ssh-add", path).CombinedOutput(); err != nil {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to add key %s: %v\n", entry.Name(), strings.TrimSpace(string(out)))
+				utils.LogWarn("[kilo-docker] Warning: failed to add key %s: %v\n", entry.Name(), strings.TrimSpace(string(out)))
 			} else {
-				fmt.Fprintf(os.Stderr, "[kilo-docker] Added SSH key: %s\n", entry.Name())
+				utils.Log("[kilo-docker] Added SSH key: %s\n", entry.Name(), utils.WithOutput())
 			}
 		}
 	}
