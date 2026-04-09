@@ -1,3 +1,14 @@
+## [2.17.0](https://github.com/mbabic84/kilo-docker/compare/v2.16.0...v2.17.0) (2026-04-09)
+
+### Features
+
+* add --remember flag for persistent Ainstruct login ([4b15f0e](https://github.com/mbabic84/kilo-docker/commit/4b15f0ebd7b59000b942066f9e54a68fecae408d))
+* refactor CLI flag parsing with declarative flag definitions ([9c815c7](https://github.com/mbabic84/kilo-docker/commit/9c815c742246c25a21838e1f66991c35fb07ae1a))
+
+### Bug Fixes
+
+* prevent race condition in token refresh with mutex ([7b26e46](https://github.com/mbabic84/kilo-docker/commit/7b26e466befa16f49c33902864a237d1075f6eef))
+
 ## [2.16.0](https://github.com/mbabic84/kilo-docker/compare/v2.15.0...v2.16.0) (2026-04-08)
 
 ### Features
