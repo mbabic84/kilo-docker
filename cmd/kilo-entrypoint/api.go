@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
@@ -29,9 +30,20 @@ func (s *Syncer) refreshTokenIfNeeded() error {
 	return s.forceRefreshToken()
 }
 
+// forceRefreshTokenWithMu wraps forceRefreshToken with a mutex to prevent
+// race conditions when concurrent requests both attempt token refresh with
+// the same refresh token. With server-side token rotation, this ensures
+// only one refresh happens and subsequent requests use the new token.
+func (s *Syncer) forceRefreshTokenWithMu() error {
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+	return s.forceRefreshToken()
+}
+
 // forceRefreshToken unconditionally refreshes the access token using the
 // refresh token. Used when the API returns INVALID_TOKEN, overriding the
-// local expiry-based skip logic.
+// local expiry-based skip logic. On success, persists the new tokens to
+// encrypted storage to prevent token rotation issues.
 func (s *Syncer) forceRefreshToken() error {
 	if s.refreshToken == "" {
 		return fmt.Errorf("no refresh token available")
@@ -41,16 +53,22 @@ func (s *Syncer) forceRefreshToken() error {
 	if err != nil {
 		return fmt.Errorf("token refresh request failed: %w", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
+
+	// Check HTTP status code before attempting to decode
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("token refresh returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
 	var result struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 		ExpiresIn    int64  `json:"expires_in"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		_ = resp.Body.Close()
 		return fmt.Errorf("token refresh decode failed: %w", err)
 	}
-	_ = resp.Body.Close()
 	if result.AccessToken == "" {
 		return fmt.Errorf("token refresh returned empty access token")
 	}
@@ -61,8 +79,34 @@ func (s *Syncer) forceRefreshToken() error {
 	if result.ExpiresIn > 0 {
 		s.tokenExpiry = time.Now().Unix() + result.ExpiresIn
 	}
-	utils.Log("[ainstruct-sync] Token refreshed\n")
+
+	s.saveTokensToEncrypted()
+	utils.Log("[ainstruct-sync] Token refreshed and saved to encrypted storage\n")
 	return nil
+}
+
+// saveTokensToEncrypted persists the current sync tokens to encrypted storage.
+// Called after successful token refresh to prevent token rotation issues.
+// If saveTokensFn is set (for testing), it is called instead.
+func (s *Syncer) saveTokensToEncrypted() {
+	if s.saveTokensFn != nil {
+		s.saveTokensFn()
+		return
+	}
+	homeDir, _, _, userID := loadUserConfig()
+	if homeDir == "" || userID == "" {
+		utils.LogWarn("[ainstruct-sync] Cannot save tokens: missing homeDir or userID\n")
+		return
+	}
+	tokenExpiryStr := ""
+	if s.tokenExpiry > 0 {
+		tokenExpiryStr = strconv.FormatInt(s.tokenExpiry, 10)
+	}
+	if err := saveSyncTokensToEncrypted(homeDir, userID, s.accessToken, s.refreshToken, tokenExpiryStr); err != nil {
+		utils.LogWarn("[ainstruct-sync] Failed to save refreshed tokens: %v\n", err)
+	} else {
+		utils.Log("[ainstruct-sync] Refreshed tokens saved to encrypted storage\n")
+	}
 }
 
 // apiRequest makes an authenticated request to the Ainstruct API. It handles
@@ -94,7 +138,8 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 			return nil, fmt.Errorf("INVALID_TOKEN and no refresh token")
 		}
 		// Force refresh — the server explicitly told us the token is invalid.
-		if err := s.forceRefreshToken(); err != nil {
+		// Uses mutex to prevent race with concurrent refresh attempts.
+		if err := s.forceRefreshTokenWithMu(); err != nil {
 			utils.LogError("[ainstruct-sync] Token refresh failed — stopping watcher\n")
 			s.authExpired = true
 			return nil, err
@@ -120,6 +165,36 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 		}
 		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
 			utils.Log("[ainstruct-sync] API retry error response body: %s\n", utils.Redact(string(respBody)))
+			return nil, fmt.Errorf("API %s %s (retry) returned %d: %s", method, path, retryResp.StatusCode, string(respBody))
+		}
+		return respBody, nil
+	}
+
+	// Handle plain 401 (server returned 401 without INVALID_TOKEN error body).
+	// The access token may be expired but the server doesn't use the
+	// INVALID_TOKEN convention. Attempt a refresh and retry.
+	if resp.StatusCode == http.StatusUnauthorized && s.refreshToken != "" {
+		utils.Log("[ainstruct-sync] Plain 401 received, attempting token refresh\n")
+		if err := s.forceRefreshTokenWithMu(); err != nil {
+			utils.LogWarn("[ainstruct-sync] Token refresh for plain 401 failed: %v\n", err)
+			utils.LogError("[ainstruct-sync] Token invalid — stopping watcher\n")
+			s.authExpired = true
+			return nil, fmt.Errorf("plain 401 and refresh failed: %w", err)
+		}
+		retryResp, retryErr := s.doAPIRequest(method, path, body)
+		if retryErr != nil {
+			return nil, retryErr
+		}
+		respBody, err = io.ReadAll(retryResp.Body)
+		_ = retryResp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("reading retry response: %w", err)
+		}
+		utils.Log("[ainstruct-sync] API %s %s (retry) => %d\n", method, path, retryResp.StatusCode)
+		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
+			utils.Log("[ainstruct-sync] API retry error response body: %s\n", utils.Redact(string(respBody)))
+			utils.LogError("[ainstruct-sync] Token invalid after refresh — stopping watcher\n")
+			s.authExpired = true
 			return nil, fmt.Errorf("API %s %s (retry) returned %d: %s", method, path, retryResp.StatusCode, string(respBody))
 		}
 		return respBody, nil
