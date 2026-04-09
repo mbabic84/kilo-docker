@@ -16,6 +16,7 @@ func newTestSyncer(serverURL string) *Syncer {
 		tokenExpiry:  time.Now().Add(1 * time.Hour).Unix(),
 		client:       &http.Client{Timeout: 5 * time.Second},
 		syncPaths:    defaultSyncPaths,
+		saveTokensFn: func() {}, // no-op: prevent writing to real encrypted storage
 	}
 }
 

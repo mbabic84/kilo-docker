@@ -68,14 +68,7 @@ func printHelp() {
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "help", "Show this help message"))
 
 	var optLines []string
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--once", "Run a one-time session without persisting data (no volume)"))
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--port, -p <host:container>", "Map a port (host_port:container_port). Can be specified multiple times"))
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--volume, -v <host:container>", "Mount a volume (host_path:container_path). Can be specified multiple times"))
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--workspace, -w <path>", "Specify a custom workspace path (defaults to current directory)"))
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--playwright", "Start a Playwright MCP sidecar container for browser automation"))
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--ssh", "Enable SSH agent forwarding into the container"))
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--network <name>", "Connect the container to a Docker network"))
-	optLines = append(optLines, fmt.Sprintf("  %-*s %s", w-2, "--yes, -y", "Auto-confirm all prompts (useful for piped/non-interactive installs)"))
+	optLines = append(optLines, formatFlagHelp())
 
 	var exLines []string
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker", "# start a shell in the container"))

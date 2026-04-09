@@ -20,11 +20,12 @@ import (
 //   - Installs enabled services from KD_SERVICES env var
 //   - Sets up service groups for socket access
 //   - Validates SSH agent socket
+//   - Auto-login if --remember and valid stored tokens exist
 //
 // User creation, home directory, and privilege drop are handled by
 // runUserInit() when docker exec calls kilo-entrypoint zellij-attach.
-func runInit() error {
-utils.Log("[init] Container initializing\n")
+func runInit(remember bool) error {
+	utils.Log("[init] Container initializing (remember=%v)\n", remember)
 	if os.Getuid() == 0 {
 		utils.Log("[init] Running as root (UID=0)\n")
 		if err := installServices(); err != nil {
@@ -58,13 +59,30 @@ utils.Log("[init] Container initializing\n")
 		return fmt.Errorf("entrypoint binary not found at %s: %w", binaryPath, err)
 	}
 
-	if len(os.Args) <= 1 {
-		// Keep container alive — zellij is started via docker exec from the host.
+	args := os.Args[1:]
+
+	// If no args or only flags (no subcommand), sleep until docker exec attaches
+	if len(args) == 0 || (len(args) > 0 && strings.HasPrefix(args[0], "-")) {
 		utils.Log("[init] Init complete, waiting for exec\n")
 		return syscall.Exec("/bin/sleep", []string{"sleep", "infinity"}, os.Environ())
 	}
 
-	return syscall.Exec(binaryPath, os.Args[1:], os.Environ())
+	// Preserve --remember flag when execing to zellij-attach
+	if remember && len(args) > 0 && args[0] == "zellij-attach" {
+		hasRemember := false
+		for _, arg := range args {
+			if arg == "--remember" {
+				hasRemember = true
+				break
+			}
+		}
+		if !hasRemember {
+			args = append(args, "--remember")
+			utils.Log("[init] Preserving --remember flag for zellij-attach\n")
+		}
+	}
+
+	return syscall.Exec(binaryPath, args, os.Environ())
 }
 
 // servicesMarkerPath is the file used to track which services have been

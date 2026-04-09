@@ -15,15 +15,43 @@ const initMarker = "/tmp/.kilo-initialized"
 
 // runZellijAttach is the entry point for the "zellij-attach" subcommand.
 // If the container is already initialized, it execs zellij directly.
-// Otherwise it runs the first-time user init flow.
-func runZellijAttach() error {
-	utils.Log("[zellijattach] Checking init marker at %s\n", initMarker)
+// Otherwise it runs the first-time user init flow (which handles auto-login if remember=true).
+func runZellijAttach(remember bool) error {
+	utils.Log("[zellijattach] Entry: remember=%v\n", remember)
+
 	if _, err := os.Stat(initMarker); err == nil {
-		utils.Log("[zellijattach] Container already initialized\n")
+		utils.Log("[zellijattach] Init marker exists, skipping userinit\n")
+		if !remember {
+			clearStoredSyncTokens()
+		}
 		return execZellij()
 	}
-	utils.Log("[zellijattach] Running first-time initialization\n")
-	return runUserInit()
+
+	// Container not initialized - run full user init
+	// runUserInit handles auto-login if remember=true and tokens are valid
+	return runUserInit(remember)
+}
+
+// clearStoredSyncTokens clears sync tokens from encrypted storage if they exist.
+// Called when --remember is not used to ensure no leftover tokens.
+func clearStoredSyncTokens() {
+	homeDir, _, _, userID := loadUserConfig()
+	if homeDir == "" || userID == "" {
+		return
+	}
+	_, _, storedSync, storedRefresh, _, loadErr := loadEncryptedTokens(homeDir, userID)
+	if loadErr != nil {
+		return
+	}
+	if storedSync == "" && storedRefresh == "" {
+		utils.Log("[zellijattach] No stored sync tokens to clear\n")
+		return
+	}
+	if err := clearSyncTokensFromEncrypted(homeDir, userID); err != nil {
+		utils.LogWarn("[zellijattach] Failed to clear sync tokens: %v\n", err)
+	} else {
+		utils.Log("[zellijattach] Cleared stored sync tokens\n")
+	}
 }
 
 // loadUserConfig loads the persisted user configuration from the volume.

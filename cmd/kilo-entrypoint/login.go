@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -227,7 +228,8 @@ utils.Log("[login] No existing PAT found, creating new one...\n")
 
 // runLoginInteractive prompts for username/password via TTY, authenticates
 // with the Ainstruct API, fetches the user profile, and obtains an MCP PAT.
-func runLoginInteractive() (loginResult, error) {
+// If remember is true, SYNC tokens are saved to encrypted storage.
+func runLoginInteractive(remember bool) (loginResult, error) {
 	var result loginResult
 
 	utils.Log("[kilo-docker] === Ainstruct Authentication ===\n", utils.WithOutput())
@@ -301,10 +303,10 @@ func runLoginInteractive() (loginResult, error) {
 	result.RefreshToken = loginResp.RefreshToken
 	result.ExpiresIn = loginResp.ExpiresIn
 
-	// Load stored encrypted ainstruct token so ensurePAT can skip
-	// rotation when the existing PAT is still valid.
-	var storedAinstruct string
 	homeDir := "/home/" + deriveHomeName(result.UserID)
+	_ = os.MkdirAll(homeDir, 0755)
+
+	var storedAinstruct string
 	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
 	if encData, err := os.ReadFile(encPath); err == nil {
 		if decrypted, decErr := decryptAES(encData, result.UserID); decErr == nil {
@@ -319,6 +321,15 @@ func runLoginInteractive() (loginResult, error) {
 		utils.Log("[kilo-docker] Ainstruct MCP server will be disabled.\n", utils.WithOutput())
 	} else if patToken != "" {
 		result.MCPToken = patToken
+	}
+
+	if remember && loginResp.AccessToken != "" {
+		syncExpiry := strconv.FormatInt(time.Now().Unix()+loginResp.ExpiresIn, 10)
+		if err := saveSyncTokensToEncrypted(homeDir, result.UserID, loginResp.AccessToken, loginResp.RefreshToken, syncExpiry); err != nil {
+			utils.LogWarn("[login] Failed to save sync tokens: %v\n", err)
+		} else {
+			utils.Log("[login] Sync tokens saved to encrypted storage\n")
+		}
 	}
 
 	utils.Log("[kilo-docker] Signed in successfully.\n", utils.WithOutput())

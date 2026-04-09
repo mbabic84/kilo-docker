@@ -81,10 +81,13 @@ type Syncer struct {
 	authExpired    bool
 	client         *http.Client
 	syncPaths      []string // whitelist of paths (relative to kilo config dir) to sync
+	saveTokensFn   func()  // override for testing; nil uses default saveTokensToEncrypted
+	refreshMu      sync.Mutex // serializes token refresh to prevent race with server-side token rotation
 }
 
-// NewSyncer creates a Syncer configured from environment variables.
-// Reads API URL, tokens, and token expiry from KD_AINSTRUCT_* env vars.
+// NewSyncer creates a Syncer configured from encrypted token storage.
+// Reads tokens from <home>/.local/share/kilo/.tokens.env.enc and falls back
+// to environment variables for backward compatibility.
 func NewSyncer() *Syncer {
 	home := constants.GetHomeDir()
 	kiloConfigDir := constants.GetKiloConfigDir()
@@ -93,14 +96,34 @@ func NewSyncer() *Syncer {
 		baseURL = constants.AinstructBaseURL
 	}
 	apiURL := baseURL + "/api/v1"
+
+	var accessToken, refreshToken string
 	var expiry int64
-	if v := os.Getenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY"); v != "" {
-		expiry, _ = strconv.ParseInt(v, 10, 64)
+
+	// Try to load from encrypted storage first
+	homeDir, _, _, userID := loadUserConfig()
+	if homeDir != "" && userID != "" {
+		encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
+		if encData, err := os.ReadFile(encPath); err == nil {
+			if decrypted, err := decryptAES(encData, userID); err == nil {
+				var expiryStr string
+				_, _, accessToken, refreshToken, expiryStr, _ = parseTokenEnv(string(decrypted))
+				if expiryStr != "" {
+					expiry, _ = strconv.ParseInt(expiryStr, 10, 64)
+				}
+				utils.Log("[ainstruct-sync] Loaded tokens from encrypted storage\n")
+			}
+		}
 	}
+
+	if accessToken == "" {
+		utils.LogError("[ainstruct-sync] No sync tokens found — please run login first\n")
+	}
+
 	return &Syncer{
 		apiURL:        apiURL,
-		accessToken:   os.Getenv("KD_AINSTRUCT_SYNC_TOKEN"),
-		refreshToken:  os.Getenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN"),
+		accessToken:   accessToken,
+		refreshToken:  refreshToken,
 		tokenExpiry:   expiry,
 		homeDir:       home,
 		kiloConfigDir: kiloConfigDir,
