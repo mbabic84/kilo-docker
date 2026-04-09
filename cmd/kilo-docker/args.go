@@ -6,41 +6,43 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 func serializeArgs(cfg config, sshEnabled bool) string {
-	var sessionArgs string
-	if cfg.once {
-		sessionArgs += "--once "
+	var parts []string
+
+	utils.Log("[serializeArgs] cfg.remember=%v, cfg.ssh=%v, cfg.once=%v\n", cfg.remember, cfg.ssh, cfg.once)
+
+	for _, f := range boolFlags {
+		if serialized, ok := f.serialize(cfg); ok {
+			parts = append(parts, serialized)
+		}
 	}
+
+	for _, f := range valueFlags {
+		if serialized := f.serializeArgs(cfg); len(serialized) > 0 {
+			parts = append(parts, serialized...)
+		}
+	}
+
 	for _, svcName := range cfg.enabledServices {
 		svc := getService(svcName)
 		if svc != nil && svc.Flag != "" {
-			sessionArgs += svc.Flag + " "
+			parts = append(parts, svc.Flag)
 		}
 	}
-	if cfg.playwright {
-		sessionArgs += "--playwright "
+
+	if sshEnabled && !cfg.ssh {
+		parts = append(parts, "--ssh")
 	}
-	if sshEnabled {
-		sessionArgs += "--ssh "
-	}
-	if cfg.network != "" {
-		sessionArgs += "--network " + cfg.network + " "
-	}
-	for _, port := range cfg.ports {
-		sessionArgs += "--port " + port + " "
-	}
-	for _, vol := range cfg.volumes {
-		sessionArgs += "--volume " + vol + " "
-	}
-	if cfg.workspace != "" {
-		sessionArgs += "--workspace " + cfg.workspace + " "
-	}
+
 	if len(cfg.args) > 0 {
-		sessionArgs += strings.Join(cfg.args, " ") + " "
+		parts = append(parts, cfg.args...)
 	}
-	return strings.TrimSpace(sessionArgs)
+
+	return strings.Join(parts, " ")
 }
 
 func buildContainerArgs(cfg config, volume, workspace, containerName, containerState,
@@ -100,12 +102,10 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 	args = append(args, "--name", containerName)
 	args = append(args, "--hostname", containerName)
 
-	if cfg.network != "" {
-		args = append(args, "--network", cfg.network)
-	}
-
-	for _, port := range cfg.ports {
-		args = append(args, "-p", port)
+	for _, f := range valueFlags {
+		if dockerArgs := f.buildDockerArgs(cfg); len(dockerArgs) > 0 {
+			args = append(args, dockerArgs...)
+		}
 	}
 
 	for _, envVar := range []string{"TERM", "COLORTERM", "LANG", "LC_ALL"} {

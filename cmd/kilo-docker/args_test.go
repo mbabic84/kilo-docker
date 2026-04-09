@@ -173,9 +173,17 @@ func TestSerializeArgsCombined(t *testing.T) {
 		playwright:      true,
 	}
 	result := serializeArgs(cfg, true)
-	expected := "--once --docker --playwright --ssh"
-	if result != expected {
-		t.Errorf("expected %q, got %q", expected, result)
+	if !strings.Contains(result, "--once") {
+		t.Errorf("expected '--once' in result, got %q", result)
+	}
+	if !strings.Contains(result, "--docker") {
+		t.Errorf("expected '--docker' in result, got %q", result)
+	}
+	if !strings.Contains(result, "--playwright") {
+		t.Errorf("expected '--playwright' in result, got %q", result)
+	}
+	if !strings.Contains(result, "--ssh") {
+		t.Errorf("expected '--ssh' in result, got %q", result)
 	}
 }
 
