@@ -34,6 +34,42 @@ func loadEncryptedTokens(home, userID string) (context7, ainstruct, syncToken, s
 	return parseTokenEnv(string(decrypted))
 }
 
+// saveSyncTokensToEncrypted loads existing encrypted tokens, updates only the
+// SYNC token fields, and re-encrypts. Preserves MCP tokens (Context7, Ainstruct).
+func saveSyncTokensToEncrypted(home, userID, syncToken, syncRefreshToken, syncTokenExpiry string) error {
+	context7Token, ainstructToken := "", ""
+
+	storedContext7, storedAinstruct, _, _, _, loadErr := loadEncryptedTokens(home, userID)
+	if loadErr == nil {
+		if storedContext7 != "" {
+			context7Token = storedContext7
+		}
+		if storedAinstruct != "" {
+			ainstructToken = storedAinstruct
+		}
+	}
+
+	return saveEncryptedTokens(home, userID, context7Token, ainstructToken, syncToken, syncRefreshToken, syncTokenExpiry)
+}
+
+// clearSyncTokensFromEncrypted loads existing encrypted tokens, clears only
+// the SYNC token fields, and re-encrypts. Preserves MCP tokens.
+func clearSyncTokensFromEncrypted(home, userID string) error {
+	context7Token, ainstructToken := "", ""
+
+	storedContext7, storedAinstruct, _, _, _, loadErr := loadEncryptedTokens(home, userID)
+	if loadErr == nil {
+		if storedContext7 != "" {
+			context7Token = storedContext7
+		}
+		if storedAinstruct != "" {
+			ainstructToken = storedAinstruct
+		}
+	}
+
+	return saveEncryptedTokens(home, userID, context7Token, ainstructToken, "", "", "")
+}
+
 // parseTokenEnv extracts token values from KEY=VALUE formatted data.
 func parseTokenEnv(data string) (context7, ainstruct, syncToken, syncRefresh, syncExpiry string, err error) {
 	for _, line := range strings.Split(data, "\n") {

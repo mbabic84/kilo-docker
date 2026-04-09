@@ -17,9 +17,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
@@ -61,9 +63,12 @@ func runHelp() {
 	const w = 40
 	fmt.Println("kilo-entrypoint - Container entrypoint for kilo-docker")
 	fmt.Println("")
-	fmt.Println("Usage: kilo-entrypoint [subcommand]")
+	fmt.Println("Usage: kilo-entrypoint [flags] [subcommand]")
 	fmt.Println("")
 	fmt.Println("With no arguments, runs container initialization.")
+	fmt.Println("")
+	fmt.Println("Flags:")
+	fmt.Printf("  %-*s %s\n", w, "--remember", "Remember Ainstruct login for auto-login on session attach")
 	fmt.Println("")
 	fmt.Println("Subcommands:")
 	fmt.Printf("  %-*s %s\n", w, "help", "Show this help message")
@@ -71,7 +76,7 @@ func runHelp() {
 	fmt.Printf("  %-*s %s\n", w, "update-config", "Download config template, merge with existing config")
 	fmt.Printf("  %-*s %s\n", w, "backup [path]", "Create tar.gz of KILO_HOME (default: /tmp/backup.tar.gz)")
 	fmt.Printf("  %-*s %s\n", w, "restore [path]", "Extract tar.gz into KILO_HOME with ownership fix")
-		fmt.Printf("  %-*s %s\n", w, "mcp-config", "Apply MCP enabled states from encrypted token storage")
+	fmt.Printf("  %-*s %s\n", w, "mcp-config", "Apply MCP enabled states from encrypted token storage")
 	fmt.Printf("  %-*s %s\n", w, "mcp-tokens", "Interactive token management")
 	fmt.Printf("  %-*s %s\n", w, "sync", "Start ainstruct file watcher + REST sync")
 	fmt.Printf("  %-*s %s\n", w, "sync ls", "List all ainstruct sync files")
@@ -79,6 +84,10 @@ func runHelp() {
 	fmt.Printf("  %-*s %s\n", w, "resync", "Delete all remote documents and re-push local files")
 	fmt.Printf("  %-*s %s\n", w, "zellij-attach", "Attach to existing zellij session")
 	fmt.Printf("  %-*s %s\n", w, "print-env", "Print export statements for current tokens")
+	fmt.Println("")
+	fmt.Println("Examples:")
+	fmt.Println("  kilo-entrypoint --remember zellij-attach")
+	fmt.Println("  kilo-entrypoint sync")
 	fmt.Println("")
 	fmt.Println("Any other argument is passed through to exec.LookPath for")
 	fmt.Println("direct binary execution (e.g. \"kilo\", \"sh\", \"bash\").")
@@ -100,22 +109,41 @@ func runPrintEnv() {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		if err := runInit(); err != nil {
+	remember := flag.Bool("remember", false, "Remember login credentials for future sessions")
+	flag.Parse()
+	utils.Log("[main] Entrypoint started, os.Args=%v, remember=%v\n", os.Args, *remember)
+
+	remaining := flag.Args()
+	hasSubcommand := len(remaining) > 0 && !strings.HasPrefix(remaining[0], "-")
+	onlyFlags := len(remaining) == 0 || (len(remaining) == 1 && strings.HasPrefix(remaining[0], "-"))
+	alreadyInitialized := func() bool {
+		_, err := os.Stat("/tmp/.kilo-initialized")
+		return err == nil
+	}
+
+	if onlyFlags && !hasSubcommand {
+		if alreadyInitialized() {
+			if err := runZellijAttach(*remember); err != nil {
+				utils.LogError("[main] zellij-attach error: %v\n", err, utils.WithOutput())
+				os.Exit(1)
+			}
+			return
+		}
+		if err := runInit(*remember); err != nil {
 			utils.LogError("[main] init error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
 		return
 	}
 
-	name := os.Args[1]
+	name := remaining[0]
 	binary, passthrough := resolveCommand(name)
 	if passthrough {
 		if binary == "" {
 			utils.LogError("[main] unknown subcommand or command: %s\n", name, utils.WithOutput())
 			os.Exit(1)
 		}
-		if err := syscall.Exec(binary, os.Args[1:], os.Environ()); err != nil {
+		if err := syscall.Exec(binary, remaining, os.Environ()); err != nil {
 			utils.LogError("[main] exec %s: %v\n", name, err, utils.WithOutput())
 			os.Exit(1)
 		}
@@ -135,8 +163,8 @@ func main() {
 		}
 	case "backup":
 		outputPath := "/tmp/backup.tar.gz"
-		if len(os.Args) > 2 {
-			outputPath = os.Args[2]
+		if len(remaining) > 1 {
+			outputPath = remaining[1]
 		}
 		if err := runBackup(outputPath); err != nil {
 			utils.LogError("[main] backup error: %v\n", err, utils.WithOutput())
@@ -144,8 +172,8 @@ func main() {
 		}
 	case "restore":
 		archivePath := "/tmp/backup.tar.gz"
-		if len(os.Args) > 2 {
-			archivePath = os.Args[2]
+		if len(remaining) > 1 {
+			archivePath = remaining[1]
 		}
 		if err := runRestore(archivePath); err != nil {
 			utils.LogError("[main] restore error: %v\n", err, utils.WithOutput())
@@ -162,30 +190,30 @@ func main() {
 			os.Exit(1)
 		}
 	case "sync":
-		if len(os.Args) < 3 {
+		if len(remaining) < 2 {
 			runSyncMode()
 			return
 		}
-		switch os.Args[2] {
+		switch remaining[1] {
 		case "ls":
 			s := NewSyncer()
-			humanReadable := len(os.Args) > 3 && os.Args[3] == "-h"
+			humanReadable := len(remaining) > 2 && remaining[2] == "-h"
 			if err := s.listSyncFiles(humanReadable); err != nil {
 				utils.LogError("[main] sync ls error: %v\n", err, utils.WithOutput())
 				os.Exit(1)
 			}
 		case "rm":
-			if len(os.Args) < 4 {
+			if len(remaining) < 3 {
 				utils.LogError("[main] sync rm requires a file argument\n", utils.WithOutput())
 				os.Exit(1)
 			}
 			s := NewSyncer()
-			if err := s.removeSyncFile(os.Args[3]); err != nil {
+			if err := s.removeSyncFile(remaining[2]); err != nil {
 				utils.LogError("[main] sync rm error: %v\n", err, utils.WithOutput())
 				os.Exit(1)
 			}
 		default:
-			utils.LogError("[main] unknown sync subcommand: %s\n", os.Args[2], utils.WithOutput())
+			utils.LogError("[main] unknown sync subcommand: %s\n", remaining[1], utils.WithOutput())
 			os.Exit(1)
 		}
 	case "resync":
@@ -197,7 +225,7 @@ func main() {
 		s.pushAll()
 		utils.Log("[main] Resync complete.\n")
 	case "zellij-attach":
-		if err := runZellijAttach(); err != nil {
+		if err := runZellijAttach(*remember); err != nil {
 			utils.LogError("[main] zellij-attach error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}

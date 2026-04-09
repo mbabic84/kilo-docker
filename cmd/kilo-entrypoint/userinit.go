@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -29,8 +31,8 @@ import (
 //   - Sync startup
 //   - Privilege drop to the created user
 //   - Exec zellij
-func runUserInit() error {
-	utils.Log("[userinit] starting initialization\n")
+func runUserInit(remember bool) error {
+	utils.Log("[userinit] starting initialization (remember=%v)\n", remember)
 
 	puidStr := os.Getenv("PUID")
 	if puidStr == "" {
@@ -49,24 +51,55 @@ func runUserInit() error {
 	if existingUser != "" {
 		utils.Log("[userinit] Found existing user data: %s\n", existingUser)
 	}
-	// Login
-	utils.Log("[kilo-docker] Starting Ainstruct authentication\n", utils.WithOutput())
-	loginRes, err := runLoginInteractive()
-	if err != nil {
-		return fmt.Errorf("login failed: %w", err)
-	}
-	userID := loginRes.UserID
+
+	var loginRes loginResult
+	var userID string
+	var username string
+	var homeDir string
 
 	if existingUser != "" {
-		derived := deriveHomeName(userID)
-		if derived != existingUser {
-			return fmt.Errorf("user mismatch: expected %s, got %s", existingUser, derived)
+		username = existingUser
+		homeDir = "/home/" + username
+		userIDPath := filepath.Join(homeDir, ".local/share/kilo/.user-config.json")
+		if data, err := os.ReadFile(userIDPath); err == nil {
+			var config map[string]string
+			if json.Unmarshal(data, &config) == nil {
+				if uid, ok := config["userID"]; ok {
+					userID = uid
+				}
+			}
 		}
-		utils.Log("[userinit] User verified: %s\n", derived)
 	}
 
-	username := deriveHomeName(userID)
-	homeDir := "/home/" + username
+	// Try auto-login if remember is set and we have stored credentials
+	if remember && existingUser != "" && userID != "" {
+		utils.Log("[kilo-docker] Attempting auto-login with saved session...\n", utils.WithOutput())
+		autoRes, autoLogin, autoErr := checkAutoLogin(homeDir, userID)
+		if autoLogin && autoErr == nil {
+			loginRes = autoRes
+			utils.Log("[kilo-docker] Signed in automatically using saved session\n", utils.WithOutput())
+		} else if autoErr != nil {
+			utils.Log("[kilo-docker] Auto-login failed, please sign in again\n", utils.WithOutput())
+		}
+	}
+
+	// Fall back to interactive login if auto-login didn't work
+	if loginRes.UserID == "" {
+		utils.Log("[kilo-docker] Starting Ainstruct authentication\n", utils.WithOutput())
+		newLoginRes, err := runLoginInteractive(remember)
+		if err != nil {
+			return fmt.Errorf("login failed: %w", err)
+		}
+		loginRes = newLoginRes
+		userID = loginRes.UserID
+	}
+
+	if username == "" {
+		username = deriveHomeName(userID)
+	}
+	if homeDir == "" {
+		homeDir = "/home/" + username
+	}
 
 	// Create OS user
 	utils.Log("[userinit] Creating user: %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
@@ -132,29 +165,6 @@ func runUserInit() error {
 	// Set HOME temporarily so GetKiloConfigDir() and token paths resolve correctly
 	savedHome := os.Getenv("HOME")
 	_ = os.Setenv("HOME", homeDir)
-
-	// Load encrypted tokens to get sync tokens for file sync
-	// MCP tokens (context7, ainstruct) are managed via 'kilo-entrypoint mcp-tokens' command
-	tokenFilePath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
-	if _, encErr := os.Stat(tokenFilePath); encErr == nil {
-		if encData, readErr := os.ReadFile(tokenFilePath); readErr == nil {
-			if decrypted, decErr := decryptAES(encData, userID); decErr == nil {
-				_, _, sTok, sRef, sExp, _ := parseTokenEnv(string(decrypted))
-				if sTok != "" {
-					_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", sTok)
-				}
-				if sRef != "" {
-					_ = os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", sRef)
-				}
-				if sExp != "" {
-					_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", sExp)
-				}
-			}
-		}
-	}
-
-	// MCP tokens are managed via 'kilo-entrypoint mcp-tokens' command
-	// No longer prompted during initialization
 
 	// Save all tokens (ainstruct PAT from login + context7 + sync tokens)
 	utils.Log("[userinit] Saving MCP tokens\n")
@@ -368,6 +378,113 @@ func getUserGroups(username string) []int {
 	return groups
 }
 
+// checkAutoLogin attempts to auto-login using stored sync tokens.
+// Returns (loginResult, autoLoggedIn bool, error).
+// If auto-login fails, caller should fall back to interactive login.
+func checkAutoLogin(homeDir, userID string) (loginResult, bool, error) {
+	utils.Log("[checkAutoLogin] userID=%s, homeDir=%s\n", userID, homeDir)
+
+	tokenPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
+	info, statErr := os.Stat(tokenPath)
+	if statErr != nil {
+		utils.LogWarn("[checkAutoLogin] token file not found at %s: %v\n", tokenPath, statErr)
+		return loginResult{}, false, fmt.Errorf("token file not found: %w", statErr)
+	}
+	utils.Log("[checkAutoLogin] token file found: size=%d, mode=%s\n", info.Size(), info.Mode())
+
+	_, _, storedSync, storedRefresh, storedExpiry, loadErr := loadEncryptedTokens(homeDir, userID)
+	if loadErr != nil {
+		utils.LogWarn("[checkAutoLogin] loadEncryptedTokens failed (likely decryption error — wrong userID?): %v\n", loadErr)
+		return loginResult{}, false, fmt.Errorf("no stored tokens: %w", loadErr)
+	}
+
+	maskVal := func(s string) string {
+		if len(s) > 8 {
+			return s[:4] + "..." + s[len(s)-4:]
+		}
+		return "***"
+	}
+	utils.Log("[checkAutoLogin] storedSync=%s, storedRefresh=%s, storedExpiry=%s\n",
+		maskVal(storedSync), maskVal(storedRefresh), storedExpiry)
+
+	if storedSync == "" || storedRefresh == "" {
+		utils.LogWarn("[checkAutoLogin] missing sync or refresh token (syncEmpty=%v, refreshEmpty=%v)\n",
+			storedSync == "", storedRefresh == "")
+		return loginResult{}, false, fmt.Errorf("missing sync or refresh token")
+	}
+
+	if storedExpiry != "" {
+		expiryUnix, parseErr := strconv.ParseInt(storedExpiry, 10, 64)
+		if parseErr != nil {
+			utils.LogWarn("[checkAutoLogin] failed to parse expiry %q: %v\n", storedExpiry, parseErr)
+		} else if time.Now().Unix() > expiryUnix {
+			utils.Log("[checkAutoLogin] access token expired (expiry=%d, now=%d), attempting refresh\n", expiryUnix, time.Now().Unix())
+			newAccess, newRefresh, newExpiry, refreshErr := refreshSyncTokens(homeDir, userID, storedRefresh)
+			if refreshErr != nil {
+				utils.LogWarn("[checkAutoLogin] token refresh failed: %v\n", refreshErr)
+				return loginResult{}, false, refreshErr
+			}
+			if err := saveSyncTokensToEncrypted(homeDir, userID, newAccess, newRefresh, strconv.FormatInt(newExpiry, 10)); err != nil {
+				utils.LogWarn("[checkAutoLogin] failed to save refreshed tokens: %v\n", err)
+			}
+			// Update ALL stored values including the new refresh token
+			// to ensure the returned loginResult has the correct tokens.
+			storedSync = newAccess
+			storedRefresh = newRefresh
+			storedExpiry = strconv.FormatInt(newExpiry, 10)
+		} else {
+			utils.Log("[checkAutoLogin] access token still valid (expiry=%d, now=%d, remaining=%ds)\n",
+				expiryUnix, time.Now().Unix(), expiryUnix-time.Now().Unix())
+		}
+	} else {
+		utils.Log("[checkAutoLogin] no expiry set, skipping expiration check\n")
+	}
+
+	result := loginResult{
+		AccessToken:  storedSync,
+		RefreshToken: storedRefresh,
+		UserID:       userID,
+	}
+	if storedExpiry != "" {
+		expiryUnix, _ := strconv.ParseInt(storedExpiry, 10, 64)
+		result.ExpiresIn = expiryUnix - time.Now().Unix()
+	}
+
+	utils.Log("[userinit] checkAutoLogin: auto-login successful\n")
+	return result, true, nil
+}
+
+// refreshSyncTokens calls POST /auth/refresh and returns new tokens.
+func refreshSyncTokens(homeDir, userID, refreshToken string) (access, refresh string, expiry int64, err error) {
+	baseURL := os.Getenv("KD_AINSTRUCT_BASE_URL")
+	if baseURL == "" {
+		baseURL = constants.AinstructBaseURL
+	}
+
+	body, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
+	resp, err := http.Post(baseURL+"/auth/refresh", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", "", 0, fmt.Errorf("refresh request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", "", 0, fmt.Errorf("refresh returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int64  `json:"expires_in"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", 0, fmt.Errorf("failed to decode refresh response: %w", err)
+	}
+
+	return result.AccessToken, result.RefreshToken, time.Now().Unix() + result.ExpiresIn, nil
+}
+
 // initTokens merges the MCP token from login with any existing encrypted
 // tokens on the volume and re-saves them. Also stores sync JWT tokens for
 // the file sync subsystem.
@@ -447,53 +564,29 @@ func findExistingUser() string {
 	baseDir := "/home"
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
+		utils.LogWarn("[findExistingUser] error reading %s: %v\n", baseDir, err)
 		return ""
 	}
+	utils.Log("[findExistingUser] scanning %s (%d entries)\n", baseDir, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "kd-") {
 			continue
 		}
 		tokenPath := filepath.Join(baseDir, entry.Name(), ".local/share/kilo/.tokens.env.enc")
 		if _, err := os.Stat(tokenPath); err == nil {
+			utils.Log("[findExistingUser] found user %s with token file\n", entry.Name())
 			return entry.Name()
+		} else {
+			utils.Log("[findExistingUser] dir %s exists but no token file: %v\n", entry.Name(), err)
 		}
 	}
+	utils.Log("[findExistingUser] no user with token file found in %s\n", baseDir)
 	return ""
 }
 
-// startSyncWithTokens decrypts tokens from the volume, sets them as
-// process env vars for the sync child process, and starts sync in background.
+// startSyncWithTokens starts the sync process. Tokens are loaded by
+// sync_content.go directly from encrypted storage.
 func startSyncWithTokens(homeDir, userID string) error {
-	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
-	if _, err := os.Stat(encPath); err != nil {
-		return nil
-	}
-
-	encData, err := os.ReadFile(encPath)
-	if err != nil {
-		return nil
-	}
-
-	decrypted, err := decryptAES(encData, userID)
-	if err != nil {
-		return nil
-	}
-
-	_, _, syncToken, syncRefresh, syncExpiry, _ := parseTokenEnv(string(decrypted))
-
-	// Sync tokens are needed globally for file sync - set via os.Setenv
-	if syncToken != "" {
-		_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN", syncToken)
-	}
-	if syncRefresh != "" {
-		_ = os.Setenv("KD_AINSTRUCT_SYNC_REFRESH_TOKEN", syncRefresh)
-	}
-	if syncExpiry != "" {
-		_ = os.Setenv("KD_AINSTRUCT_SYNC_TOKEN_EXPIRY", syncExpiry)
-	}
-	// MCP tokens (context7, ainstruct) should ONLY be set by the kilo wrapper script
-	// Not here - not even for the sync subprocess
-
 	go func() {
 		cmd := exec.Command("kilo-entrypoint", "sync")
 		cmd.Stdout = os.Stdout

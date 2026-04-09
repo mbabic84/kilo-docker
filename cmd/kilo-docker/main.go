@@ -109,6 +109,12 @@ func runContainer(cfg config) {
 		}
 	}
 
+	rememberFlag := ""
+	if cfg.remember {
+		rememberFlag = "--remember"
+	}
+	utils.Log("[kilo-docker] cfg.remember=%v, rememberFlag=%q\n", cfg.remember, rememberFlag)
+
 	if containerState == "running" {
 		currentFlags := serializeArgs(cfg, cfg.ssh)
 		storedFlags := getContainerLabel(containerName, "kilo.args")
@@ -120,7 +126,12 @@ func runContainer(cfg config) {
 				_, _ = dockerRun("rm", "-f", containerName)
 				containerState = "not_found"
 			} else {
-				_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+				// Pass --remember BEFORE zellij-attach so flag.Parse() catches it
+				if rememberFlag != "" {
+					_ = execDockerInteractive(containerName, "kilo-entrypoint", rememberFlag, "zellij-attach")
+				} else {
+					_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+				}
 				handleSessionEnd(containerName, cfg.once)
 				return
 			}
@@ -192,22 +203,43 @@ func runContainer(cfg config) {
 	image := repoURL + ":latest"
 	switch containerState {
 	case "running":
-		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+		// Pass --remember BEFORE zellij-attach so flag.Parse() catches it
+		if rememberFlag != "" {
+			_ = execDockerInteractive(containerName, "kilo-entrypoint", rememberFlag, "zellij-attach")
+		} else {
+			_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+		}
 		handleSessionEnd(containerName, cfg.once)
 	case "exited", "created":
 		_, _ = dockerRun("start", "-d", containerName)
 		time.Sleep(2 * time.Second)
-		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+		// Pass --remember BEFORE zellij-attach so flag.Parse() catches it
+		if rememberFlag != "" {
+			_ = execDockerInteractive(containerName, "kilo-entrypoint", rememberFlag, "zellij-attach")
+		} else {
+			_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+		}
 		handleSessionEnd(containerName, cfg.once)
 	default:
-		runArgs := buildRunArgs(containerArgs, image, cfg.args, false)
+		// Pass --remember to entrypoint at container start for auto-login during init
+		startArgs := cfg.args
+		if rememberFlag != "" {
+			startArgs = append([]string{rememberFlag}, startArgs...)
+		}
+		runArgs := buildRunArgs(containerArgs, image, startArgs, false)
 		runArgs[1] = "-d"
+		utils.Log("[kilo-docker] Docker run args: docker %s\n", strings.Join(runArgs, " "))
 		if _, err := dockerRunDetached(runArgs...); err != nil {
 			utils.LogError("%v\n", err)
 			os.Exit(1)
 		}
 		time.Sleep(2 * time.Second)
-		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+		// Pass --remember BEFORE zellij-attach so flag.Parse() catches it
+		if rememberFlag != "" {
+			_ = execDockerInteractive(containerName, "kilo-entrypoint", rememberFlag, "zellij-attach")
+		} else {
+			_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
+		}
 		handleSessionEnd(containerName, cfg.once)
 	}
 }
