@@ -214,3 +214,17 @@ func TestSerializeArgsNetwork(t *testing.T) {
 		t.Errorf("expected %q, got %q", expected, result)
 	}
 }
+
+func TestSerializeArgsYesOnlyWhenExplicit(t *testing.T) {
+	cfgWithoutYes := config{}
+	resultWithoutYes := serializeArgs(cfgWithoutYes, false)
+	if strings.Contains(resultWithoutYes, "--yes") {
+		t.Errorf("expected no '--yes' when cfg.yes=false, got %q", resultWithoutYes)
+	}
+
+	cfgWithYes := config{yes: true}
+	resultWithYes := serializeArgs(cfgWithYes, false)
+	if !strings.Contains(resultWithYes, "--yes") {
+		t.Errorf("expected '--yes' when cfg.yes=true, got %q", resultWithYes)
+	}
+}
