@@ -1,3 +1,9 @@
+## [2.17.1](https://github.com/mbabic84/kilo-docker/compare/v2.17.0...v2.17.1) (2026-04-10)
+
+### Bug Fixes
+
+* do not persist --yes flag when user confirms recreation dialog ([75403c3](https://github.com/mbabic84/kilo-docker/commit/75403c3de60749edc2da9e667e45d49b62a592eb))
+
 ## [2.17.0](https://github.com/mbabic84/kilo-docker/compare/v2.16.0...v2.17.0) (2026-04-09)
 
 ### Features
