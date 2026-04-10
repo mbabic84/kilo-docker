@@ -83,9 +83,9 @@ func handleSessions(cfg config) {
 		utils.Log("[kilo-docker] Recreating with stored args: %q, parsed: %v\n", storedArgs, parsedArgs)
 
 		newCfg := parseArgs(parsedArgs)
-		utils.Log("[kilo-docker] Parsed config: remember=%v, ssh=%v, services=%v\n", newCfg.remember, newCfg.ssh, newCfg.enabledServices)
+		utils.Log("[kilo-docker] Parsed config: remember=%v, ssh=%v, yes=%v, services=%v\n", newCfg.remember, newCfg.ssh, newCfg.yes, newCfg.enabledServices)
 		newCfg.command = "" // ensure runContainer creates a new container
-		newCfg.yes = true  // skip prompts during recreate
+		utils.Log("[kilo-docker] Recreate config after normalization: yes=%v, serialized=%q\n", newCfg.yes, serializeArgs(newCfg, newCfg.ssh))
 
 		// Change to the session's original workspace
 		if targetSession.Workspace != "" {
