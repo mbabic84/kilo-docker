@@ -20,7 +20,7 @@
     },
     "playwright": {
       "type": "remote",
-      "url": "http://playwright-mcp:8931/mcp",
+      "url": "http://kilo-playwright-mcp:8931/mcp",
       "enabled": false
     }
   },

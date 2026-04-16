@@ -136,8 +136,9 @@ func TestSerializeArgsEmpty(t *testing.T) {
 		enabledServices: []string{},
 	}
 	result := serializeArgs(cfg, false)
-	if result != "" {
-		t.Errorf("expected empty string, got %q", result)
+	expected := "--network kilo-shared"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
 	}
 }
 
@@ -147,8 +148,9 @@ func TestSerializeArgsOnce(t *testing.T) {
 		enabledServices: []string{},
 	}
 	result := serializeArgs(cfg, false)
-	if result != "--once" {
-		t.Errorf("expected '--once', got %q", result)
+	expected := "--once --network kilo-shared"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
 	}
 }
 
@@ -206,10 +208,10 @@ func TestSerializeArgsNetwork(t *testing.T) {
 	cfg := config{
 		once:            false,
 		enabledServices: []string{},
-		network:         "my-network",
+		networks:        []string{"my-network"},
 	}
 	result := serializeArgs(cfg, false)
-	expected := "--network my-network"
+	expected := "--network kilo-shared --network my-network"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -68,6 +69,8 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 
 	if cfg.playwright {
 		args = append(args, "-e", "PLAYWRIGHT_ENABLED=1")
+		// Mount shared volume at /mnt/playwright-output in Kilo container
+		args = append(args, "-v", fmt.Sprintf("%s:/mnt/playwright-output", PlaywrightVolumeName))
 	}
 	for _, svcName := range cfg.enabledServices {
 		svc := getService(svcName)

@@ -66,7 +66,7 @@ kilo-docker
 | `--port`, `-p` | Map port (host_port:container_port), repeatable |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--ssh` | Enable SSH agent forwarding into the container |
-| `--network <name>` | Attach to a specific Docker network |
+| `--network <name>` | Attach to a Docker network (repeatable, `kilo-shared` is always included) |
 | `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
 | `--version` | Print kilo-docker version |
 
@@ -142,9 +142,9 @@ The `--playwright` flag starts a [Playwright MCP](https://github.com/microsoft/p
 kilo-docker --playwright
 ```
 
-The sidecar runs headless Chromium in HTTP mode on port 8931 inside a dedicated Docker network (`kilo-playwright-<username>`). Both the sidecar container and network are automatically cleaned up when Kilo exits.
+The sidecar runs headless Chromium in HTTP mode on port 8931 inside the shared Docker network (`kilo-shared`). The Playwright container is shared across sessions — if already running, it's reused rather than recreated.
 
-Screenshots and other output files are saved to `.playwright-mcp/` in the workspace directory.
+Screenshots and output files are saved to a shared volume (`kilo-playwright-output`) mounted at `/home/kd-<hash>/playwright-output` inside the Kilo container.
 
 ## SSH Agent Forwarding
 
@@ -161,7 +161,24 @@ kilo-docker --ssh
 
 > **Security:** Private keys never enter the container. The container communicates with the host's SSH agent via a Unix socket.
 
-## Services
+## Networking
+
+All Kilo containers are automatically attached to a shared Docker network (`kilo-shared`), enabling container-to-container communication by name across sessions:
+
+```bash
+# Kilo containers can resolve each other by container name
+kilo-docker
+# Inside container: ping <other-container-name>
+```
+
+You can attach to additional networks using the `--network` flag (repeatable):
+
+```bash
+kilo-docker --network my-network
+kilo-docker --network net1 --network net2
+```
+
+The `kilo-shared` network is always included implicitly — it doesn't need to be specified and won't trigger flag mismatch detection when comparing stored vs current args.
 
 Kilo Docker uses a data-driven service architecture. Services are defined as structured data, making it easy to add new capabilities without modifying core logic.
 
