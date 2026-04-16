@@ -17,19 +17,21 @@ var version = "dev"
 var kiloVersion = "unknown"
 
 type config struct {
-	once            bool
-	remember        bool
-	playwright      bool
-	ssh             bool
-	yes             bool
-	network         string
-	networkFlag     bool
-	ports           []string
-	volumes         []string
-	workspace       string
-	command         string
-	args            []string
-	enabledServices []string
+	once                    bool
+	remember                bool
+	playwright              bool
+	playwrightRecreateVolume bool
+	ssh                     bool
+	yes                     bool
+	help                    bool
+	networks                []string
+	networkFlag             bool
+	ports                   []string
+	volumes                 []string
+	workspace               string
+	command                 string
+	args                    []string
+	enabledServices         []string
 }
 
 type boolFlag struct {
@@ -48,6 +50,12 @@ type valueFlag struct {
 }
 
 var boolFlags = []boolFlag{
+	{
+		Names:       []string{"--help", "-h"},
+		Description: "Show help message",
+		setField:    func(c *config) { c.help = true },
+		serialize:   func(c config) (string, bool) { return "", false },
+	},
 	{
 		Names:       []string{"--once"},
 		Description: "Run a one-time session without persisting data (no volume)",
@@ -71,6 +79,12 @@ var boolFlags = []boolFlag{
 		Description: "Enable SSH agent forwarding into the container",
 		setField:    func(c *config) { c.ssh = true },
 		serialize:   func(c config) (string, bool) { return "--ssh", c.ssh },
+	},
+	{
+		Names:       []string{"--volume", "-v"},
+		Description: "Recreate the Playwright volume (delete and create new)",
+		setField:    func(c *config) { c.playwrightRecreateVolume = true },
+		serialize:   func(c config) (string, bool) { return "--volume", c.playwrightRecreateVolume },
 	},
 	{
 		Names:       []string{"--yes", "-y"},
@@ -104,10 +118,10 @@ var valueFlags = []valueFlag{
 	},
 	{
 		Names:            []string{"--network"},
-		Description:     "Connect the container to a Docker network",
-		setField:        func(c *config, v string) { c.network = v; c.networkFlag = true },
-		serializeArgs:   func(c config) []string { return optional("--network", c.network) },
-		buildDockerArgs: func(c config) []string { return optional("--network", c.network) },
+		Description:     "Connect to a Docker network (repeatable). 'kilo-shared' is always included.",
+		setField:        func(c *config, v string) { c.networks = append(c.networks, v); c.networkFlag = true },
+		serializeArgs:   func(c config) []string { return flatten("--network", normalizeNetworks(c.networks, true)) },
+		buildDockerArgs: func(c config) []string { return flatten("--network", normalizeNetworks(c.networks, true)) },
 	},
 }
 
@@ -124,6 +138,80 @@ func optional(flag, value string) []string {
 		return nil
 	}
 	return []string{flag, value}
+}
+
+func normalizeForCompare(args string) string {
+	parts := strings.Split(args, " ")
+	var filtered []string
+	skipNext := false
+	for i, p := range parts {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		if p == "--network" && i+1 < len(parts) && parts[i+1] == SharedNetworkName {
+			skipNext = true
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	return strings.Join(filtered, " ")
+}
+
+func argsMatch(current, stored string) bool {
+	return normalizeForCompare(current) == normalizeForCompare(stored)
+}
+
+// serializeForDisplay serializes args for display in session list, excluding implicit kilo-shared network.
+func serializeForDisplay(cfg config, sshEnabled bool) string {
+	var parts []string
+
+	for _, f := range boolFlags {
+		if serialized, ok := f.serialize(cfg); ok {
+			parts = append(parts, serialized)
+		}
+	}
+
+	// Only show networks if user explicitly passed --network flag
+	// Then exclude kilo-shared from display (it's implicit)
+	if cfg.networkFlag {
+		var userNetworks []string
+		for _, n := range cfg.networks {
+			if n != SharedNetworkName {
+				userNetworks = append(userNetworks, n)
+			}
+		}
+		if len(userNetworks) > 0 {
+			parts = append(parts, flatten("--network", userNetworks)...)
+		}
+	}
+
+	// Add all other value flags (skip network, it's handled above)
+	for _, f := range valueFlags {
+		if f.Names[0] == "--network" {
+			continue // handled above
+		}
+		if serialized := f.serializeArgs(cfg); len(serialized) > 0 {
+			parts = append(parts, serialized...)
+		}
+	}
+
+	for _, svcName := range cfg.enabledServices {
+		svc := getService(svcName)
+		if svc != nil && svc.Flag != "" {
+			parts = append(parts, svc.Flag)
+		}
+	}
+
+	if sshEnabled && !cfg.ssh {
+		parts = append(parts, "--ssh")
+	}
+
+	if len(cfg.args) > 0 {
+		parts = append(parts, cfg.args...)
+	}
+
+	return strings.Join(parts, " ")
 }
 
 func parseArgs(args []string) config {

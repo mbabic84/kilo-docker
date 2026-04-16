@@ -58,6 +58,7 @@ func printHelp() {
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions cleanup -y -a", "Remove all exited sessions"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions recreate <name|index>", "Recreate a session (preserves volume, same flags)"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "networks", "List available Docker networks"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "playwright", "Recreate Playwright MCP container"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "backup [-f]", "Create backup of volume to tar.gz (auto-names with timestamp)"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "restore <file> [-f] [-v|--volume <name>]", "Restore volume from backup"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "init", "Reset configuration (remove volume)"))
@@ -80,6 +81,7 @@ func printHelp() {
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions recreate 1", "# recreate session with same flags"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker backup", "# create backup"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker restore backup.tar.gz", "# restore from backup"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker playwright", "# recreate Playwright MCP container"))
 
 	help := strings.Join([]string{
 		"Usage: kilo-docker [options] [services] [command] [args...]",
@@ -98,5 +100,36 @@ func printHelp() {
 		"",
 	}, "\n")
 
+	fmt.Fprintf(os.Stderr, "%s", help)
+}
+
+func printCommandHelp(command string) {
+	var help string
+	switch command {
+	case "playwright":
+		help = `Usage: kilo-docker playwright [options]
+
+Recreate the Playwright MCP container with the latest image.
+
+Options:
+  -v, --volume          Recreate the Playwright volume (deletes all data)
+  -y, --yes             Auto-confirm prompts
+
+This will:
+  - Ensure the shared network (kilo-shared) exists
+  - Ensure/validate the shared volume (kilo-playwright-output) exists
+  - Pull the latest mcr.microsoft.com/playwright/mcp image
+  - Start a new container with correct UID/GID
+
+The container runs on the kilo-shared network and uses the
+kilo-playwright-output volume for storing screenshots and output.
+
+Example:
+  kilo-docker playwright                # recreate container
+  kilo-docker playwright -v             # recreate container and volume
+`
+	default:
+		help = fmt.Sprintf("Unknown command: %s\nRun 'kilo-docker help' for usage.\n", command)
+	}
 	fmt.Fprintf(os.Stderr, "%s", help)
 }

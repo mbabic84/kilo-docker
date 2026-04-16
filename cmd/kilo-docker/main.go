@@ -48,6 +48,16 @@ import (
 func main() {
 	cfg := parseFlags()
 
+	// Handle --help flag
+	if cfg.help {
+		if cfg.command != "" {
+			printCommandHelp(cfg.command)
+		} else {
+			printHelp()
+		}
+		return
+	}
+
 	// Warn if running in non-interactive mode without -y flag
 	if !isTerminal() && !cfg.yes {
 		utils.LogWarn("[kilo-docker] Running in non-interactive mode (non-TTY). Use -y to auto-confirm prompts.\n")
@@ -74,6 +84,8 @@ func main() {
 		handleInit(cfg)
 	case "update-config":
 		handleUpdateConfig(cfg)
+	case "playwright":
+		handlePlaywright(cfg)
 	default:
 		runContainer(cfg)
 	}
@@ -83,6 +95,19 @@ func runContainer(cfg config) {
 	if !dockerDaemonRunning() {
 		utils.LogError("[kilo-docker] Docker daemon is not running.\n")
 		os.Exit(1)
+	}
+
+	// Ensure shared resources
+	if err := EnsureSharedNetwork(); err != nil {
+		utils.LogError("[kilo-docker] Failed to ensure shared network: %v\n", err)
+		os.Exit(1)
+	}
+
+	if cfg.playwright {
+		if err := EnsurePlaywrightVolume(); err != nil {
+			utils.LogError("[kilo-docker] Failed to ensure Playwright volume: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	pwd, _ := os.Getwd()
@@ -118,7 +143,7 @@ func runContainer(cfg config) {
 	if containerState == "running" {
 		currentFlags := serializeArgs(cfg, cfg.ssh)
 		storedFlags := getContainerLabel(containerName, "kilo.args")
-		if currentFlags != storedFlags {
+		if !argsMatch(currentFlags, storedFlags) {
 			utils.Log("[kilo-docker] Existing session uses different flags.\n", utils.WithOutput())
 			utils.Log("[kilo-docker]   Existing: %s\n", storedFlags, utils.WithOutput())
 			utils.Log("[kilo-docker]   Current:  %s\n", currentFlags, utils.WithOutput())
@@ -169,22 +194,18 @@ func runContainer(cfg config) {
 
 	dataVolume := resolveVolume(cfg)
 
-	playwrightNetwork := cfg.network
 	if cfg.playwright {
-		if err := startPlaywright(&playwrightNetwork); err != nil {
+		if err := startPlaywright(); err != nil {
 			utils.LogError("%v\n", err)
 			os.Exit(1)
 		}
-		defer cleanupPlaywright(playwrightNetwork)
+		defer cleanupPlaywright()
 	}
 
-	if cfg.networkFlag && cfg.network == "" && isTerminal() {
+	if cfg.networkFlag && len(cfg.networks) == 0 && isTerminal() {
 		if net, _ := selectNetwork(); net != "" {
-			cfg.network = net
+			cfg.networks = append(cfg.networks, net)
 		}
-	}
-	if cfg.playwright {
-		cfg.network = playwrightNetwork
 	}
 
 	if !cfg.once {
@@ -278,4 +299,54 @@ func confirmPrompt(message string, yes bool) bool {
 	var response string
 	_, _ = fmt.Scanln(&response)
 	return strings.ToLower(strings.TrimSpace(response)) == "y"
+}
+
+func handlePlaywright(cfg config) {
+	if !dockerDaemonRunning() {
+		utils.LogError("[kilo-docker] Docker daemon is not running.\n")
+		os.Exit(1)
+	}
+
+	// Ensure shared network
+	if err := EnsureSharedNetwork(); err != nil {
+		utils.LogError("[kilo-docker] Failed to ensure shared network: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Handle volume recreation
+	if cfg.playwrightRecreateVolume {
+		if !cfg.yes {
+			if !confirmPrompt("This will delete all data in the Playwright volume. Continue? [y/N]: ", false) {
+				utils.Log("[playwright] Cancelled.\n", utils.WithOutput())
+				return
+			}
+		}
+		utils.Log("[playwright] Removing existing volume...\n", utils.WithOutput())
+		_, _ = dockerRun("volume", "rm", PlaywrightVolumeName)
+	}
+
+	// Ensure volume (creates if removed, or validates existing)
+	if err := EnsurePlaywrightVolume(); err != nil {
+		utils.LogError("[kilo-docker] Failed to ensure Playwright volume: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Remove existing container if any
+	utils.Log("[playwright] Removing existing container if any...\n", utils.WithOutput())
+	_, _ = dockerRun("rm", "-f", SharedPlaywrightContainerName)
+
+	// Pull latest image
+	utils.Log("[playwright] Pulling latest Playwright MCP image...\n", utils.WithOutput())
+	if _, err := dockerRun("pull", "mcr.microsoft.com/playwright/mcp"); err != nil {
+		utils.LogError("[playwright] Failed to pull image: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Start the container with correct uid/gid
+	if err := startPlaywright(); err != nil {
+		utils.LogError("[playwright] Failed to start: %v\n", err)
+		os.Exit(1)
+	}
+
+	utils.Log("[playwright] Container '%s' is ready on network '%s'\n", SharedPlaywrightContainerName, SharedNetworkName, utils.WithOutput())
 }

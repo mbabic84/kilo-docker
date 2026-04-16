@@ -39,7 +39,10 @@ func getSessions() ([]session, error) {
 				s.Workspace = strings.TrimPrefix(label, "kilo.workspace=")
 			}
 			if strings.HasPrefix(label, "kilo.args=") {
-				s.Args = strings.TrimPrefix(label, "kilo.args=")
+				// Parse stored args to get network config for display
+				storedArgs := strings.TrimPrefix(label, "kilo.args=")
+				cfg := parseArgs(strings.Fields(storedArgs))
+				s.Args = serializeForDisplay(cfg, false)
 			}
 		}
 		sessions = append(sessions, s)

@@ -162,6 +162,20 @@ func runUserInit(remember bool) error {
 	utils.Log("[userinit] Installing user-scoped services\n")
 	_ = installUserServices(homeDir)
 
+	// Setup Playwright output symlink if enabled
+	if os.Getenv("PLAYWRIGHT_ENABLED") == "1" {
+		playwrightMount := "/mnt/playwright-output"
+		if _, err := os.Stat(playwrightMount); err == nil {
+			playwrightLink := filepath.Join(homeDir, ".playwright-mcp")
+			_ = os.Remove(playwrightLink)
+			if err := os.Symlink(playwrightMount, playwrightLink); err != nil {
+				utils.LogWarn("[userinit] failed to create playwright symlink: %v\n", err)
+			} else {
+				utils.Log("[userinit] Created playwright symlink: %s -> %s\n", playwrightLink, playwrightMount)
+			}
+		}
+	}
+
 	// Set HOME temporarily so GetKiloConfigDir() and token paths resolve correctly
 	savedHome := os.Getenv("HOME")
 	_ = os.Setenv("HOME", homeDir)

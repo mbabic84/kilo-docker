@@ -2,91 +2,79 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"strings"
 	"time"
+
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
-// startPlaywright pulls and starts the Playwright MCP sidecar container.
-// It creates a dedicated Docker network, waits up to 30 seconds for the
-// browser automation service to accept TCP connections on port 8931,
-// and logs any startup failures to stderr. The network pointer is updated
-// with the created network name.
-func startPlaywright(network *string) error {
+// startPlaywright ensures the shared Playwright MCP container is running.
+// It uses the shared network (kilo-shared) and shared volume (kilo-playwright-output).
+// The container is reused if already running.
+func startPlaywright() error {
 	playwrightImage := "mcr.microsoft.com/playwright/mcp"
-	playwrightContainer := "playwright-mcp"
-	pwd, _ := os.Getwd()
-	baseName := pwd[strings.LastIndex(pwd, "/")+1:]
 
-	if *network != "" {
-		return fmt.Errorf("--playwright and --network are mutually exclusive")
-	}
+	outputDir := PlaywrightMountPath
 
-	user, _ := exec.Command("whoami").Output()
-	*network = fmt.Sprintf("kilo-playwright-%s", strings.TrimSpace(string(user)))
+	state := dockerState(SharedPlaywrightContainerName)
+	switch state {
+	case "running":
+		utils.Log("[playwright] Reusing existing Playwright MCP container\n")
+	case "exited", "dead", "created":
+		utils.Log("[playwright] Starting stopped Playwright MCP container\n")
+		_, _ = dockerRun("start", SharedPlaywrightContainerName)
+	default:
+		utils.Log("[playwright] Pulling Playwright MCP image...\n", utils.WithOutput())
+		_, _ = dockerRun("pull", playwrightImage)
 
-	if _, err := dockerRun("network", "inspect", *network); err != nil {
-		_, _ = dockerRun("network", "create", *network)
-	}
+		_, _ = dockerRun("rm", "-f", SharedPlaywrightContainerName)
 
-	fmt.Fprintf(os.Stderr, "Pulling Playwright MCP image...\n")
-	_, _ = dockerRun("pull", playwrightImage)
-
-	_ = os.MkdirAll(".playwright-mcp", 0755)
-
-	_, _ = dockerRun("rm", "-f", playwrightContainer)
-
-	outputDir := fmt.Sprintf("/mnt/%s/.playwright-mcp", baseName)
-	_, err := dockerRunDetached("run", "-d", "--rm", "--init",
-		"--name", playwrightContainer,
-		"--network", *network,
-		"--entrypoint", "node",
-		"-v", fmt.Sprintf("%s:/mnt/%s", pwd, baseName),
-		playwrightImage,
-		"cli.js", "--headless", "--browser", "chromium", "--no-sandbox",
-		"--port", "8931", "--host", "0.0.0.0",
-		"--output-dir", outputDir,
-		"--allowed-hosts", "*",
-	)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(os.Stderr, "Waiting for Playwright MCP...")
-	for i := 1; i <= 30; i++ {
-		state := dockerState(playwrightContainer)
-		if state != "running" {
-			fmt.Fprintf(os.Stderr, " container stopped.\n")
-			_, _ = dockerRun("logs", playwrightContainer)
-			_, _ = dockerRun("rm", "-f", playwrightContainer)
-			_, _ = dockerRun("network", "rm", *network)
-			return fmt.Errorf("playwright MCP container exited unexpectedly")
+		// Run as default 'node' user (UID 1000) - Docker handles volume ownership
+		_, err := dockerRunDetached("run", "-d", "--rm", "--init",
+			"--name", SharedPlaywrightContainerName,
+			"--network", SharedNetworkName,
+			"-v", fmt.Sprintf("%s:%s", PlaywrightVolumeName, outputDir),
+			playwrightImage,
+			"--headless", "--browser", "chromium", "--no-sandbox",
+			"--port", "8931", "--host", "0.0.0.0",
+			"--output-dir", outputDir,
+			"--allowed-hosts", "*",
+		)
+		if err != nil {
+			return fmt.Errorf("failed to start Playwright container: %w", err)
 		}
 
-		ready, _ := dockerExec(playwrightContainer, "", "node", "-e",
-			"const net=require('net');const s=net.connect(8931,'127.0.0.1',()=>{s.destroy();process.exit(0)});s.on('error',()=>process.exit(1));s.setTimeout(2000,()=>{s.destroy();process.exit(1)})")
-		if ready != "" || dockerState(playwrightContainer) == "running" {
-			fmt.Fprintf(os.Stderr, " ready.\n")
-			break
-		}
+		utils.Log("[playwright] Waiting for Playwright MCP...\n", utils.WithOutput())
+		for i := 1; i <= 30; i++ {
+			state := dockerState(SharedPlaywrightContainerName)
+			if state != "running" {
+				utils.LogError("[playwright] container stopped.\n")
+				_, _ = dockerRun("logs", SharedPlaywrightContainerName)
+				return fmt.Errorf("playwright MCP container exited unexpectedly")
+			}
 
-		if i == 30 {
-			fmt.Fprintf(os.Stderr, " timeout.\n")
-			_, _ = dockerRun("logs", playwrightContainer)
-			_, _ = dockerRun("rm", "-f", playwrightContainer)
-			_, _ = dockerRun("network", "rm", *network)
-			return fmt.Errorf("playwright MCP did not become ready in 30s")
+			ready, _ := dockerExec(SharedPlaywrightContainerName, "", "node", "-e",
+				"const net=require('net');const s=net.connect(8931,'127.0.0.1',()=>{s.destroy();process.exit(0)});s.on('error',()=>process.exit(1));s.setTimeout(2000,()=>{s.destroy();process.exit(1)})")
+			if ready != "" || dockerState(SharedPlaywrightContainerName) == "running" {
+				utils.Log("[playwright] ready.\n", utils.WithOutput())
+				break
+			}
+
+			if i == 30 {
+				utils.LogError("[playwright] timeout.\n")
+				_, _ = dockerRun("logs", SharedPlaywrightContainerName)
+				return fmt.Errorf("playwright MCP did not become ready in 30s")
+			}
+			time.Sleep(time.Second)
+			utils.Log(".", utils.WithOutput())
 		}
-		time.Sleep(time.Second)
-		fmt.Fprintf(os.Stderr, ".")
 	}
 
 	return nil
 }
 
-// cleanupPlaywright removes the Playwright MCP container and its Docker network.
-func cleanupPlaywright(network string) {
-	_, _ = dockerRun("rm", "-f", "playwright-mcp")
-	_, _ = dockerRun("network", "rm", network)
+// cleanupPlaywright removes the Playwright MCP container (optional cleanup).
+// Since it's shared, we don't remove it by default - it persists for reuse.
+func cleanupPlaywright() {
+	// Don't remove the shared container - it persists for reuse
+	utils.Log("[playwright] Container %s kept running for future sessions\n", SharedPlaywrightContainerName, utils.WithOutput())
 }
