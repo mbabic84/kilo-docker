@@ -1,3 +1,13 @@
+## [3.0.0](https://github.com/mbabic84/kilo-docker/compare/v2.18.0...v3.0.0) (2026-04-16)
+
+### ⚠ BREAKING CHANGES
+
+* kilo containers now always attach to the implicit kilo-shared network, which can change behavior for existing sessions created with previous networking assumptions.
+
+### Features
+
+* add shared network and persistent Playwright runtime ([33cddca](https://github.com/mbabic84/kilo-docker/commit/33cddca4d23e85fae19f0adac7a6fc0038a0a95d))
+
 ## [2.18.0](https://github.com/mbabic84/kilo-docker/compare/v2.17.1...v2.18.0) (2026-04-16)
 
 ### Features
