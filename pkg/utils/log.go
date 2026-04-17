@@ -52,7 +52,12 @@ func logToFile(format string, args ...interface{}) {
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	msg := fmt.Sprintf(format, args...)
 	msg = strings.TrimRight(msg, "\n")
-	_, _ = fmt.Fprintf(f, "[%s] %s\n", timestamp, msg)
+
+	instanceID := os.Getenv("KILO_CONTAINER_NAME")
+	if instanceID == "" {
+		instanceID = "host"
+	}
+	_, _ = fmt.Fprintf(f, "[%s] [%s] %s\n", timestamp, instanceID, msg)
 }
 
 func Log(format string, args ...interface{}) {

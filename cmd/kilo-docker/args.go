@@ -135,6 +135,7 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 	}
 	args = append(args, "-e", "PAT_USERNAME="+username)
 	args = append(args, "-e", "PAT_HOSTNAME="+hostname)
+	args = append(args, "-e", "KILO_CONTAINER_NAME="+containerName)
 
 	return args
 }
