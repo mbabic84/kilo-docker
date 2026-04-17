@@ -1,3 +1,9 @@
+## [3.1.2](https://github.com/mbabic84/kilo-docker/compare/v3.1.1...v3.1.2) (2026-04-17)
+
+### Bug Fixes
+
+* hide default kilo-shared network in flag mismatch display ([8bca4ff](https://github.com/mbabic84/kilo-docker/commit/8bca4ff1f006a0c9a40e40f6b67ca249570440b6))
+
 ## [3.1.1](https://github.com/mbabic84/kilo-docker/compare/v3.1.0...v3.1.1) (2026-04-17)
 
 ### Bug Fixes
