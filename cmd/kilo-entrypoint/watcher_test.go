@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"path/filepath"
 	"testing"
 )
 
@@ -131,5 +132,40 @@ func TestParseInotifyEventsLongName(t *testing.T) {
 	}
 	if events[0].cookie != 42 {
 		t.Errorf("cookie = %d, want 42", events[0].cookie)
+	}
+}
+
+func TestCollectWatchDirsIncludesFileParents(t *testing.T) {
+	watchDirs := []string{"/tmp/config/rules", "/tmp/config/commands"}
+	watchFiles := []string{"/tmp/config/opencode.json", "/tmp/config/tools.json"}
+
+	got := collectWatchDirs(watchDirs, watchFiles)
+	want := []string{"/tmp/config/rules", "/tmp/config/commands", "/tmp/config"}
+
+	if len(got) != len(want) {
+		t.Fatalf("collectWatchDirs len=%d, want %d (got=%v)", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("collectWatchDirs[%d]=%q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestCollectWatchDirsDeduplicatesEntries(t *testing.T) {
+	parent := filepath.Join("/tmp", "config")
+	watchDirs := []string{filepath.Join(parent, "rules"), parent}
+	watchFiles := []string{filepath.Join(parent, "opencode.json")}
+
+	got := collectWatchDirs(watchDirs, watchFiles)
+	want := []string{filepath.Join(parent, "rules"), parent}
+
+	if len(got) != len(want) {
+		t.Fatalf("collectWatchDirs len=%d, want %d (got=%v)", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("collectWatchDirs[%d]=%q, want %q", i, got[i], want[i])
+		}
 	}
 }
