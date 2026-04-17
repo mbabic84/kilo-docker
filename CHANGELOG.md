@@ -1,3 +1,9 @@
+## [3.1.1](https://github.com/mbabic84/kilo-docker/compare/v3.1.0...v3.1.1) (2026-04-17)
+
+### Bug Fixes
+
+* add tzdata package to fix timezone sync with host ([9478148](https://github.com/mbabic84/kilo-docker/commit/947814827280c581a305f8bc14250aa45b7fd9dc))
+
 ## [3.1.0](https://github.com/mbabic84/kilo-docker/compare/v3.0.1...v3.1.0) (2026-04-17)
 
 ### Features
