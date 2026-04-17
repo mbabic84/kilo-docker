@@ -1,3 +1,9 @@
+## [3.0.1](https://github.com/mbabic84/kilo-docker/compare/v3.0.0...v3.0.1) (2026-04-17)
+
+### Bug Fixes
+
+* **ainstruct-sync:** watch parent dirs of whitelisted files for atomic replace ([e2734d5](https://github.com/mbabic84/kilo-docker/commit/e2734d58fbbe590e1c6166f0537cdb0895a0920d))
+
 ## [3.0.0](https://github.com/mbabic84/kilo-docker/compare/v2.18.0...v3.0.0) (2026-04-16)
 
 ### ⚠ BREAKING CHANGES
