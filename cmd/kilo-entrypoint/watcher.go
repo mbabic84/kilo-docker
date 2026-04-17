@@ -79,6 +79,29 @@ func shouldWatchDir(path string) bool {
 	return true
 }
 
+func collectWatchDirs(watchDirs, watchFiles []string) []string {
+	dirs := make([]string, 0, len(watchDirs)+len(watchFiles))
+	seen := make(map[string]struct{}, len(watchDirs)+len(watchFiles))
+	add := func(dir string) {
+		if dir == "" {
+			return
+		}
+		if _, ok := seen[dir]; ok {
+			return
+		}
+		seen[dir] = struct{}{}
+		dirs = append(dirs, dir)
+	}
+
+	for _, dir := range watchDirs {
+		add(dir)
+	}
+	for _, file := range watchFiles {
+		add(filepath.Dir(file))
+	}
+	return dirs
+}
+
 func runWatcher(ctx context.Context, s *Syncer) error {
 	fd, err := unix.InotifyInit1(unix.IN_CLOEXEC)
 	if err != nil {
@@ -88,7 +111,8 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 
 	watchDirs := s.syncedAbsDirs()
 	watchFiles := s.syncedAbsFiles()
-	for _, dir := range watchDirs {
+	watchRoots := collectWatchDirs(watchDirs, watchFiles)
+	for _, dir := range watchRoots {
 		_ = os.MkdirAll(dir, 0o755)
 	}
 
@@ -99,13 +123,18 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	// For files, this is the full file path.
 	wdToPath := make(map[int32]string)
 
+	watchedDirs := make(map[string]struct{})
 	addDirWatch := func(dir string) {
+		if _, ok := watchedDirs[dir]; ok {
+			return
+		}
 		wd, err := unix.InotifyAddWatch(fd, dir, watchMask)
 		if err != nil {
 			utils.Log("[ainstruct-sync] Failed to watch dir %s: %v\n", dir, err)
 			return
 		}
 		wdToPath[int32(wd)] = dir
+		watchedDirs[dir] = struct{}{}
 	}
 
 	addFileWatch := func(file string) {
@@ -118,7 +147,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	}
 
 	// Watch directories recursively
-	for _, dir := range watchDirs {
+	for _, dir := range watchRoots {
 		addDirWatch(dir)
 		_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
