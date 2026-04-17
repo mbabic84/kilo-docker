@@ -1,3 +1,9 @@
+## [3.1.0](https://github.com/mbabic84/kilo-docker/compare/v3.0.1...v3.1.0) (2026-04-17)
+
+### Features
+
+* **logs:** add instance identifier to shared log output ([2af8c2e](https://github.com/mbabic84/kilo-docker/commit/2af8c2efcdd35b039a58ef89dedf2c81da33cc8c))
+
 ## [3.0.1](https://github.com/mbabic84/kilo-docker/compare/v3.0.0...v3.0.1) (2026-04-17)
 
 ### Bug Fixes
