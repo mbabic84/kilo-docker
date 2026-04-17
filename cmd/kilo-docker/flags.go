@@ -288,3 +288,11 @@ func formatFlagHelp() string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+func serializeStoredArgs(storedArgs string) string {
+	if storedArgs == "" {
+		return ""
+	}
+	cfg := parseArgs(strings.Fields(storedArgs))
+	return serializeForDisplay(cfg, false)
+}

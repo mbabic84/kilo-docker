@@ -141,11 +141,12 @@ func runContainer(cfg config) {
 	utils.Log("[kilo-docker] cfg.remember=%v, rememberFlag=%q\n", cfg.remember, rememberFlag)
 
 	if containerState == "running" {
-		currentFlags := serializeArgs(cfg, cfg.ssh)
+		currentFlags := serializeForDisplay(cfg, cfg.ssh)
 		storedFlags := getContainerLabel(containerName, "kilo.args")
+		displayedStoredFlags := serializeStoredArgs(storedFlags)
 		if !argsMatch(currentFlags, storedFlags) {
 			utils.Log("[kilo-docker] Existing session uses different flags.\n", utils.WithOutput())
-			utils.Log("[kilo-docker]   Existing: %s\n", storedFlags, utils.WithOutput())
+			utils.Log("[kilo-docker]   Existing: %s\n", displayedStoredFlags, utils.WithOutput())
 			utils.Log("[kilo-docker]   Current:  %s\n", currentFlags, utils.WithOutput())
 			if cfg.yes || confirmPrompt("Recreate with new flags? [y/N]: ", cfg.yes) {
 				_, _ = dockerRun("rm", "-f", containerName)
