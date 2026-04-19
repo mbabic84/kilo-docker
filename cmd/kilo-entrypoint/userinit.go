@@ -130,22 +130,56 @@ func runUserInit(remember bool) error {
 
 	// Copy default config templates if user doesn't have them.
 	// Templates use 'template-' prefix to avoid being read as system configs.
-	hashFile := filepath.Join(homeDir, ".config/kilo/.ainstruct-hashes")
+	localKilo := filepath.Join(homeDir, ".config/kilo/kilo.jsonc")
 	localOpencode := filepath.Join(homeDir, ".config/kilo/opencode.json")
+	utils.Log("[userinit] config init: checking for kilo.jsonc at %s\n", localKilo)
 
-	if _, err := os.Stat(hashFile); os.IsNotExist(err) {
-		hasRemote, checkErr := checkRemoteHasOpencode(homeDir, userID)
-		if checkErr != nil {
-			utils.LogWarn("[userinit] opencode init: remote check failed (%v), falling back to template\n", checkErr)
-			copyFileIfMissing("/etc/kilo/template-opencode.json", localOpencode)
-		} else if hasRemote {
-			utils.Log("[userinit] opencode init: remote has opencode.json, will sync from remote\n")
+	if _, err := os.Stat(localKilo); os.IsNotExist(err) {
+		utils.Log("[userinit] config init: kilo.jsonc not found, checking for opencode.json migration\n")
+		// Try to migrate from opencode.json
+		if _, err := os.Stat(localOpencode); err == nil {
+			utils.Log("[userinit] config init: migrating opencode.json to kilo.jsonc\n")
+			data, err := os.ReadFile(localOpencode)
+			if err == nil {
+				if err := os.WriteFile(localKilo, data, 0644); err == nil {
+					utils.Log("[userinit] config init: migrated opencode.json → kilo.jsonc\n")
+					// Delete old opencode.json after successful migration
+					if err := os.Remove(localOpencode); err == nil {
+						utils.Log("[userinit] config init: deleted old opencode.json\n")
+						// Also delete from remote
+						if delErr := deleteRemoteOpencode(homeDir, userID); delErr != nil {
+							utils.LogWarn("[userinit] config init: remote delete failed: %v\n", delErr)
+						}
+					}
+				} else {
+					utils.LogWarn("[userinit] config init: migration failed: %v, falling back to template\n", err)
+					copyFileIfMissing("/etc/kilo/template-kilo.jsonc", localKilo)
+				}
+			} else {
+				utils.LogWarn("[userinit] config init: read opencode.json failed: %v, falling back to template\n", err)
+				copyFileIfMissing("/etc/kilo/template-kilo.jsonc", localKilo)
+			}
 		} else {
-			utils.Log("[userinit] opencode init: no remote opencode.json, copying template\n")
-			copyFileIfMissing("/etc/kilo/template-opencode.json", localOpencode)
+			hashFile := filepath.Join(homeDir, ".config/kilo/.ainstruct-hashes")
+			if _, err := os.Stat(hashFile); os.IsNotExist(err) {
+				utils.Log("[userinit] config init: no hash file - first time user\n")
+				hasRemote, checkErr := checkRemoteHasConfig(homeDir, userID)
+				if checkErr != nil {
+					utils.LogWarn("[userinit] config init: remote check failed (%v), falling back to template\n", checkErr)
+					copyFileIfMissing("/etc/kilo/template-kilo.jsonc", localKilo)
+				} else if hasRemote {
+					utils.Log("[userinit] config init: remote has kilo.jsonc, will sync from remote\n")
+				} else {
+					utils.Log("[userinit] config init: no remote kilo.jsonc, copying template\n")
+					copyFileIfMissing("/etc/kilo/template-kilo.jsonc", localKilo)
+				}
+			} else {
+				utils.Log("[userinit] config init: existing user (hash file found), copying template\n")
+				copyFileIfMissing("/etc/kilo/template-kilo.jsonc", localKilo)
+			}
 		}
 	} else {
-		utils.Log("[userinit] opencode init: existing user, skipping (hash cache found)\n")
+		utils.Log("[userinit] config init: kilo.jsonc exists, skipping\n")
 	}
 
 	copyFileIfMissing("/etc/zellij/template-config.kdl", filepath.Join(homeDir, ".config/zellij/config.kdl"))
@@ -668,8 +702,8 @@ func runMCPTokens() error {
 	return nil
 }
 
-func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
-	utils.Log("[userinit] checkRemote: Checking remote for opencode.json (first-time init)\n")
+func checkRemoteHasConfig(homeDir, userID string) (bool, error) {
+	utils.Log("[userinit] checkRemote: Checking remote for kilo.jsonc (first time init)\n")
 
 	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
 	encData, err := os.ReadFile(encPath)
@@ -780,14 +814,138 @@ func checkRemoteHasOpencode(homeDir, userID string) (bool, error) {
 	_ = resp.Body.Close()
 
 	for _, d := range docsResult.Documents {
-		if d.Metadata.LocalPath == "opencode.json" {
-			utils.Log("[userinit] checkRemote: found opencode.json in remote collection\n")
+		if d.Metadata.LocalPath == "kilo.jsonc" || d.Metadata.LocalPath == "kilo.json" {
+			utils.Log("[userinit] checkRemote: found %s in remote collection\n", d.Metadata.LocalPath)
 			return true, nil
 		}
 	}
 
-	utils.Log("[userinit] checkRemote: no opencode.json in remote collection\n")
+	utils.Log("[userinit] checkRemote: no kilo.jsonc/kilo.json in remote collection\n")
 	return false, nil
+}
+
+// deleteRemoteOpencode deletes opencode.json from the remote ainstruct collection.
+// Called after successful migration to kilo.jsonc to clean up old config.
+func deleteRemoteOpencode(homeDir, userID string) error {
+	utils.Log("[userinit] deleteRemote: Checking for old opencode.json in remote\n")
+
+	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
+	encData, err := os.ReadFile(encPath)
+	if err != nil {
+		utils.LogWarn("[userinit] deleteRemote: no encrypted tokens: %v\n", err)
+		return err
+	}
+
+	decrypted, err := decryptAES(encData, userID)
+	if err != nil {
+		utils.LogWarn("[userinit] deleteRemote: decrypt failed: %v\n", err)
+		return err
+	}
+
+	_, _, syncToken, _, _, _ := parseTokenEnv(string(decrypted))
+	if syncToken == "" {
+		return fmt.Errorf("no sync token")
+	}
+
+	baseURL := os.Getenv("KD_AINSTRUCT_BASE_URL")
+	if baseURL == "" {
+		baseURL = constants.AinstructBaseURL
+	}
+
+	collectionsURL := baseURL + "/api/v1/collections"
+	req, err := http.NewRequest("GET", collectionsURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+syncToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("collections API returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Collections []struct {
+			CollectionID string `json:"collection_id"`
+			Name         string `json:"name"`
+		} `json:"collections"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return err
+	}
+
+	var collectionID string
+	for _, c := range result.Collections {
+		if c.Name == "kilo-docker" {
+			collectionID = c.CollectionID
+			break
+		}
+	}
+
+	if collectionID == "" {
+		return nil
+	}
+
+	docsURL := baseURL + "/api/v1/documents?collection_id=" + collectionID
+	req, err = http.NewRequest("GET", docsURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+syncToken)
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("documents API returned %d", resp.StatusCode)
+	}
+
+	var docsResult struct {
+		Documents []struct {
+			DocumentID string `json:"document_id"`
+			Metadata  struct {
+				LocalPath string `json:"local_path"`
+			} `json:"metadata"`
+		} `json:"documents"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&docsResult); err != nil {
+		return err
+	}
+
+	for _, d := range docsResult.Documents {
+		if d.Metadata.LocalPath == "opencode.json" {
+			utils.Log("[userinit] deleteRemote: deleting opencode.json from remote\n")
+			deleteURL := baseURL + "/api/v1/documents/" + d.DocumentID
+			req, err = http.NewRequest("DELETE", deleteURL, nil)
+			if err != nil {
+				return err
+			}
+			req.Header.Set("Authorization", "Bearer "+syncToken)
+
+			resp, err = client.Do(req)
+			if err != nil {
+				utils.LogWarn("[userinit] deleteRemote: delete failed: %v\n", err)
+				return err
+			}
+			resp.Body.Close()
+			utils.Log("[userinit] deleteRemote: deleted opencode.json from remote\n")
+			return nil
+		}
+	}
+
+	utils.Log("[userinit] deleteRemote: no opencode.json found in remote\n")
+	return nil
 }
 
 func maskToken(token string) string {

@@ -56,7 +56,8 @@ func documentType(path string) string {
 // whitelisted for sync. Only files matching these paths are watched, pulled,
 // and pushed. Directories are synced recursively. Everything else is ignored.
 var defaultSyncPaths = []string{
-	"opencode.json",
+	"kilo.json",
+	"kilo.jsonc",
 	"rules",
 	"commands",
 	"agents",

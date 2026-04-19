@@ -32,7 +32,7 @@ RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client
 # Templates for initial user configs - use 'template-' prefix to avoid
 # being read as system configs (which would override user settings).
 COPY configs/zellij.kdl /etc/zellij/template-config.kdl
-COPY configs/opencode.json /etc/kilo/template-opencode.json
+COPY configs/kilo.jsonc /etc/kilo/template-kilo.jsonc
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo-real
 COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
 COPY scripts/kilo-wrapper.sh /usr/local/bin/kilo

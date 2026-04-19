@@ -211,7 +211,8 @@ func TestIsSyncedPath(t *testing.T) {
 		want bool
 	}{
 		// Whitelisted files
-		{"opencode.json", true},
+		{"kilo.json", true},
+		{"kilo.jsonc", true},
 		// Whitelisted directories (root)
 		{"rules", true},
 		{"commands", true},
