@@ -1,3 +1,13 @@
+## [3.3.0](https://github.com/mbabic84/kilo-docker/compare/v3.2.0...v3.3.0) (2026-04-19)
+
+### Features
+
+* migrate config from opencode.json to kilo.jsonc ([77449cd](https://github.com/mbabic84/kilo-docker/commit/77449cd59e686f7d2b962a583c3552591b83a785))
+
+### Bug Fixes
+
+* update tests for kilo.jsonc sync paths ([11f6fdd](https://github.com/mbabic84/kilo-docker/commit/11f6fdd80ccba94da5c1b8fa2fdd9dbf70f70c11))
+
 ## [3.2.0](https://github.com/mbabic84/kilo-docker/compare/v3.1.2...v3.2.0) (2026-04-18)
 
 ### Features
