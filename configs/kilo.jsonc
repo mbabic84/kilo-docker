@@ -28,9 +28,6 @@
     "~/.config/kilo/rules/*.md"
   ],
   "permission": {
-    "*": "ask",
-    "ainstruct_*": "allow",
-    "context7_*": "allow",
-    "playwright_*": "allow"
+    "*": "ask"
   }
 }
