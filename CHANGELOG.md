@@ -1,3 +1,9 @@
+## [3.3.1](https://github.com/mbabic84/kilo-docker/compare/v3.3.0...v3.3.1) (2026-04-19)
+
+### Bug Fixes
+
+* make MCP tools default to ask not allow\n\nRemove broad allow rules for MCP namespaces (ainstruct_*, context7_*, playwright_*). Global "*": "ask" now covers all tools including MCP, ensuring confirmation prompts for MCP operations by default. Safer default behavior.\n\nNo other permission changes. ([f06f144](https://github.com/mbabic84/kilo-docker/commit/f06f1446fbd17061443b409cc7ac9dcaa6251f9c))
+
 ## [3.3.0](https://github.com/mbabic84/kilo-docker/compare/v3.2.0...v3.3.0) (2026-04-19)
 
 ### Features
