@@ -108,7 +108,11 @@ func selectNetwork() (string, error) {
 }
 
 // listNetworks prints all Docker network names to stdout.
-func listNetworks() error {
+func listNetworks(cfg config) error {
+	if cfg.help {
+		printCommandHelp("networks")
+		return nil
+	}
 	cmd := exec.Command("docker", "network", "ls", "--format", "{{.Name}}")
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
