@@ -51,7 +51,13 @@ func main() {
 	// Handle --help flag
 	if cfg.help {
 		if cfg.command != "" {
-			printCommandHelp(cfg.command)
+			if cfg.command == "sessions" && len(cfg.args) > 0 {
+				printCommandHelp(cfg.command + " " + cfg.args[0])
+			} else if cfg.command == "update" && len(cfg.args) > 0 {
+				printCommandHelp(cfg.command + " " + cfg.args[0])
+			} else {
+				printCommandHelp(cfg.command)
+			}
 		} else {
 			printHelp()
 		}
@@ -65,25 +71,33 @@ func main() {
 
 	switch cfg.command {
 	case "help":
-		printHelp()
+		if len(cfg.args) > 0 {
+			if cfg.args[0] == "sessions" && len(cfg.args) > 1 {
+				printCommandHelp(cfg.args[0] + " " + cfg.args[1])
+			} else if cfg.args[0] == "update" && len(cfg.args) > 1 {
+				printCommandHelp(cfg.args[0] + " " + cfg.args[1])
+			} else {
+				printCommandHelp(cfg.args[0])
+			}
+		} else {
+			printHelp()
+		}
 	case "version":
 		printVersion()
 	case "networks":
-		_ = listNetworks()
+		_ = listNetworks(cfg)
 	case "sessions":
 		handleSessions(cfg)
 	case "update":
-		handleUpdate()
+		handleUpdate(cfg)
 	case "cleanup":
-		handleCleanup(cfg.yes)
+		handleCleanup(cfg)
 	case "backup":
 		handleBackup(cfg)
 	case "restore":
 		handleRestore(cfg)
 	case "init":
 		handleInit(cfg)
-	case "update-config":
-		handleUpdateConfig(cfg)
 	case "playwright":
 		handlePlaywright(cfg)
 	default:
@@ -303,6 +317,10 @@ func confirmPrompt(message string, yes bool) bool {
 }
 
 func handlePlaywright(cfg config) {
+	if cfg.help {
+		printCommandHelp("playwright")
+		return
+	}
 	if !dockerDaemonRunning() {
 		utils.LogError("[kilo-docker] Docker daemon is not running.\n")
 		os.Exit(1)

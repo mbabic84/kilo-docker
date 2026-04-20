@@ -10,6 +10,10 @@ import (
 
 // handleBackup creates a gzipped tar backup of the data volume.
 func handleBackup(cfg config) {
+	if cfg.help {
+		printCommandHelp("backup")
+		return
+	}
 	args := cfg.args
 	backupFile := ""
 	forceBackup := false
@@ -69,6 +73,10 @@ func handleBackup(cfg config) {
 
 // handleRestore restores a tar.gz backup into the data volume.
 func handleRestore(cfg config) {
+	if cfg.help {
+		printCommandHelp("restore")
+		return
+	}
 	args := cfg.args
 	backupFile := ""
 	forceRestore := false

@@ -52,20 +52,15 @@ func printHelp() {
 	}
 
 	var cmdLines []string
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions [name|index]", "List sessions or attach to one"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions cleanup [-y]", "Remove a session (interactive selection)"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions cleanup [-y] <name|index>", "Remove a session by name or index"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions cleanup -y -a", "Remove all exited sessions"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions recreate <name|index>", "Recreate a session (preserves volume, same flags)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions", "Manage sessions (use sessions -h for subcommands)"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "networks", "List available Docker networks"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "playwright", "Recreate Playwright MCP container"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "backup [-f]", "Create backup of volume to tar.gz (auto-names with timestamp)"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "restore <file> [-f] [-v|--volume <name>]", "Restore volume from backup"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "init", "Reset configuration (remove volume)"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "cleanup", "Remove volume, containers, images, and installed binary"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "update", "Pull the latest Docker image and update the binary"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "update-config", "Download latest opencode.json template and merge with existing config"))
-	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "version", "Show kilo-docker and kilo versions"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "backup", "Create backup of volume"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "restore", "Restore volume from backup"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "init", "Reset configuration"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "cleanup", "Remove all artifacts"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "update", "Update binary and/or config (use update -h for subcommands)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "version", "Show versions"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "help", "Show this help message"))
 
 	var optLines []string
@@ -78,10 +73,9 @@ func printHelp() {
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --ssh", "# with SSH agent forwarding"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker -p 8080:8080 -p 3000:3000", "# with port mappings"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions", "# list all sessions"))
-	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions recreate 1", "# recreate session with same flags"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions -h", "# see sessions help"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker backup", "# create backup"))
-	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker restore backup.tar.gz", "# restore from backup"))
-	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker playwright", "# recreate Playwright MCP container"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker restore -h", "# see restore help"))
 
 	help := strings.Join([]string{
 		"Usage: kilo-docker [options] [services] [command] [args...]",
@@ -98,6 +92,7 @@ func printHelp() {
 		"Examples:",
 		strings.Join(exLines, "\n"),
 		"",
+		"Use 'kilo-docker <command> -h' for more details about a command.",
 	}, "\n")
 
 	fmt.Fprintf(os.Stderr, "%s", help)
@@ -106,6 +101,68 @@ func printHelp() {
 func printCommandHelp(command string) {
 	var help string
 	switch command {
+	case "sessions":
+		help = `Usage: kilo-docker sessions [command] [options]
+
+List sessions or attach to one.
+
+Commands:
+  (no command)          List all sessions and attach interactively
+  cleanup               Remove sessions
+  recreate              Recreate a session with the same flags
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-docker sessions                          # list sessions
+  kilo-docker sessions -h                       # show this help
+`
+	case "sessions cleanup":
+		help = `Usage: kilo-docker sessions cleanup [options] [name|index]
+
+Remove one or more sessions.
+
+Options:
+  -a, --all             Remove all exited sessions
+  -y, --yes             Skip confirmation prompts
+  -h, --help            Show this help message
+
+Without flags, shows interactive selection.
+With -a, prompts for each session (or skips if -y is set).
+
+Examples:
+  kilo-docker sessions cleanup                  # interactive selection
+  kilo-docker sessions cleanup 1                # remove session 1
+  kilo-docker sessions cleanup -a              # remove all exited (with prompt)
+  kilo-docker sessions cleanup -a -y            # remove all exited (no prompt)
+  kilo-docker sessions cleanup -h              # show this help
+`
+	case "sessions recreate":
+		help = `Usage: kilo-docker sessions recreate <name|index>
+
+Recreate a session with the same configuration.
+
+This removes the old container but preserves the volume,
+then starts a fresh container with the same flags.
+
+Examples:
+  kilo-docker sessions recreate 1               # recreate session 1
+  kilo-docker sessions recreate my-session     # recreate by name
+  kilo-docker sessions recreate -h             # show this help
+`
+	case "networks":
+		help = `Usage: kilo-docker networks
+
+List available Docker networks.
+
+Shows all Docker networks on the host, including the
+kilo-shared network used by kilo-docker services.
+
+Examples:
+  kilo-docker networks
+  kilo-docker networks -h
+`
 	case "playwright":
 		help = `Usage: kilo-docker playwright [options]
 
@@ -114,6 +171,7 @@ Recreate the Playwright MCP container with the latest image.
 Options:
   -v, --volume          Recreate the Playwright volume (deletes all data)
   -y, --yes             Auto-confirm prompts
+  -h, --help            Show this help message
 
 This will:
   - Ensure the shared network (kilo-shared) exists
@@ -124,9 +182,137 @@ This will:
 The container runs on the kilo-shared network and uses the
 kilo-playwright-output volume for storing screenshots and output.
 
-Example:
+Examples:
   kilo-docker playwright                # recreate container
   kilo-docker playwright -v             # recreate container and volume
+  kilo-docker playwright -h            # show this help
+`
+	case "backup":
+		help = `Usage: kilo-docker backup [options]
+
+Create a backup of the kilo-docker volume.
+
+Options:
+  -f, --force             Overwrite existing backup file
+  -h, --help              Show this help message
+
+Creates a tar.gz archive of the volume data. By default,
+auto-generates a timestamped filename.
+
+Examples:
+  kilo-docker backup                     # backup with auto-generated name
+  kilo-docker backup -f my-backup.tar.gz # backup to specific file
+  kilo-docker backup -h                  # show this help
+`
+	case "restore":
+		help = `Usage: kilo-docker restore <file> [options]
+
+Restore kilo-docker volume from a backup.
+
+Arguments:
+  <file>                 Path to the backup tar.gz file
+
+Options:
+  -f, --force            Overwrite existing data
+  -v, --volume <name>    Restore to a specific volume (default: kilo-docker-data)
+  -h, --help            Show this help message
+
+Examples:
+  kilo-docker restore backup.tar.gz
+  kilo-docker restore backup.tar.gz -f
+  kilo-docker restore backup.tar.gz -v my-volume
+  kilo-docker restore -h
+`
+	case "init":
+		help = `Usage: kilo-docker init [options]
+
+Reset configuration by removing the volume.
+
+WARNING: This deletes all data in the kilo-docker volume.
+
+Options:
+  -y, --yes             Skip confirmation
+  -h, --help            Show this help message
+
+Examples:
+  kilo-docker init
+  kilo-docker init -y
+  kilo-docker init -h
+`
+	case "cleanup":
+		help = `Usage: kilo-docker cleanup [options]
+
+Remove all kilo-docker artifacts from the system.
+
+WARNING: This removes:
+  - The kilo-docker-data volume
+  - All kilo-docker containers
+  - The kilo-docker image
+  - The kilo-docker binary
+
+Options:
+  -y, --yes             Skip confirmation
+  -h, --help            Show this help message
+
+Examples:
+  kilo-docker cleanup
+  kilo-docker cleanup -y
+  kilo-docker cleanup -h
+`
+	case "update":
+		help = `Usage: kilo-docker update [command]
+
+Update kilo-docker binary and/or merge configuration.
+
+Commands:
+  (no command)          Pull latest Docker image and update binary
+  config                Download latest opencode.json and merge with existing
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-docker update                    # update binary
+  kilo-docker update -h                 # show this help
+  kilo-docker update config             # merge config
+  kilo-docker update config -h          # see config options
+`
+	case "update config":
+		help = `Usage: kilo-docker update config
+
+Download the latest opencode.json template and merge with existing config.
+
+This will pull the latest configuration template from the repository
+and merge it with your existing config in the volume.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-docker update config
+  kilo-docker update config -h
+`
+	case "version":
+		help = `Usage: kilo-docker version
+
+Show kilo-docker and kilo versions.
+
+Examples:
+  kilo-docker version
+  kilo-docker version -h
+`
+	case "help":
+		help = `Usage: kilo-docker help [command]
+
+Show help for kilo-docker commands.
+
+Arguments:
+  [command]             Optional command to get help for
+
+Examples:
+  kilo-docker help
+  kilo-docker help sessions
+  kilo-docker help sessions cleanup
 `
 	default:
 		help = fmt.Sprintf("Unknown command: %s\nRun 'kilo-docker help' for usage.\n", command)

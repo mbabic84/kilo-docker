@@ -81,7 +81,26 @@ func getOSArch() (osName, arch string) {
 
 // handleUpdate downloads the latest kilo-docker binary from GitHub releases
 // and pulls the latest Docker image.
-func handleUpdate() {
+func handleUpdate(cfg config) {
+	if cfg.help {
+		if len(cfg.args) > 0 && cfg.args[0] == "config" {
+			printCommandHelp("update config")
+			return
+		}
+		printCommandHelp("update")
+		return
+	}
+
+	if len(cfg.args) > 0 && cfg.args[0] == "config" {
+		handleUpdateConfig(cfg)
+		return
+	}
+
+	if len(cfg.args) > 0 && cfg.args[0] != "config" {
+		fmt.Fprintf(os.Stderr, "Unknown subcommand: %s\nRun 'kilo-docker update -h' for usage.\n", cfg.args[0])
+		os.Exit(1)
+	}
+
 	home, _ := os.UserHomeDir()
 	target := filepath.Join(home, ".local", "bin", "kilo-docker")
 
@@ -148,8 +167,12 @@ func handleUpdate() {
 
 // handleCleanup removes all kilo-docker artifacts: containers, volumes,
 // Docker images, and the installed script.
-func handleCleanup(yes bool) {
-	if !promptConfirm("Remove volume, containers, and images for kilo-docker? [y/N]: ", yes) {
+func handleCleanup(cfg config) {
+	if cfg.help {
+		printCommandHelp("cleanup")
+		return
+	}
+	if !promptConfirm("Remove volume, containers, and images for kilo-docker? [y/N]: ", cfg.yes) {
 		utils.Log("[kilo-docker] Aborted.\n", utils.WithOutput())
 		return
 	}
@@ -180,6 +203,10 @@ func handleCleanup(yes bool) {
 
 // handleInit resets the data volume, prompting for confirmation.
 func handleInit(cfg config) {
+	if cfg.help {
+		printCommandHelp("init")
+		return
+	}
 	dataVolume := resolveVolume(cfg)
 	if dataVolume == "" {
 		utils.Log("[kilo-docker] Nothing to reset in --once mode.\n", utils.WithOutput())
@@ -199,6 +226,10 @@ func handleInit(cfg config) {
 // handleUpdateConfig downloads the latest opencode.json template and
 // merges it with the existing config in the volume.
 func handleUpdateConfig(cfg config) {
+	if cfg.help {
+		printCommandHelp("update config")
+		return
+	}
 	dataVolume := resolveVolume(cfg)
 	if dataVolume == "" {
 		utils.Log("[kilo-docker] Nothing to update in --once mode.\n", utils.WithOutput())
