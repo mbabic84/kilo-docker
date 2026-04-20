@@ -1,3 +1,9 @@
+## [3.3.2](https://github.com/mbabic84/kilo-docker/compare/v3.3.1...v3.3.2) (2026-04-20)
+
+### Bug Fixes
+
+* require confirmation before bulk session cleanup ([97877bd](https://github.com/mbabic84/kilo-docker/commit/97877bdefc9c76da3602e47adc62a8c95144d2a7))
+
 ## [3.3.1](https://github.com/mbabic84/kilo-docker/compare/v3.3.0...v3.3.1) (2026-04-19)
 
 ### Bug Fixes
