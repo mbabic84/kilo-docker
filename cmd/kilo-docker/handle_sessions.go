@@ -18,15 +18,29 @@ func handleSessions(cfg config) {
 	recreateMode := false
 	attachTarget := ""
 
+	if cfg.help {
+		if len(args) > 0 && args[0] == "cleanup" {
+			printCommandHelp("sessions cleanup")
+			return
+		}
+		if len(args) > 0 && args[0] == "recreate" {
+			printCommandHelp("sessions recreate")
+			return
+		}
+		printCommandHelp("sessions")
+		return
+	}
+
 	if len(args) > 0 && args[0] == "cleanup" {
 		cleanupMode = true
 		args = args[1:]
-		for len(args) > 0 && (args[0] == "-y" || args[0] == "--yes" || args[0] == "-a" || args[0] == "--all") {
-			switch args[0] {
-			case "-y", "--yes":
+		for len(args) > 0 {
+			if args[0] == "-y" || args[0] == "--yes" {
 				cleanupYes = true
-			case "-a", "--all":
+			} else if args[0] == "-a" || args[0] == "--all" {
 				cleanupAll = true
+			} else {
+				break
 			}
 			args = args[1:]
 		}
@@ -110,16 +124,16 @@ func handleSessions(cfg config) {
 
 	if cleanupMode {
 		if cleanupAll {
-			removed := 0
 			for _, s := range sessions {
-				if dockerState(s.Name) == "exited" {
+				if dockerState(s.Name) != "exited" {
+					continue
+				}
+				if cleanupYes || promptConfirm("Remove session '"+s.Name+"'? [y/N]: ", cleanupYes) {
 					_, _ = dockerRun("rm", "-f", s.Name)
 					fmt.Fprintf(os.Stderr, "Session '%s' removed.\n", s.Name)
-					removed++
+				} else {
+					fmt.Fprintf(os.Stderr, "Skipped '%s'.\n", s.Name)
 				}
-			}
-			if removed == 0 {
-				fmt.Fprintf(os.Stderr, "No exited sessions to clean up.\n")
 			}
 			return
 		}
