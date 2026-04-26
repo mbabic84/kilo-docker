@@ -112,20 +112,20 @@ func runUserInit(remember bool) error {
 
 	// Create home directory and config structure
 	utils.Log("[userinit] Creating home directory: %s\n", homeDir)
-	_ = os.MkdirAll(homeDir, 0755)
-	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/commands"), 0755)
-	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/agents"), 0755)
-	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/plugins"), 0755)
-	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/skills"), 0755)
-	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/tools"), 0755)
-	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/rules"), 0755)
-	_ = os.MkdirAll(filepath.Join(homeDir, ".local/share/kilo"), 0755)
+	_ = os.MkdirAll(homeDir, 0o700)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/commands"), 0o700)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/agents"), 0o700)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/plugins"), 0o700)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/skills"), 0o700)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/tools"), 0o700)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/rules"), 0o700)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".local/share/kilo"), 0o700)
 	_ = os.MkdirAll(filepath.Join(homeDir, ".ssh"), 0700)
 
 	// Create .bashrc if missing
 	bashrc := filepath.Join(homeDir, ".bashrc")
 	if _, err := os.Stat(bashrc); os.IsNotExist(err) {
-		_ = os.WriteFile(bashrc, []byte("# ~/.bashrc\n"), 0644)
+		_ = os.WriteFile(bashrc, []byte("# ~/.bashrc\n"), 0o600)
 	}
 
 	// Copy default config templates if user doesn't have them.
@@ -141,7 +141,7 @@ func runUserInit(remember bool) error {
 			utils.Log("[userinit] config init: migrating opencode.json to kilo.jsonc\n")
 			data, err := os.ReadFile(localOpencode)
 			if err == nil {
-				if err := os.WriteFile(localKilo, data, 0644); err == nil {
+				if err := os.WriteFile(localKilo, data, 0o600); err == nil {
 					utils.Log("[userinit] config init: migrated opencode.json → kilo.jsonc\n")
 					// Delete old opencode.json after successful migration
 					if err := os.Remove(localOpencode); err == nil {
@@ -231,7 +231,7 @@ func runUserInit(remember bool) error {
 
 	// Mark initialized
 	utils.Log("[userinit] Marking container as initialized: %s\n", initMarker)
-	_ = os.WriteFile(initMarker, []byte("1\n"), 0644)
+	_ = os.WriteFile(initMarker, []byte("1\n"), 0o600)
 
 	// Persist user configuration for re-attach
 	// Store info in a file on the volume so it survives container restarts
@@ -249,7 +249,7 @@ func runUserInit(remember bool) error {
 		userConfig["shell"] = "/bin/sh"
 	}
 	configJSON, _ := json.Marshal(userConfig)
-	if err := os.WriteFile(userConfigPath, configJSON, 0644); err != nil {
+	if err := os.WriteFile(userConfigPath, configJSON, 0o600); err != nil {
 		utils.LogWarn("[userinit] failed to save user config: %v\n", err)
 	} else {
 		redactedConfig := map[string]string{
@@ -329,8 +329,8 @@ func copyFileIfMissing(src, dst string) {
 	if err != nil {
 		return
 	}
-	_ = os.MkdirAll(filepath.Dir(dst), 0755)
-	_ = os.WriteFile(dst, data, 0644)
+	_ = os.MkdirAll(filepath.Dir(dst), 0o700)
+	_ = os.WriteFile(dst, data, 0o600)
 	utils.Log("[userinit] Copied %s\n", filepath.Base(src))
 }
 
@@ -864,7 +864,7 @@ func deleteRemoteOpencode(homeDir, userID string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("collections API returned %d", resp.StatusCode)
@@ -904,7 +904,7 @@ func deleteRemoteOpencode(homeDir, userID string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("documents API returned %d", resp.StatusCode)
@@ -938,7 +938,7 @@ func deleteRemoteOpencode(homeDir, userID string) error {
 				utils.LogWarn("[userinit] deleteRemote: delete failed: %v\n", err)
 				return err
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			utils.Log("[userinit] deleteRemote: deleted opencode.json from remote\n")
 			return nil
 		}

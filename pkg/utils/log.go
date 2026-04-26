@@ -1,3 +1,4 @@
+// Package utils contains shared helpers used by the host and entrypoint CLIs.
 package utils
 
 import (
@@ -28,7 +29,7 @@ func getLogFile() *lumberjack.Logger {
 	logFileOnce.Do(func() {
 		logDir := constants.GetKiloConfigDir()
 		logSubDir := filepath.Join(logDir, "logs")
-		if err := os.MkdirAll(logSubDir, 0o755); err != nil {
+		if err := os.MkdirAll(logSubDir, 0o700); err != nil {
 			return
 		}
 		logFile = &lumberjack.Logger{
@@ -61,15 +62,7 @@ func logToFile(format string, args ...interface{}) {
 }
 
 func Log(format string, args ...interface{}) {
-	output := false
-	logArgs := make([]interface{}, 0, len(args))
-	for _, arg := range args {
-		if opt, ok := arg.(LogOpt); ok {
-			opt(&output)
-		} else {
-			logArgs = append(logArgs, arg)
-		}
-	}
+	output, logArgs := splitLogArgs(args...)
 
 	var msg string
 	if len(logArgs) > 0 {
@@ -84,29 +77,14 @@ func Log(format string, args ...interface{}) {
 }
 
 func LogError(format string, args ...interface{}) {
-	output := false
-	logArgs := make([]interface{}, 0, len(args))
-	for _, arg := range args {
-		if opt, ok := arg.(LogOpt); ok {
-			opt(&output)
-		} else {
-			logArgs = append(logArgs, arg)
-		}
-	}
-
-	var msg string
-	if len(logArgs) > 0 {
-		msg = fmt.Sprintf("Error: "+format, logArgs...)
-	} else {
-		msg = fmt.Sprintf("Error: %s", format)
-	}
-	if output {
-		fmt.Fprint(os.Stderr, msg)
-	}
-	logToFile("[ERROR] "+format, logArgs...)
+	logWithPrefix("Error: ", "[ERROR] ", format, args...)
 }
 
 func LogWarn(format string, args ...interface{}) {
+	logWithPrefix("Warning: ", "[WARN] ", format, args...)
+}
+
+func splitLogArgs(args ...interface{}) (bool, []interface{}) {
 	output := false
 	logArgs := make([]interface{}, 0, len(args))
 	for _, arg := range args {
@@ -116,15 +94,20 @@ func LogWarn(format string, args ...interface{}) {
 			logArgs = append(logArgs, arg)
 		}
 	}
+	return output, logArgs
+}
+
+func logWithPrefix(userPrefix, filePrefix, format string, args ...interface{}) {
+	output, logArgs := splitLogArgs(args...)
 
 	var msg string
 	if len(logArgs) > 0 {
-		msg = fmt.Sprintf("Warning: "+format, logArgs...)
+		msg = fmt.Sprintf(userPrefix+format, logArgs...)
 	} else {
-		msg = fmt.Sprintf("Warning: %s", format)
+		msg = fmt.Sprintf("%s%s", userPrefix, format)
 	}
 	if output {
 		fmt.Fprint(os.Stderr, msg)
 	}
-	logToFile("[WARN] "+format, logArgs...)
+	logToFile(filePrefix+format, logArgs...)
 }

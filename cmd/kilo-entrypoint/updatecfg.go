@@ -53,7 +53,7 @@ func runUpdateConfig() error {
 		merged := mergeJSON(template, existing)
 		out, _ := json.MarshalIndent(merged, "", "  ")
 		tmpPath := configPath + ".tmp"
-		if err := os.WriteFile(tmpPath, out, 0644); err != nil {
+		if err := os.WriteFile(tmpPath, out, 0o600); err != nil {
 			return err
 		}
 		if err := os.Rename(tmpPath, configPath); err != nil {
@@ -61,10 +61,10 @@ func runUpdateConfig() error {
 		}
 		utils.Log("[updatecfg] Config merged. Existing customizations preserved, new servers added.\n")
 	} else {
-		if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(configPath), 0o700); err != nil {
 			return err
 		}
-		if err := os.WriteFile(configPath, templateData, 0644); err != nil {
+		if err := os.WriteFile(configPath, templateData, 0o600); err != nil {
 			return err
 		}
 		utils.Log("[updatecfg] Config created from template.\n")

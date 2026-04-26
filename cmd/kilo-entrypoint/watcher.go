@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,17 +41,22 @@ func parseInotifyEvents(buf []byte, n int) []inotifyEvent {
 		if offset+16 > n {
 			break
 		}
-		wd := int32(buf[offset]) | int32(buf[offset+1])<<8 | int32(buf[offset+2])<<16 | int32(buf[offset+3])<<24
-		mask := uint32(buf[offset+4]) | uint32(buf[offset+5])<<8 | uint32(buf[offset+6])<<16 | uint32(buf[offset+7])<<24
-		cookie := uint32(buf[offset+8]) | uint32(buf[offset+9])<<8 | uint32(buf[offset+10])<<16 | uint32(buf[offset+11])<<24
-		nameLen := uint32(buf[offset+12]) | uint32(buf[offset+13])<<8 | uint32(buf[offset+14])<<16 | uint32(buf[offset+15])<<24
+		header := buf[offset : offset+16]
+		wd := int32(binary.LittleEndian.Uint32(header[0:4]))
+		mask := binary.LittleEndian.Uint32(header[4:8])
+		cookie := binary.LittleEndian.Uint32(header[8:12])
+		nameLen := binary.LittleEndian.Uint32(header[12:16])
+		nameBytesEnd := offset + 16 + int(nameLen)
+		if nameBytesEnd > n {
+			break
+		}
 		name := ""
 		if nameLen > 0 {
-			nameBytes := buf[offset+16 : offset+16+int(nameLen)]
+			nameBytes := buf[offset+16 : nameBytesEnd]
 			name = string(bytes.TrimRight(nameBytes, "\x00"))
 		}
 		events = append(events, inotifyEvent{wd: wd, mask: mask, cookie: cookie, nameLen: nameLen, name: name})
-		offset += 16 + int(nameLen)
+		offset = nameBytesEnd
 		for offset%4 != 0 {
 			offset++
 		}
@@ -113,7 +120,7 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 	watchFiles := s.syncedAbsFiles()
 	watchRoots := collectWatchDirs(watchDirs, watchFiles)
 	for _, dir := range watchRoots {
-		_ = os.MkdirAll(dir, 0o755)
+		_ = os.MkdirAll(dir, 0o700)
 	}
 
 	const watchMask = unix.IN_CREATE | unix.IN_MODIFY | unix.IN_DELETE | unix.IN_MOVED_TO | unix.IN_MOVED_FROM
@@ -133,7 +140,12 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 			utils.Log("[ainstruct-sync] Failed to watch dir %s: %v\n", dir, err)
 			return
 		}
-		wdToPath[int32(wd)] = dir
+		wd32, ok := safeInt32(wd)
+		if !ok {
+			utils.LogWarn("[ainstruct-sync] Watch descriptor overflow for dir %s\n", dir)
+			return
+		}
+		wdToPath[wd32] = dir
 		watchedDirs[dir] = struct{}{}
 	}
 
@@ -143,7 +155,12 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 			utils.Log("[ainstruct-sync] Failed to watch file %s: %v\n", file, err)
 			return
 		}
-		wdToPath[int32(wd)] = file
+		wd32, ok := safeInt32(wd)
+		if !ok {
+			utils.LogWarn("[ainstruct-sync] Watch descriptor overflow for file %s\n", file)
+			return
+		}
+		wdToPath[wd32] = file
 	}
 
 	// Watch directories recursively
@@ -180,7 +197,11 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 		default:
 		}
 
-		fds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLIN}}
+		pollFD, ok := safeInt32(fd)
+		if !ok {
+			return fmt.Errorf("poll fd overflow: %d", fd)
+		}
+		fds := []unix.PollFd{{Fd: pollFD, Events: unix.POLLIN}}
 		_, err := unix.Poll(fds, -1)
 		if err != nil {
 			if err == unix.EINTR {
@@ -253,6 +274,13 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 		default:
 		}
 	}
+}
+
+func safeInt32(v int) (int32, bool) {
+	if v < math.MinInt32 || v > math.MaxInt32 {
+		return 0, false
+	}
+	return int32(v), true
 }
 
 // debounceLoop runs in a background goroutine, processing pending events

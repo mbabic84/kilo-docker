@@ -131,7 +131,7 @@ func installServices() error {
 		}
 	}
 
-	if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0644); err != nil {
+	if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0o600); err != nil {
 		utils.LogWarn("[init] failed to write services marker: %v\n", err)
 	}
 
@@ -280,7 +280,7 @@ func copyServiceConfigs(home string) error {
 			if _, err := os.Stat(dst); err == nil {
 				continue
 			}
-			if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 				continue
 			}
 			src, err := os.Open(cfg.Src)
@@ -288,7 +288,7 @@ func copyServiceConfigs(home string) error {
 				continue
 			}
 		defer func() { _ = src.Close() }()
-		f, err := os.Create(dst)
+		f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 		if err != nil {
 			continue
 		}
@@ -352,7 +352,7 @@ func setupKnownHosts(home string) error {
 	_ = os.MkdirAll(sshDir, 0700)
 
 	knownHosts := filepath.Join(sshDir, "known_hosts")
-	f, err := os.OpenFile(knownHosts, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(knownHosts, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
@@ -388,4 +388,3 @@ func chownRecursive(path string, uid, gid int) {
 		return nil
 	})
 }
-

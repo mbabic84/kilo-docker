@@ -657,8 +657,8 @@ func (s *Syncer) pullCollection() error {
 			continue
 		}
 		absPath := filepath.Join(s.kiloConfigDir, relPath)
-		_ = os.MkdirAll(filepath.Dir(absPath), 0o755)
-		if err := os.WriteFile(absPath, []byte(fullDoc.Content), 0o644); err != nil {
+		_ = os.MkdirAll(filepath.Dir(absPath), 0o700)
+		if err := os.WriteFile(absPath, []byte(fullDoc.Content), 0o600); err != nil {
 			utils.LogError("[ainstruct-sync] Failed to write %s: %v\n", relPath, err)
 			continue
 		}

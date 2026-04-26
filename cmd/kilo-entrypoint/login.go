@@ -304,7 +304,7 @@ func runLoginInteractive(remember bool) (loginResult, error) {
 	result.ExpiresIn = loginResp.ExpiresIn
 
 	homeDir := "/home/" + deriveHomeName(result.UserID)
-	_ = os.MkdirAll(homeDir, 0755)
+	_ = os.MkdirAll(homeDir, 0o700)
 
 	var storedAinstruct string
 	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")

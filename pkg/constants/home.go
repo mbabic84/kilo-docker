@@ -1,3 +1,4 @@
+// Package constants defines shared fixed paths and service endpoints.
 package constants
 
 import (

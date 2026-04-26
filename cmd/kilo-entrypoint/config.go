@@ -163,7 +163,7 @@ func updateMCPEnabledStates(configPath string, playwrightEnabled, context7Enable
 	// Atomic write: write to temp file first, then rename
 	tmpPath := configPath + ".tmp"
 	utils.Log("[MCP Config] Writing to temp file: %s\n", tmpPath)
-	if err := os.WriteFile(tmpPath, out, 0644); err != nil {
+	if err := os.WriteFile(tmpPath, out, 0o600); err != nil {
 		utils.LogError("[MCP Config] Failed to write temp file: %v\n", err)
 		return err
 	}
