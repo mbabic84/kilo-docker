@@ -94,6 +94,20 @@ var BuiltInServices = []Service{
 		RequiresSocket: "",
 	},
 	{
+		Name:        "build",
+		Flag:        "--build",
+		Description: "Install build base dependencies (gcc, g++, make, python3) for compiling native extensions",
+		Install: []string{
+			"command -v gcc >/dev/null || apk add --no-cache build-base",
+			"command -v python3 >/dev/null || apk add --no-cache python3",
+		},
+		EnvVars: map[string]string{
+			"BUILD_ENABLED": "1",
+		},
+		Volumes:        []string{},
+		RequiresSocket: "",
+	},
+	{
 		Name:        "nvm",
 		Flag:        "--nvm",
 		Description: "Install NVM (Node Version Manager) for managing Node.js versions",
