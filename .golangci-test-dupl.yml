@@ -1,0 +1,33 @@
+version: "2"
+
+run:
+  go: "1.26"
+  timeout: 5m
+
+linters:
+  default: none
+
+  enable:
+    - dupl
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - dupl
+
+  settings:
+    dupl:
+      threshold: 60
+
+output:
+  formats:
+    text:
+      path: stdout
+      color: true
+      print-issued-lines: true
+      print-linter-name: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

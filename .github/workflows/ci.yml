@@ -34,6 +34,19 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $HOME/.local/bin v2.11.4
+
+      - name: Run golangci-lint
+        run: $HOME/.local/bin/golangci-lint run ./... --timeout=5m
+
+      - name: Run tests with race detector
+        run: go test -race ./...
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
