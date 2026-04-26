@@ -24,8 +24,8 @@ func TestGetServiceUnknown(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 7 {
-		t.Errorf("expected 7 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 8 {
+		t.Errorf("expected 8 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
