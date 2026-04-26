@@ -1,3 +1,9 @@
+## [3.7.1](https://github.com/mbabic84/kilo-docker/compare/v3.7.0...v3.7.1) (2026-04-26)
+
+### Bug Fixes
+
+* resolve golangci-lint findings ([d147021](https://github.com/mbabic84/kilo-docker/commit/d1470217d193c665ba598bc6df73155f1e8b330b))
+
 ## [3.7.0](https://github.com/mbabic84/kilo-docker/compare/v3.6.0...v3.7.0) (2026-04-26)
 
 ### Features
