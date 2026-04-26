@@ -1,3 +1,9 @@
+## [3.7.0](https://github.com/mbabic84/kilo-docker/compare/v3.6.0...v3.7.0) (2026-04-26)
+
+### Features
+
+* add --build option for on-demand build-base installation ([405eda4](https://github.com/mbabic84/kilo-docker/commit/405eda4a7b758b0c0ba9f6456f9d0028cc8753c8))
+
 ## [3.6.0](https://github.com/mbabic84/kilo-docker/compare/v3.5.0...v3.6.0) (2026-04-25)
 
 ### Features
