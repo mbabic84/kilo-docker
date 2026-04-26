@@ -1,3 +1,4 @@
+// Package services defines built-in optional tools exposed by kilo-docker.
 package services
 
 type CopyConfig struct {

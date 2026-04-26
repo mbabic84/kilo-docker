@@ -32,7 +32,7 @@ func (s *Syncer) hashGet(relPath string) string {
 func (s *Syncer) hashSet(relPath, hash string) error {
 	s.hashMu.Lock()
 	defer s.hashMu.Unlock()
-	if err := os.MkdirAll(filepath.Dir(s.hashFile), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.hashFile), 0o700); err != nil {
 		return fmt.Errorf("creating hash directory: %w", err)
 	}
 	var lines []string
@@ -54,7 +54,7 @@ func (s *Syncer) hashSet(relPath, hash string) error {
 	if !found {
 		lines = append(lines, prefix+hash)
 	}
-	if err := os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
 		utils.LogWarn("[ainstruct-sync] Failed to write hash file %s: %v\n", s.hashFile, err)
 		return fmt.Errorf("writing hash file: %w", err)
 	}
@@ -78,7 +78,7 @@ func (s *Syncer) hashDelete(relPath string) error {
 		}
 		lines = append(lines, line)
 	}
-	if err := os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(s.hashFile, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
 		utils.LogWarn("[ainstruct-sync] Failed to write hash file %s: %v\n", s.hashFile, err)
 		return fmt.Errorf("writing hash file: %w", err)
 	}

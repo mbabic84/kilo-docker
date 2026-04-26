@@ -1,9 +1,11 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 )
@@ -65,10 +67,81 @@ func handleBackup(cfg config) {
 	_, _ = dockerRun("cp", tempContainer+":/src/.", tempDir+"/src")
 	_, _ = dockerRun("rm", "-f", tempContainer)
 
-	_ = os.MkdirAll(filepath.Dir(backupFile), 0755)
-	_ = exec.Command("tar", "czf", backupFile, "-C", tempDir+"/src", ".").Run()
+	_ = os.MkdirAll(filepath.Dir(backupFile), 0o700)
+	if err := archiveDirectory(filepath.Join(tempDir, "src"), backupFile); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to create backup archive: %v\n", err)
+		os.Exit(1)
+	}
 
 	fmt.Fprintf(os.Stderr, "Backup created: %s\n", backupFile)
+}
+
+func archiveDirectory(srcDir, backupFile string) error {
+	f, err := os.Create(backupFile)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	gz := gzip.NewWriter(f)
+	defer func() { _ = gz.Close() }()
+
+	tw := tar.NewWriter(gz)
+	defer func() { _ = tw.Close() }()
+
+	return walkArchiveTree(srcDir, srcDir, tw)
+}
+
+func walkArchiveTree(root, path string, tw *tar.Writer) error {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		fullPath := filepath.Join(path, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		relPath, err := filepath.Rel(root, fullPath)
+		if err != nil {
+			return err
+		}
+		if err := writeArchiveEntry(tw, fullPath, relPath, info); err != nil {
+			return err
+		}
+		if info.IsDir() {
+			if err := walkArchiveTree(root, fullPath, tw); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func writeArchiveEntry(tw *tar.Writer, fullPath, relPath string, info os.FileInfo) error {
+	header, err := tar.FileInfoHeader(info, "")
+	if err != nil {
+		return err
+	}
+	header.Name = filepath.ToSlash(relPath)
+	if info.IsDir() && header.Name[len(header.Name)-1] != '/' {
+		header.Name += "/"
+	}
+	if err := tw.WriteHeader(header); err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return nil
+	}
+
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+	_, err = io.Copy(tw, file)
+	return err
 }
 
 // handleRestore restores a tar.gz backup into the data volume.
@@ -116,7 +189,7 @@ func handleRestore(cfg config) {
 		os.Exit(1)
 	}
 
-	if _, err := exec.Command("tar", "-tzf", backupFile).CombinedOutput(); err != nil {
+	if err := validateArchiveFile(backupFile); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: invalid or corrupted backup file.\n")
 		os.Exit(1)
 	}
@@ -144,4 +217,29 @@ func handleRestore(cfg config) {
 	_, _ = dockerRun("run", "--rm", "-v", targetVolume+":/dest", "alpine", "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "/dest")
 
 	fmt.Fprintf(os.Stderr, "Restore complete.\n")
+}
+
+func validateArchiveFile(backupFile string) error {
+	f, err := os.Open(backupFile)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = gz.Close() }()
+
+	tr := tar.NewReader(gz)
+	for {
+		_, err := tr.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
 }

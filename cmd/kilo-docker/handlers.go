@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -13,17 +12,25 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
-// downloadFile downloads a file from url to dest, trying curl first then wget.
+// downloadFile downloads a file from url to dest.
 func downloadFile(url, dest string) error {
-	cmd := exec.Command("curl", "-fsSL", url, "-o", dest)
-	if err := cmd.Run(); err == nil {
-		return nil
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
 	}
-	cmd = exec.Command("wget", "-q", "-O", dest, url)
-	if err := cmd.Run(); err == nil {
-		return nil
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed: %s", resp.Status)
 	}
-	return fmt.Errorf("neither curl nor wget succeeded")
+
+	f, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+
+	_, err = io.Copy(f, resp.Body)
+	return err
 }
 
 // latestVersions holds the latest available versions from the remote.
@@ -142,7 +149,7 @@ func handleUpdate(cfg config) {
 				_ = os.Remove(tempPath)
 				utils.LogError("[kilo-docker] Error: Failed to download update: %v\n", err)
 			} else {
-				if err := os.Chmod(tempPath, 0755); err != nil {
+				if err := os.Chmod(tempPath, 0o755); err != nil {
 					_ = os.Remove(tempPath)
 					utils.LogError("[kilo-docker] Error: failed to set permissions: %v\n", err)
 				} else if err := os.Rename(tempPath, target); err != nil {

@@ -34,13 +34,15 @@ func handleSessions(cfg config) {
 	if len(args) > 0 && args[0] == "cleanup" {
 		cleanupMode = true
 		args = args[1:]
+	parseCleanupFlags:
 		for len(args) > 0 {
-			if args[0] == "-y" || args[0] == "--yes" {
+			switch args[0] {
+			case "-y", "--yes":
 				cleanupYes = true
-			} else if args[0] == "-a" || args[0] == "--all" {
+			case "-a", "--all":
 				cleanupAll = true
-			} else {
-				break
+			default:
+				break parseCleanupFlags
 			}
 			args = args[1:]
 		}

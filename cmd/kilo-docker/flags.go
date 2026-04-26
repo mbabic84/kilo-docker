@@ -49,6 +49,16 @@ type valueFlag struct {
 	buildDockerArgs func(config) []string
 }
 
+func newRepeatableValueFlag(longName, shortName, description string, getValues func(config) []string, setValue func(*config, string)) valueFlag {
+	return valueFlag{
+		Names:            []string{longName, shortName},
+		Description:      description,
+		setField:         setValue,
+		serializeArgs:    func(c config) []string { return flatten(longName, getValues(c)) },
+		buildDockerArgs:  func(c config) []string { return flatten(shortName, getValues(c)) },
+	}
+}
+
 var boolFlags = []boolFlag{
 	{
 		Names:       []string{"--help", "-h"},
@@ -95,20 +105,20 @@ var boolFlags = []boolFlag{
 }
 
 var valueFlags = []valueFlag{
-	{
-		Names:            []string{"--port", "-p"},
-		Description:     "Map a port (host_port:container_port). Can be specified multiple times",
-		setField:        func(c *config, v string) { c.ports = append(c.ports, v) },
-		serializeArgs:   func(c config) []string { return flatten("--port", c.ports) },
-		buildDockerArgs: func(c config) []string { return flatten("-p", c.ports) },
-	},
-	{
-		Names:            []string{"--volume", "-v"},
-		Description:     "Mount a volume (host_path:container_path). Can be specified multiple times",
-		setField:        func(c *config, v string) { c.volumes = append(c.volumes, v) },
-		serializeArgs:   func(c config) []string { return flatten("--volume", c.volumes) },
-		buildDockerArgs: func(c config) []string { return flatten("-v", c.volumes) },
-	},
+	newRepeatableValueFlag(
+		"--port",
+		"-p",
+		"Map a port (host_port:container_port). Can be specified multiple times",
+		func(c config) []string { return c.ports },
+		func(c *config, v string) { c.ports = append(c.ports, v) },
+	),
+	newRepeatableValueFlag(
+		"--volume",
+		"-v",
+		"Mount a volume (host_path:container_path). Can be specified multiple times",
+		func(c config) []string { return c.volumes },
+		func(c *config, v string) { c.volumes = append(c.volumes, v) },
+	),
 	{
 		Names:            []string{"--workspace", "-w"},
 		Description:     "Specify a custom workspace path (defaults to current directory)",

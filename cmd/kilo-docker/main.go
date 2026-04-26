@@ -35,7 +35,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -162,7 +161,7 @@ func runContainer(cfg config) {
 			utils.Log("[kilo-docker] Existing session uses different flags.\n", utils.WithOutput())
 			utils.Log("[kilo-docker]   Existing: %s\n", displayedStoredFlags, utils.WithOutput())
 			utils.Log("[kilo-docker]   Current:  %s\n", currentFlags, utils.WithOutput())
-			if cfg.yes || confirmPrompt("Recreate with new flags? [y/N]: ", cfg.yes) {
+			if cfg.yes || promptConfirm("Recreate with new flags? [y/N]: ", cfg.yes) {
 				_, _ = dockerRun("rm", "-f", containerName)
 				containerState = "not_found"
 			} else {
@@ -305,17 +304,6 @@ func handleSessionEnd(containerName string, onceMode bool) {
 	}
 }
 
-func confirmPrompt(message string, yes bool) bool {
-	if yes {
-		utils.Log("%sy\n", message, utils.WithOutput())
-		return true
-	}
-	fmt.Print(message)
-	var response string
-	_, _ = fmt.Scanln(&response)
-	return strings.ToLower(strings.TrimSpace(response)) == "y"
-}
-
 func handlePlaywright(cfg config) {
 	if cfg.help {
 		printCommandHelp("playwright")
@@ -335,7 +323,7 @@ func handlePlaywright(cfg config) {
 	// Handle volume recreation
 	if cfg.playwrightRecreateVolume {
 		if !cfg.yes {
-			if !confirmPrompt("This will delete all data in the Playwright volume. Continue? [y/N]: ", false) {
+			if !promptConfirm("This will delete all data in the Playwright volume. Continue? [y/N]: ", false) {
 				utils.Log("[playwright] Cancelled.\n", utils.WithOutput())
 				return
 			}

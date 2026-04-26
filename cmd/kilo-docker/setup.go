@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"strings"
@@ -19,7 +20,8 @@ func resolveVolume(cfg config) string {
 }
 
 func isTerminal() bool {
-	return term.IsTerminal(int(os.Stdout.Fd()))
+	fd, ok := fileDescriptor(os.Stdout.Fd())
+	return ok && term.IsTerminal(fd)
 }
 
 func dockerDaemonRunning() bool {
@@ -36,6 +38,13 @@ func promptConfirm(message string, yes bool) bool {
 	var response string
 	_, _ = fmt.Scanln(&response)
 	return strings.ToLower(strings.TrimSpace(response)) == "y"
+}
+
+func fileDescriptor(fd uintptr) (int, bool) {
+	if fd > uintptr(math.MaxInt) {
+		return 0, false
+	}
+	return int(fd), true
 }
 
 func printVersion() {
