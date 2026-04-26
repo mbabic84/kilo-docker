@@ -1,0 +1,57 @@
+# golangci-lint configuration
+# Committed to ensure reproducible linting across environments
+
+version: "2"
+
+run:
+  go: "1.26"
+  timeout: 5m
+
+linters:
+  default: none
+
+  enable:
+    - staticcheck
+    - errcheck
+    - dupl
+    - gocyclo
+    - gosec
+
+  exclusions:
+    generated: strict
+
+    paths:
+      - generated$
+      - vendor$
+      - third_party$
+
+    rules:
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - dupl
+
+  settings:
+    dupl:
+      threshold: 60
+    
+    gocyclo:
+      min-complexity: 15
+    
+    errcheck:
+      check-type-assertions: false
+
+    staticcheck:
+      checks: ["all"]
+
+output:
+  formats:
+    text:
+      path: stdout
+      color: true
+      print-issued-lines: true
+      print-linter-name: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
