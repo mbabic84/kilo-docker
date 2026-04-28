@@ -1,3 +1,9 @@
+## [3.8.1](https://github.com/mbabic84/kilo-docker/compare/v3.8.0...v3.8.1) (2026-04-28)
+
+### Bug Fixes
+
+* **entrypoint:** restore groups and fail on inaccessible workspace ([eaa9fce](https://github.com/mbabic84/kilo-docker/commit/eaa9fce7118bfbc5bdcb844103d5b4a8b31a06fa))
+
 ## [3.8.0](https://github.com/mbabic84/kilo-docker/compare/v3.7.1...v3.8.0) (2026-04-28)
 
 ### Features
