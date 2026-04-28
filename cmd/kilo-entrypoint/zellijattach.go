@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -109,7 +110,7 @@ func loadUserConfig() (homeDir, username, shell, userID string) {
 func execZellij() error {
 	// Load user configuration to set environment variables and drop privileges
 	homeDir, username, shell, _ := loadUserConfig()
-	
+
 	// If no user config found, we can't properly run as user
 	if homeDir == "" || username == "" {
 		utils.LogWarn("[zellijattach] No user config found, running as root\n")
@@ -124,6 +125,13 @@ func execZellij() error {
 					if gidStr, ok := config["gid"]; ok {
 						uid, _ := strconv.Atoi(uidStr)
 						gid, _ := strconv.Atoi(gidStr)
+						suppGroups := getUserGroups(username)
+						if len(suppGroups) > 0 {
+							utils.Log("[zellijattach] Restoring supplementary groups for %s: %v\n", username, suppGroups)
+							if err := syscall.Setgroups(suppGroups); err != nil {
+								utils.LogWarn("[zellijattach] Failed to restore supplementary groups: %v\n", err)
+							}
+						}
 						utils.Log("[zellijattach] Dropping privileges to UID=%d, GID=%d\n", uid, gid)
 						_ = syscall.Setgid(gid)
 						_ = syscall.Setuid(uid)
@@ -132,10 +140,10 @@ func execZellij() error {
 			}
 		}
 	}
-	
+
 	// Create a copy of the environment
 	env := os.Environ()
-	
+
 	// Set HOME, USER, LOGNAME, SHELL from persisted config
 	if homeDir != "" {
 		env = appendOrReplaceEnv(env, "HOME", homeDir)
@@ -147,9 +155,25 @@ func execZellij() error {
 	if shell != "" {
 		env = appendOrReplaceEnv(env, "SHELL", shell)
 	}
-	
+
+	if err := ensureAccessibleWorkingDir(); err != nil {
+		return err
+	}
+
 	utils.Log("[zellijattach] Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
 	return syscall.Exec("/usr/local/bin/zellij", []string{"zellij", "attach", "--create", "kilo-docker"}, env)
+}
+
+func ensureAccessibleWorkingDir() error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("workspace is not accessible after privilege drop: %w", err)
+	}
+	if _, err := os.Stat("."); err != nil {
+		return fmt.Errorf("workspace %q is not accessible after privilege drop: %w", wd, err)
+	}
+	utils.Log("[zellijattach] Using working directory: %s\n", wd)
+	return nil
 }
 
 // appendOrReplaceEnv appends or replaces an environment variable in the env slice.
