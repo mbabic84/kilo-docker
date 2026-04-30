@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
@@ -225,7 +224,6 @@ func handleSessions(cfg config) {
 			}
 		}
 		_, _ = dockerRun("start", "-d", containerToAttach)
-		time.Sleep(2 * time.Second)
 		// Pass --remember BEFORE zellij-attach so flag.Parse() catches it
 		if rememberFlag != "" {
 			_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", rememberFlag, "zellij-attach")
