@@ -39,7 +39,6 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
@@ -247,7 +246,6 @@ func runContainer(cfg config) {
 		handleSessionEnd(containerName, cfg.once)
 	case "exited", "created":
 		_, _ = dockerRun("start", "-d", containerName)
-		time.Sleep(2 * time.Second)
 		// Pass --remember BEFORE zellij-attach so flag.Parse() catches it
 		if rememberFlag != "" {
 			_ = execDockerInteractive(containerName, "kilo-entrypoint", rememberFlag, "zellij-attach")
@@ -268,7 +266,6 @@ func runContainer(cfg config) {
 			utils.LogError("%v\n", err)
 			os.Exit(1)
 		}
-		time.Sleep(2 * time.Second)
 		// Pass --remember BEFORE zellij-attach so flag.Parse() catches it
 		if rememberFlag != "" {
 			_ = execDockerInteractive(containerName, "kilo-entrypoint", rememberFlag, "zellij-attach")

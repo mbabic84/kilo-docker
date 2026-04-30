@@ -8,17 +8,29 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 const initMarker = "/tmp/.kilo-initialized"
 
+const userInitInProgressMarker = "/tmp/.kilo-user-init-in-progress"
+
+const initReadyTimeoutEnvVar = "KD_INIT_READY_TIMEOUT"
+
+const defaultInitReadyTimeout = 5 * time.Minute
+
 // runZellijAttach is the entry point for the "zellij-attach" subcommand.
 // If the container is already initialized, it execs zellij directly.
 // Otherwise it runs the first-time user init flow (which handles auto-login if remember=true).
 func runZellijAttach(remember bool) error {
 	utils.Log("[zellijattach] Entry: remember=%v\n", remember)
+
+	if err := waitForMarker(initReadyMarker, initReadyTimeout(),
+		"[kilo-docker] Waiting for container initialization to finish...\n"); err != nil {
+		return err
+	}
 
 	if _, err := os.Stat(initMarker); err == nil {
 		utils.Log("[zellijattach] Init marker exists, skipping userinit\n")
@@ -28,9 +40,93 @@ func runZellijAttach(remember bool) error {
 		return execZellij()
 	}
 
+	claimed, err := claimUserInit()
+	if err != nil {
+		return err
+	}
+	if !claimed {
+		if err := waitForCompletedUserInit(initReadyTimeout()); err != nil {
+			return err
+		}
+		if !remember {
+			clearStoredSyncTokens()
+		}
+		return execZellij()
+	}
+	defer func() { _ = os.Remove(userInitInProgressMarker) }()
+
 	// Container not initialized - run full user init
 	// runUserInit handles auto-login if remember=true and tokens are valid
 	return runUserInit(remember)
+}
+
+func initReadyTimeout() time.Duration {
+	value := strings.TrimSpace(os.Getenv(initReadyTimeoutEnvVar))
+	if value == "" {
+		return defaultInitReadyTimeout
+	}
+
+	timeout, err := time.ParseDuration(value)
+	if err != nil {
+		utils.LogWarn("[zellijattach] Invalid %s=%q, using default %s\n", initReadyTimeoutEnvVar, value, defaultInitReadyTimeout)
+		return defaultInitReadyTimeout
+	}
+	if timeout <= 0 {
+		utils.LogWarn("[zellijattach] Invalid %s=%q, using default %s\n", initReadyTimeoutEnvVar, value, defaultInitReadyTimeout)
+		return defaultInitReadyTimeout
+	}
+
+	return timeout
+}
+
+func waitForMarker(marker string, timeout time.Duration, waitingMsg string) error {
+	if _, err := os.Stat(marker); err == nil {
+		return nil
+	}
+
+	utils.Log(waitingMsg, utils.WithOutput())
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(marker); err == nil {
+			return nil
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	return fmt.Errorf("initialization marker %q did not appear in %s", marker, timeout)
+}
+
+func claimUserInit() (bool, error) {
+	f, err := os.OpenFile(userInitInProgressMarker, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err == nil {
+		_ = f.Close()
+		utils.Log("[zellijattach] Claimed user initialization\n")
+		return true, nil
+	}
+	if os.IsExist(err) {
+		return false, nil
+	}
+	return false, fmt.Errorf("failed to claim user initialization: %w", err)
+}
+
+func waitForCompletedUserInit(timeout time.Duration) error {
+	if _, err := os.Stat(initMarker); err == nil {
+		return nil
+	}
+
+	utils.Log("[kilo-docker] Waiting for user initialization to finish...\n", utils.WithOutput())
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(initMarker); err == nil {
+			return nil
+		}
+		if _, err := os.Stat(userInitInProgressMarker); os.IsNotExist(err) {
+			return fmt.Errorf("user initialization ended without completing")
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	return fmt.Errorf("user initialization did not complete in %s", timeout)
 }
 
 // clearStoredSyncTokens clears sync tokens from encrypted storage if they exist.

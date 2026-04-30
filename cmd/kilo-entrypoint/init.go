@@ -15,6 +15,8 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
+const initReadyMarker = "/tmp/.kilo-init-ready"
+
 // runInit performs container initialization when invoked with no subcommand.
 // It runs as root and handles infrastructure setup:
 //   - Installs enabled services from KD_SERVICES env var
@@ -38,7 +40,7 @@ func runInit(remember bool) error {
 
 		if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
 			if info, err := os.Stat(sshAuthSock); err == nil && info.Mode()&os.ModeSocket != 0 {
-			if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
+				if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
 					utils.LogWarn("[init] SSH socket not accessible: %v\n", err)
 				} else {
 					_ = conn.Close()
@@ -47,6 +49,12 @@ func runInit(remember bool) error {
 			} else {
 				utils.LogWarn("[init] SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
 			}
+		}
+
+		if err := os.WriteFile(initReadyMarker, []byte("1\n"), 0o600); err != nil {
+			utils.LogWarn("[init] failed to write init-ready marker: %v\n", err)
+		} else {
+			utils.Log("[init] Wrote init-ready marker: %s\n", initReadyMarker)
 		}
 	}
 
@@ -154,9 +162,10 @@ func runVersionCheck(cmd string, homeDir string) string {
 }
 
 // compareVersions compares two version strings. Returns:
-//   -1 if v1 < v2 (v1 is older)
-//    0 if v1 == v2
-//    1 if v1 > v2 (v1 is newer)
+//
+//	-1 if v1 < v2 (v1 is older)
+//	 0 if v1 == v2
+//	 1 if v1 > v2 (v1 is newer)
 func compareVersions(v1, v2 string) int {
 	if v1 == v2 {
 		return 0
@@ -287,13 +296,13 @@ func copyServiceConfigs(home string) error {
 			if err != nil {
 				continue
 			}
-		defer func() { _ = src.Close() }()
-		f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-		if err != nil {
-			continue
-		}
-		defer func() { _ = f.Close() }()
-		_, _ = io.Copy(f, src)
+			defer func() { _ = src.Close() }()
+			f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+			if err != nil {
+				continue
+			}
+			defer func() { _ = f.Close() }()
+			_, _ = io.Copy(f, src)
 		}
 	}
 	return nil

@@ -229,16 +229,12 @@ func runUserInit(remember bool) error {
 
 	_ = os.Setenv("HOME", savedHome)
 
-	// Mark initialized
-	utils.Log("[userinit] Marking container as initialized: %s\n", initMarker)
-	_ = os.WriteFile(initMarker, []byte("1\n"), 0o600)
-
 	// Persist user configuration for re-attach
 	// Store info in a file on the volume so it survives container restarts
 	userConfigPath := filepath.Join(homeDir, ".local/share/kilo/.user-config.json")
 	utils.Log("[userinit] Saving user config to: %s\n", userConfigPath)
 	userConfig := map[string]string{
-		"homeDir": homeDir,
+		"homeDir":  homeDir,
 		"username": username,
 		"uid":      puidStr,
 		"gid":      pgidStr,
@@ -281,7 +277,7 @@ func runUserInit(remember bool) error {
 
 	// Drop privileges and exec zellij
 	utils.Log("[userinit] Dropping privileges to %s (UID=%s, GID=%s)\n", username, puidStr, pgidStr)
-	
+
 	// Set supplementary groups BEFORE setting gid/uid
 	if len(suppGroups) > 0 {
 		utils.Log("[userinit] Setting supplementary groups: %v\n", suppGroups)
@@ -289,7 +285,7 @@ func runUserInit(remember bool) error {
 			utils.LogWarn("[userinit] Failed to set supplementary groups: %v\n", err)
 		}
 	}
-	
+
 	_ = syscall.Setgid(pgid)
 	_ = syscall.Setuid(puid)
 
@@ -300,6 +296,10 @@ func runUserInit(remember bool) error {
 	// Delete stale zellij sessions from previous container lifecycle
 	utils.Log("[userinit] Clearing old zellij sessions\n")
 	clearZellijSessions()
+
+	// Mark initialized only after all user init work has completed.
+	utils.Log("[userinit] Marking container as initialized: %s\n", initMarker)
+	_ = os.WriteFile(initMarker, []byte("1\n"), 0o600)
 
 	utils.Log("[userinit] Starting zellij\n")
 	return execZellij()
@@ -393,26 +393,26 @@ func joinServiceGroups(username string) {
 // Uses getent to read the group database.
 func getUserGroups(username string) []int {
 	var groups []int
-	
+
 	// Read /etc/group to find all groups the user belongs to
 	data, err := os.ReadFile("/etc/group")
 	if err != nil {
 		utils.LogWarn("[userinit] Failed to read /etc/group: %v\n", err)
 		return groups
 	}
-	
+
 	for _, line := range strings.Split(string(data), "\n") {
 		// Format: groupname:password:GID:user1,user2,...
 		parts := strings.Split(line, ":")
 		if len(parts) < 4 {
 			continue
 		}
-		
+
 		gid, err := strconv.Atoi(parts[2])
 		if err != nil {
 			continue
 		}
-		
+
 		// Check if user is in this group
 		members := strings.Split(parts[3], ",")
 		for _, member := range members {
@@ -422,7 +422,7 @@ func getUserGroups(username string) []int {
 			}
 		}
 	}
-	
+
 	return groups
 }
 
@@ -913,7 +913,7 @@ func deleteRemoteOpencode(homeDir, userID string) error {
 	var docsResult struct {
 		Documents []struct {
 			DocumentID string `json:"document_id"`
-			Metadata  struct {
+			Metadata   struct {
 				LocalPath string `json:"local_path"`
 			} `json:"metadata"`
 		} `json:"documents"`
