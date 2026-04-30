@@ -1,3 +1,9 @@
+## [3.9.1](https://github.com/mbabic84/kilo-docker/compare/v3.9.0...v3.9.1) (2026-04-30)
+
+### Bug Fixes
+
+* **entrypoint:** move init waiting into entrypoint with configurable timeout ([93b5120](https://github.com/mbabic84/kilo-docker/commit/93b5120bab903ff9bd1891337edd5625733c151d))
+
 ## [3.9.0](https://github.com/mbabic84/kilo-docker/compare/v3.8.1...v3.9.0) (2026-04-29)
 
 ### Features
