@@ -138,11 +138,11 @@ var BuiltInServices = []Service{
 		RequiresSocket: "",
 	},
 	{
-		Name:        "s5cmd",
-		Flag:        "--s5cmd",
-		Description: "Install s5cmd, a fast S3 CLI for bulk transfers and syncs",
+		Name:        "rclone",
+		Flag:        "--rclone",
+		Description: "Install rclone, a universal CLI for S3 and 40+ cloud storage backends",
 		Install: []string{
-			"command -v s5cmd >/dev/null || (S5CMD_VERSION=$(curl -fsSL https://api.github.com/repos/peak/s5cmd/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && S5CMD_ARCH=$(case $(uname -m) in x86_64) echo '64bit' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/peak/s5cmd/releases/download/v${S5CMD_VERSION}/s5cmd_${S5CMD_VERSION}_Linux-${S5CMD_ARCH}.tar.gz\" -o /tmp/s5cmd.tar.gz && tar xzf /tmp/s5cmd.tar.gz -C /tmp && mv /tmp/s5cmd /usr/local/bin/s5cmd && chmod +x /usr/local/bin/s5cmd && rm -f /tmp/s5cmd.tar.gz)",
+			"command -v rclone >/dev/null || (RCLONE_VERSION=$(curl -fsSL https://api.github.com/repos/rclone/rclone/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && RCLONE_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && command -v unzip >/dev/null || apk add --no-cache unzip && curl -fsSL \"https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}.zip\" -o /tmp/rclone.zip && unzip -o /tmp/rclone.zip -d /tmp && mv /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}/rclone /usr/local/bin/rclone && chmod +x /usr/local/bin/rclone && rm -rf /tmp/rclone.zip /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH})",
 		},
 		Volumes:        []string{},
 		RequiresSocket: "",
