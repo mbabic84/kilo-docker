@@ -99,22 +99,22 @@ func TestPythonServiceHasRequiredFields(t *testing.T) {
 	}
 }
 
-func TestS5cmdServiceHasRequiredFields(t *testing.T) {
-	svc := getService("s5cmd")
+func TestRcloneServiceHasRequiredFields(t *testing.T) {
+	svc := getService("rclone")
 	if svc == nil {
-		t.Fatal("s5cmd service not found")
+		t.Fatal("rclone service not found")
 	}
 
-	if svc.Name != "s5cmd" {
-		t.Errorf("expected Name 's5cmd', got %q", svc.Name)
+	if svc.Name != "rclone" {
+		t.Errorf("expected Name 'rclone', got %q", svc.Name)
 	}
-	if svc.Flag != "--s5cmd" {
-		t.Errorf("expected Flag '--s5cmd', got %q", svc.Flag)
+	if svc.Flag != "--rclone" {
+		t.Errorf("expected Flag '--rclone', got %q", svc.Flag)
 	}
 	if len(svc.Install) != 1 {
-		t.Errorf("expected 1 Install command for s5cmd, got %d", len(svc.Install))
+		t.Errorf("expected 1 Install command for rclone, got %d", len(svc.Install))
 	}
 	if svc.RequiresSocket != "" {
-		t.Errorf("expected RequiresSocket to be empty for s5cmd, got %q", svc.RequiresSocket)
+		t.Errorf("expected RequiresSocket to be empty for rclone, got %q", svc.RequiresSocket)
 	}
 }
