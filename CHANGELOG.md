@@ -1,3 +1,9 @@
+## [3.12.0](https://github.com/mbabic84/kilo-docker/compare/v3.11.0...v3.12.0) (2026-05-05)
+
+### Features
+
+* replace s5cmd with rclone as optional S3 service ([f93620c](https://github.com/mbabic84/kilo-docker/commit/f93620cc32affe1e069421e19f15be9dede5fd98))
+
 ## [3.11.0](https://github.com/mbabic84/kilo-docker/compare/v3.10.0...v3.11.0) (2026-05-05)
 
 ### Features
