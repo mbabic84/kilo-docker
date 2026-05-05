@@ -1,3 +1,9 @@
+## [3.11.0](https://github.com/mbabic84/kilo-docker/compare/v3.10.0...v3.11.0) (2026-05-05)
+
+### Features
+
+* add s5cmd as optional --s5cmd service ([01e2e7b](https://github.com/mbabic84/kilo-docker/commit/01e2e7b7bfc5b53448fc35c117b43dd61dc2e47f))
+
 ## [3.10.0](https://github.com/mbabic84/kilo-docker/compare/v3.9.1...v3.10.0) (2026-05-04)
 
 ### Features
