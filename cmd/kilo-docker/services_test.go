@@ -53,8 +53,8 @@ func TestIsServiceEnabledEmpty(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 8 {
-		t.Errorf("expected 8 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 9 {
+		t.Errorf("expected 9 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
@@ -193,5 +193,25 @@ func TestPythonServiceHasRequiredFields(t *testing.T) {
 	}
 	if _, ok := svc.EnvVars["PYTHON_ENABLED"]; !ok {
 		t.Error("expected PYTHON_ENABLED in EnvVars")
+	}
+}
+
+func TestS5cmdServiceHasRequiredFields(t *testing.T) {
+	svc := getService("s5cmd")
+	if svc == nil {
+		t.Fatal("s5cmd service not found")
+	}
+
+	if svc.Name != "s5cmd" {
+		t.Errorf("expected Name 's5cmd', got %q", svc.Name)
+	}
+	if svc.Flag != "--s5cmd" {
+		t.Errorf("expected Flag '--s5cmd', got %q", svc.Flag)
+	}
+	if len(svc.Install) != 1 {
+		t.Errorf("expected 1 Install command for s5cmd, got %d", len(svc.Install))
+	}
+	if svc.RequiresSocket != "" {
+		t.Errorf("expected RequiresSocket to be empty for s5cmd, got %q", svc.RequiresSocket)
 	}
 }
