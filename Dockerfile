@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/kilo-entrypoint ./cmd/kilo-e
 # ── Builder: download Kilo binary ──
 FROM alpine:latest AS builder
 
-ARG KILO_VERSION=7.2.40
+ARG KILO_VERSION=7.2.49
 
 RUN apk add --no-cache curl tar \
     && curl -fsSL "https://github.com/Kilo-Org/kilocode/releases/download/v${KILO_VERSION}/kilo-linux-x64-musl.tar.gz" \
