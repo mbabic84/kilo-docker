@@ -1,3 +1,9 @@
+## [3.17.0](https://github.com/mbabic84/kilo-docker/compare/v3.16.0...v3.17.0) (2026-05-12)
+
+### Features
+
+* migrate Docker image from Alpine to Debian Bookworm ([00658dc](https://github.com/mbabic84/kilo-docker/commit/00658dcd47cdcc037640517828ce3984936b1d60))
+
 ## [3.16.0](https://github.com/mbabic84/kilo-docker/compare/v3.15.0...v3.16.0) (2026-05-12)
 
 ### Features
