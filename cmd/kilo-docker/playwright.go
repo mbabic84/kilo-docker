@@ -23,7 +23,7 @@ func startPlaywright() error {
 		utils.Log("[playwright] Starting stopped Playwright MCP container\n")
 		_, _ = dockerRun("start", SharedPlaywrightContainerName)
 	default:
-		utils.Log("[playwright] Pulling Playwright MCP image...\n", utils.WithOutput())
+		utils.Log("[kilo-docker] Starting browser automation sidecar...\n", utils.WithOutput())
 		_, _ = dockerRun("pull", playwrightImage)
 
 		_, _ = dockerRun("rm", "-f", SharedPlaywrightContainerName)
@@ -43,7 +43,7 @@ func startPlaywright() error {
 			return fmt.Errorf("failed to start Playwright container: %w", err)
 		}
 
-		utils.Log("[playwright] Waiting for Playwright MCP...\n", utils.WithOutput())
+		utils.Log("[kilo-docker] Waiting for browser automation sidecar...\n", utils.WithOutput())
 		for i := 1; i <= 30; i++ {
 			state := dockerState(SharedPlaywrightContainerName)
 			if state != "running" {
@@ -55,7 +55,7 @@ func startPlaywright() error {
 			ready, _ := dockerExec(SharedPlaywrightContainerName, "", "node", "-e",
 				"const net=require('net');const s=net.connect(8931,'127.0.0.1',()=>{s.destroy();process.exit(0)});s.on('error',()=>process.exit(1));s.setTimeout(2000,()=>{s.destroy();process.exit(1)})")
 			if ready != "" || dockerState(SharedPlaywrightContainerName) == "running" {
-				utils.Log("[playwright] ready.\n", utils.WithOutput())
+				utils.Log("[kilo-docker] Browser automation sidecar ready.\n", utils.WithOutput())
 				break
 			}
 
@@ -76,5 +76,5 @@ func startPlaywright() error {
 // Since it's shared, we don't remove it by default - it persists for reuse.
 func cleanupPlaywright() {
 	// Don't remove the shared container - it persists for reuse
-	utils.Log("[playwright] Container %s kept running for future sessions\n", SharedPlaywrightContainerName, utils.WithOutput())
+	utils.Log("[kilo-docker] Browser automation sidecar available.\n", utils.WithOutput())
 }

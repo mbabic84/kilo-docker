@@ -321,11 +321,11 @@ func handlePlaywright(cfg config) {
 	if cfg.playwrightRecreateVolume {
 		if !cfg.yes {
 			if !promptConfirm("This will delete all data in the Playwright volume. Continue? [y/N]: ", false) {
-				utils.Log("[playwright] Cancelled.\n", utils.WithOutput())
+				utils.Log("[kilo-docker] Cancelled.\n", utils.WithOutput())
 				return
 			}
 		}
-		utils.Log("[playwright] Removing existing volume...\n", utils.WithOutput())
+		utils.Log("[kilo-docker] Removing browser automation data volume...\n", utils.WithOutput())
 		_, _ = dockerRun("volume", "rm", PlaywrightVolumeName)
 	}
 
@@ -336,11 +336,11 @@ func handlePlaywright(cfg config) {
 	}
 
 	// Remove existing container if any
-	utils.Log("[playwright] Removing existing container if any...\n", utils.WithOutput())
+	utils.Log("[kilo-docker] Preparing browser automation sidecar...\n", utils.WithOutput())
 	_, _ = dockerRun("rm", "-f", SharedPlaywrightContainerName)
 
 	// Pull latest image
-	utils.Log("[playwright] Pulling latest Playwright MCP image...\n", utils.WithOutput())
+	utils.Log("[kilo-docker] Starting browser automation sidecar...\n", utils.WithOutput())
 	if _, err := dockerRun("pull", "mcr.microsoft.com/playwright/mcp"); err != nil {
 		utils.LogError("[playwright] Failed to pull image: %v\n", err)
 		os.Exit(1)
@@ -352,5 +352,5 @@ func handlePlaywright(cfg config) {
 		os.Exit(1)
 	}
 
-	utils.Log("[playwright] Container '%s' is ready on network '%s'\n", SharedPlaywrightContainerName, SharedNetworkName, utils.WithOutput())
+	utils.Log("[kilo-docker] Browser automation sidecar ready.\n", utils.WithOutput())
 }
