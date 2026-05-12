@@ -326,7 +326,7 @@ docker run --rm kilo-docker --version
 docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-docker
 ```
 
-The build uses a multi-stage Dockerfile: a `golang:1.26-alpine` builder compiles the `kilo-entrypoint` binary as a static binary, then the runtime stage copies it into the final Alpine image. No Go toolchain is needed on the host.
+The build uses a multi-stage Dockerfile: a `golang:1.26-bookworm` builder compiles the `kilo-entrypoint` binary as a static binary, then the runtime stage copies it into the final Debian Bookworm image. No Go toolchain is needed on the host.
 
 ## License
 

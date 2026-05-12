@@ -160,8 +160,8 @@ func TestAllDockerSubcommandsAreRecognized(t *testing.T) {
 // already include "run" are not double-prefixed.
 func TestEnsureRunArgsPreservesExistingRunCalls(t *testing.T) {
 	// Pattern from handle_backup.go:59
-	args := []string{"run", "--rm", "-d", "--name", "temp", "-v", "vol:/src:ro", "alpine:latest", "tail", "-f", "/dev/null"}
-	expected := []string{"run", "--rm", "-d", "--name", "temp", "-v", "vol:/src:ro", "alpine:latest", "tail", "-f", "/dev/null"}
+	args := []string{"run", "--rm", "-d", "--name", "temp", "-v", "vol:/src:ro", "debian:bookworm-slim", "tail", "-f", "/dev/null"}
+	expected := []string{"run", "--rm", "-d", "--name", "temp", "-v", "vol:/src:ro", "debian:bookworm-slim", "tail", "-f", "/dev/null"}
 
 	result := ensureRunArgs(args)
 	if !reflect.DeepEqual(result, expected) {
@@ -261,18 +261,18 @@ func TestBuildRunArgs(t *testing.T) {
 		{
 			name:       "with multiple extra args",
 			dockerArgs: []string{"--rm"},
-			image:      "alpine:latest",
-			extraArgs:  []string{"sh", "-c", "echo hello"},
-			terminal:   true,
-			expected:   []string{"run", "-it", "--rm", "alpine:latest", "sh", "-c", "echo hello"},
+image:      "debian:bookworm-slim",
+		extraArgs:  []string{"sh", "-c", "echo hello"},
+		terminal:   true,
+		expected:   []string{"run", "-it", "--rm", "debian:bookworm-slim", "sh", "-c", "echo hello"},
 		},
 		{
 			name:       "empty dockerArgs",
 			dockerArgs: []string{},
-			image:      "alpine:latest",
-			extraArgs:  nil,
-			terminal:   true,
-			expected:   []string{"run", "-it", "alpine:latest"},
+image:      "debian:bookworm-slim",
+		extraArgs:  nil,
+		terminal:   true,
+		expected:   []string{"run", "-it", "debian:bookworm-slim"},
 		},
 	}
 

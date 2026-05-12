@@ -52,19 +52,19 @@ run_go() {
         -w /build \
         -e GOCACHE=/build/.cache/go-build \
         -e GOMODCACHE=/build/.cache/mod \
-        golang:1.26-alpine \
-        "$@"
+golang:1.26-bookworm \
+         "$@"
 }
 
 run_go_env() {
-    docker run --rm \
-        -u "$(id -u):$(id -g)" \
-        -v "${PROJECT_DIR}:/build" \
-        -w /build \
-        -e GOCACHE=/build/.cache/go-build \
-        -e GOMODCACHE=/build/.cache/mod \
-        -e CGO_ENABLED=0 \
-        golang:1.26-alpine \
+     docker run --rm \
+         -u "$(id -u):$(id -g)" \
+         -v "${PROJECT_DIR}:/build" \
+         -w /build \
+         -e GOCACHE=/build/.cache/go-build \
+         -e GOMODCACHE=/build/.cache/mod \
+         -e CGO_ENABLED=0 \
+         golang:1.26-bookworm \
         "$@"
 }
 

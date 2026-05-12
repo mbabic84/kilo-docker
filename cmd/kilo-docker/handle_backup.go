@@ -62,7 +62,7 @@ func handleBackup(cfg config) {
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	tempContainer := fmt.Sprintf("kilo-backup-temp-%d", os.Getpid())
-	_, _ = dockerRun("run", "--rm", "-d", "--name", tempContainer, "-v", dataVolume+":/src:ro", "alpine:latest", "tail", "-f", "/dev/null")
+	_, _ = dockerRun("run", "--rm", "-d", "--name", tempContainer, "-v", dataVolume+":/src:ro", "debian:bookworm-slim", "tail", "-f", "/dev/null")
 	time.Sleep(500 * time.Millisecond)
 	_, _ = dockerRun("cp", tempContainer+":/src/.", tempDir+"/src")
 	_, _ = dockerRun("rm", "-f", tempContainer)
@@ -208,13 +208,13 @@ func handleRestore(cfg config) {
 
 	_, _ = dockerRun("volume", "create", targetVolume)
 
-	_, err := dockerRun("run", "--rm", "-v", targetVolume+":/dest", "-v", filepath.Dir(backupFile)+":/backup:ro", "alpine",
+	_, err := dockerRun("run", "--rm", "-v", targetVolume+":/dest", "-v", filepath.Dir(backupFile)+":/backup:ro", "debian:bookworm-slim",
 		"tar", "xzf", "/backup/"+filepath.Base(backupFile), "-C", "/dest")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: restore had issues: %v\n", err)
 	}
 
-	_, _ = dockerRun("run", "--rm", "-v", targetVolume+":/dest", "alpine", "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "/dest")
+	_, _ = dockerRun("run", "--rm", "-v", targetVolume+":/dest", "debian:bookworm-slim", "chown", "-R", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "/dest")
 
 	fmt.Fprintf(os.Stderr, "Restore complete.\n")
 }
