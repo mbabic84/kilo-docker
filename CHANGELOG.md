@@ -1,3 +1,9 @@
+## [3.16.0](https://github.com/mbabic84/kilo-docker/compare/v3.15.0...v3.16.0) (2026-05-12)
+
+### Features
+
+* use workspace directory name as Zellij session name ([a34b44a](https://github.com/mbabic84/kilo-docker/commit/a34b44a4b27a024132afcc530b5ee57e59e6fb9f))
+
 ## [3.15.0](https://github.com/mbabic84/kilo-docker/compare/v3.14.0...v3.15.0) (2026-05-12)
 
 ### Features
