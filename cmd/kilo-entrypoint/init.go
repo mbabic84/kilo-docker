@@ -340,7 +340,7 @@ func setupServiceGroups() error {
 		utils.Log("[init] setupServiceGroups: creating group %s with GID %s\n", svc.Name, gid)
 		// Try to create the group; if it fails (e.g., GID already exists),
 		// joinServiceGroups will handle adding the user to the existing group.
-		cmd := exec.Command("addgroup", "-g", gid, svc.Name)
+		cmd := exec.Command("addgroup", "--gid", gid, svc.Name)
 		if err := cmd.Run(); err != nil {
 			utils.Log("[init] setupServiceGroups: failed to create group %s (GID %s): %v\n", svc.Name, gid, err)
 			// Check what group already has this GID

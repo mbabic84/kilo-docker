@@ -308,11 +308,11 @@ func runUserInit(remember bool) error {
 // createOSUser creates an OS user with the given name and UID/GID.
 func createOSUser(username, uidStr, gidStr string) error {
 	_ = exec.Command("deluser", username).Run()
-	cmd := exec.Command("addgroup", "-g", gidStr, username)
+	cmd := exec.Command("addgroup", "--gid", gidStr, username)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("addgroup: %v: %s", err, out)
 	}
-	cmd = exec.Command("adduser", "-u", uidStr, "-G", username, "-D", "-s", "/bin/sh", username)
+	cmd = exec.Command("adduser", "--uid", uidStr, "--ingroup", username, "--disabled-password", "--shell", "/bin/sh", username)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("adduser: %v: %s", err, out)
 	}

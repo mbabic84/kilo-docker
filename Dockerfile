@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ── Builder: compile kilo-entrypoint ──
-FROM golang:1.26-alpine AS go-builder
+FROM golang:1.26-bookworm AS go-builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
@@ -9,21 +9,24 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/kilo-entrypoint ./cmd/kilo-entrypoint
 
 # ── Builder: download Kilo binary ──
-FROM alpine:latest AS builder
+FROM debian:bookworm-slim AS builder
 
 ARG KILO_VERSION=7.2.52
 
-RUN apk add --no-cache curl tar \
-    && curl -fsSL "https://github.com/Kilo-Org/kilocode/releases/download/v${KILO_VERSION}/kilo-linux-x64-musl.tar.gz" \
+RUN apt-get update && apt-get install -y --no-install-recommends curl tar ca-certificates \
+     && rm -rf /var/lib/apt/lists/* \
+     && curl -fsSL "https://github.com/Kilo-Org/kilocode/releases/download/v${KILO_VERSION}/kilo-linux-x64.tar.gz" \
        | tar xz -C /tmp \
     && chmod +x /tmp/kilo
 
-# ── Runtime: Alpine with tools ──
-FROM alpine:latest
+# ── Runtime: Debian with tools ──
+FROM debian:bookworm-slim
 
 ARG AINSTRUCT_BASE_URL=https://ainstruct-dev.kralicinora.cz
 
-RUN apk add --no-cache bash coreutils grep sed gawk libstdc++ git openssh-client ripgrep curl tar xz sudo jq tzdata \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash coreutils grep sed gawk libstdc++6 git openssh-client ripgrep curl tar xz-utils sudo jq tzdata ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz -o /tmp/zellij.tar.gz \
     && tar xzf /tmp/zellij.tar.gz -C /usr/local/bin && rm -rf /tmp/zellij.tar.gz && chmod +x /usr/local/bin/zellij \
     && echo "ALL ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/nopasswd \

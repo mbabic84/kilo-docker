@@ -61,7 +61,7 @@ var BuiltInServices = []Service{
 		Flag:        "--node",
 		Description: "Install Node.js LTS for development",
 		Install: []string{
-			"command -v node >/dev/null || apk add --no-cache nodejs npm",
+			"command -v node >/dev/null || apt-get update && apt-get install -y --no-install-recommends nodejs npm",
 		},
 		EnvVars: map[string]string{
 			"NODE_ENABLED": "1",
@@ -74,7 +74,7 @@ var BuiltInServices = []Service{
 		Flag:        "--gh",
 		Description: "Install GitHub CLI for interacting with GitHub",
 		Install: []string{
-			"command -v gh >/dev/null || apk add --no-cache github-cli",
+			"command -v gh >/dev/null || apt-get update && apt-get install -y --no-install-recommends gh",
 		},
 		Volumes:        []string{},
 		RequiresSocket: "",
@@ -99,8 +99,8 @@ var BuiltInServices = []Service{
 		Flag:        "--build",
 		Description: "Install build base dependencies (gcc, g++, make, python3) for compiling native extensions",
 		Install: []string{
-			"command -v gcc >/dev/null || apk add --no-cache build-base",
-			"command -v python3 >/dev/null || apk add --no-cache python3",
+"command -v gcc >/dev/null || apt-get update && apt-get install -y --no-install-recommends build-essential",
+		"command -v python3 >/dev/null || apt-get update && apt-get install -y --no-install-recommends python3",
 		},
 		EnvVars: map[string]string{
 			"BUILD_ENABLED": "1",
@@ -128,8 +128,8 @@ var BuiltInServices = []Service{
 		Flag:        "--python",
 		Description: "Install Python 3 with symlink for general purpose use",
 		Install: []string{
-			"command -v python3 >/dev/null || apk add --no-cache python3",
-			"[ -f /usr/local/bin/python ] || ln -sf $(command -v python3) /usr/local/bin/python",
+"command -v python3 >/dev/null || apt-get update && apt-get install -y --no-install-recommends python3",
+		"[ -f /usr/local/bin/python ] || ln -sf $(command -v python3) /usr/local/bin/python",
 		},
 		EnvVars: map[string]string{
 			"PYTHON_ENABLED": "1",
@@ -142,7 +142,7 @@ var BuiltInServices = []Service{
 		Flag:        "--rclone",
 		Description: "Install rclone, a universal CLI for S3 and 40+ cloud storage backends",
 		Install: []string{
-			"command -v rclone >/dev/null || (RCLONE_VERSION=$(curl -fsSL https://api.github.com/repos/rclone/rclone/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && RCLONE_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && command -v unzip >/dev/null || apk add --no-cache unzip && curl -fsSL \"https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}.zip\" -o /tmp/rclone.zip && unzip -o /tmp/rclone.zip -d /tmp && mv /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}/rclone /usr/local/bin/rclone && chmod +x /usr/local/bin/rclone && rm -rf /tmp/rclone.zip /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH})",
+			"command -v rclone >/dev/null || (RCLONE_VERSION=$(curl -fsSL https://api.github.com/repos/rclone/rclone/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && RCLONE_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && command -v unzip >/dev/null || apt-get update && apt-get install -y --no-install-recommends unzip && curl -fsSL \"https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}.zip\" -o /tmp/rclone.zip && unzip -o /tmp/rclone.zip -d /tmp && mv /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}/rclone /usr/local/bin/rclone && chmod +x /usr/local/bin/rclone && rm -rf /tmp/rclone.zip /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH})",
 		},
 		Volumes:        []string{},
 		RequiresSocket: "",
