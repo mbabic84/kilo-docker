@@ -257,7 +257,14 @@ func execZellij() error {
 	}
 
 	utils.Log("[zellijattach] Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
-	return syscall.Exec("/usr/local/bin/zellij", []string{"zellij", "attach", "--create", "kilo-docker"}, env)
+
+	sessionName := "kilo-docker"
+	if wd, err := os.Getwd(); err == nil {
+		if base := filepath.Base(wd); base != "" && base != "/" {
+			sessionName = base
+		}
+	}
+	return syscall.Exec("/usr/local/bin/zellij", []string{"zellij", "attach", "--create", sessionName}, env)
 }
 
 func ensureAccessibleWorkingDir() error {
