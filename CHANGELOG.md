@@ -1,3 +1,9 @@
+## [3.18.0](https://github.com/mbabic84/kilo-docker/compare/v3.17.0...v3.18.0) (2026-05-13)
+
+### Features
+
+* replace service groups with host supplementary groups (PGIDS); add gitnexus service ([6df1d41](https://github.com/mbabic84/kilo-docker/commit/6df1d41dbe08129b8c70d03c5ce3e112f7518905))
+
 ## [3.17.0](https://github.com/mbabic84/kilo-docker/compare/v3.16.0...v3.17.0) (2026-05-12)
 
 ### Features
