@@ -12,6 +12,7 @@ type session struct {
 	Status    string
 	Workspace string
 	Args      string
+	User      string
 }
 
 // getSessions queries Docker for all containers labeled with kilo.workspace.
@@ -43,6 +44,9 @@ func getSessions() ([]session, error) {
 				storedArgs := strings.TrimPrefix(label, "kilo.args=")
 				cfg := parseArgs(strings.Fields(storedArgs))
 				s.Args = serializeForDisplay(cfg, false)
+			}
+			if strings.HasPrefix(label, "kilo.owner=") {
+				s.User = strings.TrimPrefix(label, "kilo.owner=")
 			}
 		}
 		sessions = append(sessions, s)

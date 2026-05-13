@@ -203,3 +203,77 @@ func TestSerializeArgsYesOnlyWhenExplicit(t *testing.T) {
 		t.Errorf("expected '--yes' when cfg.yes=true, got %q", resultWithYes)
 	}
 }
+
+func TestArgsMatchIdentical(t *testing.T) {
+	if !argsMatch("--once", "--once") {
+		t.Error("identical args should match")
+	}
+}
+
+func TestArgsMatchNetworkNormalized(t *testing.T) {
+	// --network kilo-shared is implicit and should be stripped before comparison
+	if !argsMatch("--port 8080:80", "--network kilo-shared --port 8080:80") {
+		t.Error("kilo-shared network should be normalized away")
+	}
+}
+
+func TestArgsMatchDifferent(t *testing.T) {
+	if argsMatch("--once", "--playwright") {
+		t.Error("different args should not match")
+	}
+}
+
+func TestArgsMatchPortReordering(t *testing.T) {
+	// Port reordering is NOT normalized — this is a known limitation
+	if argsMatch("--port 8080:80 --port 3000:3000", "--port 3000:3000 --port 8080:80") {
+		t.Error("port reordering should not match (known limitation)")
+	}
+}
+
+func TestArgsMatchSSH(t *testing.T) {
+	// --ssh should be compared like any other flag
+	if !argsMatch("--ssh", "--ssh") {
+		t.Error("identical args with --ssh should match")
+	}
+	if argsMatch("--ssh", "") {
+		t.Error("args with --ssh should not match empty args")
+	}
+}
+
+func TestSerializeStoredArgsRoundTrip(t *testing.T) {
+	stored := "--once --ssh"
+	displayed := serializeStoredArgs(stored)
+	if !strings.Contains(displayed, "--once") {
+		t.Errorf("expected '--once' in displayed, got %q", displayed)
+	}
+	if !strings.Contains(displayed, "--ssh") {
+		t.Errorf("expected '--ssh' in displayed, got %q", displayed)
+	}
+}
+
+func TestSerializeStoredArgsEmpty(t *testing.T) {
+	if serializeStoredArgs("") != "" {
+		t.Error("empty stored args should return empty")
+	}
+}
+
+func TestSerializeStoredArgsPorts(t *testing.T) {
+	stored := "--port 8080:80 --port 3000:3000"
+	displayed := serializeStoredArgs(stored)
+	if !strings.Contains(displayed, "--port 8080:80") {
+		t.Errorf("expected '--port 8080:80' in displayed, got %q", displayed)
+	}
+	if !strings.Contains(displayed, "--port 3000:3000") {
+		t.Errorf("expected '--port 3000:3000' in displayed, got %q", displayed)
+	}
+}
+
+func TestArgsMatchExitedContainerSSHMismatch(t *testing.T) {
+	// This simulates the scenario where a container was created with --ssh
+	// but the user runs without it — args should not match
+	current := serializeForDisplay(config{}, false)
+	stored := serializeArgs(config{ssh: true}, true)
+	if argsMatch(current, stored) {
+		t.Error("args should not match when SSH flag differs")
+	}
+}

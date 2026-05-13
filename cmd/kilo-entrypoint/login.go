@@ -403,8 +403,8 @@ func promptPassword() string {
 
 
 func buildAinstructPATLabel() string {
-	username := os.Getenv("PAT_USERNAME")
-	hostname := os.Getenv("PAT_HOSTNAME")
+	username := os.Getenv("KD_USERNAME")
+	hostname := os.Getenv("KD_HOSTNAME")
 	if username == "" {
 		username = "unknown"
 	}

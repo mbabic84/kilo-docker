@@ -131,6 +131,7 @@ func runContainer(cfg config) {
 	}
 	containerName := deriveContainerName(workspace)
 	containerState := dockerState(containerName)
+
 	if cfg.once {
 		if containerState != "not_found" {
 			_, _ = dockerRun("rm", "-f", containerName)
@@ -138,7 +139,20 @@ func runContainer(cfg config) {
 		containerState = "not_found"
 	} else {
 		switch containerState {
-		case "exited", "dead", "created":
+		case "exited", "created":
+			currentFlags := serializeForDisplay(cfg, cfg.ssh)
+			storedFlags := getContainerLabel(containerName, "kilo.args")
+			displayedStoredFlags := serializeStoredArgs(storedFlags)
+			if !argsMatch(currentFlags, storedFlags) {
+				utils.Log("[kilo-docker] Existing session uses different flags.\n", utils.WithOutput())
+				utils.Log("[kilo-docker]   Existing: %s\n", displayedStoredFlags, utils.WithOutput())
+				utils.Log("[kilo-docker]   Current:  %s\n", currentFlags, utils.WithOutput())
+				if cfg.yes || promptConfirm("Recreate with new flags? [y/N]: ", cfg.yes) {
+					_, _ = dockerRun("rm", "-f", containerName)
+					containerState = "not_found"
+				}
+			}
+		case "dead":
 			_, _ = dockerRun("rm", "-f", containerName)
 			containerState = "not_found"
 		}
@@ -219,6 +233,7 @@ func runContainer(cfg config) {
 		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerName, cfg.once)
 	case "exited", "created":
+		utils.Log("[kilo-docker] Restarting existing session '%s' (use 'sessions recreate' to pick up image updates).\n", containerName, utils.WithOutput())
 		_, _ = dockerRun("start", "-d", containerName)
 		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerName, cfg.once)
