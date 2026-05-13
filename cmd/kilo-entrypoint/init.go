@@ -296,44 +296,6 @@ func expandHome(path, home string) string {
 	return path
 }
 
-// setupServiceGroups reads KD_SERVICES and DOCKER_GID env vars, then sets up
-// group membership for services that require socket access.
-func setupServiceGroups() error {
-	servicesEnv := os.Getenv("KD_SERVICES")
-	if servicesEnv == "" {
-		utils.Log("[init] setupServiceGroups: no services enabled\n")
-		return nil
-	}
-	utils.Log("[init] setupServiceGroups: services=%s\n", servicesEnv)
-
-	for _, svcName := range strings.Split(servicesEnv, ",") {
-		svc := getService(svcName)
-		if svc == nil || svc.RequiresSocket == "" {
-			utils.Log("[init] setupServiceGroups: skipping %s (no socket required)\n", svcName)
-			continue
-		}
-		gid := os.Getenv(svc.GIDEnvVar)
-		if gid == "" {
-			utils.Log("[init] setupServiceGroups: skipping %s (no GID env var)\n", svcName)
-			continue
-		}
-		utils.Log("[init] setupServiceGroups: creating group %s with GID %s\n", svc.Name, gid)
-		// Try to create the group; if it fails (e.g., GID already exists),
-		// joinServiceGroups will handle adding the user to the existing group.
-		cmd := exec.Command("addgroup", "--gid", gid, svc.Name)
-		if err := cmd.Run(); err != nil {
-			utils.Log("[init] setupServiceGroups: failed to create group %s (GID %s): %v\n", svc.Name, gid, err)
-			// Check what group already has this GID
-			if out, err := exec.Command("getent", "group", gid).Output(); err == nil {
-				utils.Log("[init] setupServiceGroups: GID %s already assigned to: %s\n", gid, strings.TrimSpace(string(out)))
-			}
-		} else {
-			utils.Log("[init] setupServiceGroups: created group %s with GID %s\n", svc.Name, gid)
-		}
-	}
-	return nil
-}
-
 // setupKnownHosts runs ssh-keyscan to pre-populate ~/.ssh/known_hosts
 // for GitHub, GitLab, and Bitbucket, avoiding interactive host key prompts.
 func setupKnownHosts(home string) error {

@@ -11,14 +11,12 @@ type Service struct {
 	Flag           string
 	Description    string
 	Install        []string
-	UserInstall    []string // Install commands that run after user creation with HOME set to user home
-	VersionCheck   string   // Command to check current version (returns version string or empty)
-	LatestVersion  string   // Command to get latest available version
+	UserInstall    []string
+	VersionCheck   string
+	LatestVersion  string
 	EnvVars        map[string]string
-	HostEnvVars    map[string]string
 	Volumes        []string
 	RequiresSocket string
-	GIDEnvVar      string
 	CopyConfigs    []CopyConfig
 }
 
@@ -35,12 +33,8 @@ var BuiltInServices = []Service{
 		EnvVars: map[string]string{
 			"DOCKER_ENABLED": "1",
 		},
-		HostEnvVars: map[string]string{
-			"DOCKER_GID": "",
-		},
 		Volumes:        []string{"/var/run/docker.sock:/var/run/docker.sock"},
 		RequiresSocket: "/var/run/docker.sock",
-		GIDEnvVar:      "DOCKER_GID",
 	},
 	{
 		Name:        "go",
@@ -52,19 +46,6 @@ var BuiltInServices = []Service{
 			"chmod +x /usr/local/bin/go-wrapper",
 			"ln -sf /usr/local/bin/go-wrapper /usr/local/bin/go",
 			"command -v golangci-lint >/dev/null || (curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b /usr/local/bin)",
-		},
-		Volumes:        []string{},
-		RequiresSocket: "",
-	},
-	{
-		Name:        "node",
-		Flag:        "--node",
-		Description: "Install Node.js LTS for development",
-		Install: []string{
-			"command -v node >/dev/null || apt-get update && apt-get install -y --no-install-recommends nodejs npm",
-		},
-		EnvVars: map[string]string{
-			"NODE_ENABLED": "1",
 		},
 		Volumes:        []string{},
 		RequiresSocket: "",
@@ -143,6 +124,19 @@ var BuiltInServices = []Service{
 		Description: "Install rclone, a universal CLI for S3 and 40+ cloud storage backends",
 		Install: []string{
 			"command -v rclone >/dev/null || (RCLONE_VERSION=$(curl -fsSL https://api.github.com/repos/rclone/rclone/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && RCLONE_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && command -v unzip >/dev/null || apt-get update && apt-get install -y --no-install-recommends unzip && curl -fsSL \"https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}.zip\" -o /tmp/rclone.zip && unzip -o /tmp/rclone.zip -d /tmp && mv /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}/rclone /usr/local/bin/rclone && chmod +x /usr/local/bin/rclone && rm -rf /tmp/rclone.zip /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH})",
+		},
+		Volumes:        []string{},
+		RequiresSocket: "",
+	},
+	{
+		Name:        "gitnexus",
+		Flag:        "--gitnexus",
+		Description: "Install GitNexus for codebase knowledge graph indexing and MCP-based code intelligence",
+		UserInstall: []string{
+			"export NVM_DIR=\"$HOME/.nvm\" && if [ ! -s \"$NVM_DIR/nvm.sh\" ]; then curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash; fi && . \"$NVM_DIR/nvm.sh\" && nvm install --lts && npm install -g gitnexus",
+		},
+		EnvVars: map[string]string{
+			"GITNEXUS_ENABLED": "1",
 		},
 		Volumes:        []string{},
 		RequiresSocket: "",

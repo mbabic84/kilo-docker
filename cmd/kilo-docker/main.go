@@ -36,9 +36,7 @@ package main
 
 import (
 	"os"
-	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
@@ -175,7 +173,6 @@ func runContainer(cfg config) {
 		}
 	}
 
-	hostEnvVars := make(map[string]string)
 	for _, svcName := range cfg.enabledServices {
 		svc := getService(svcName)
 		if svc == nil || svc.RequiresSocket == "" {
@@ -184,13 +181,6 @@ func runContainer(cfg config) {
 		if _, err := os.Stat(svc.RequiresSocket); os.IsNotExist(err) {
 			utils.LogError("%s not found. Is the host socket available?\n", svc.RequiresSocket)
 			os.Exit(1)
-		}
-		info, _ := os.Stat(svc.RequiresSocket)
-		if info != nil {
-			gid := strconv.FormatUint(uint64(info.Sys().(*syscall.Stat_t).Gid), 10)
-			for key := range svc.HostEnvVars {
-				hostEnvVars[key] = gid
-			}
 		}
 	}
 
@@ -217,7 +207,7 @@ func runContainer(cfg config) {
 	}
 
 	containerArgs := buildContainerArgs(cfg, dataVolume, workspace, containerName, containerState,
-		sshAuthSock, hostEnvVars)
+		sshAuthSock)
 
 	if sshAgentStarted {
 		defer cleanupSSH(sshAgentPid)
