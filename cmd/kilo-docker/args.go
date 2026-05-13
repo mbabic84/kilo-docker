@@ -14,7 +14,7 @@ import (
 func serializeArgs(cfg config, sshEnabled bool) string {
 	var parts []string
 
-	utils.Log("[serializeArgs] cfg.remember=%v, cfg.ssh=%v, cfg.once=%v, cfg.yes=%v\n", cfg.remember, cfg.ssh, cfg.once, cfg.yes)
+	utils.Log("[serializeArgs] cfg.ssh=%v, cfg.once=%v, cfg.yes=%v\n", cfg.ssh, cfg.once, cfg.yes)
 
 	for _, f := range boolFlags {
 		if serialized, ok := f.serialize(cfg); ok {
@@ -47,7 +47,7 @@ func serializeArgs(cfg config, sshEnabled bool) string {
 }
 
 func buildContainerArgs(cfg config, volume, workspace, containerName, containerState,
-	sshAuthSock string, hostEnvVars map[string]string) []string {
+	sshAuthSock string) []string {
 
 	args := []string{
 		"--init",
@@ -56,6 +56,21 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 		"-e", "PGID=" + strconv.Itoa(os.Getgid()),
 		"-v", workspace + ":" + workspace,
 		"-w", workspace,
+	}
+
+	// Pass supplementary group IDs so the container user can access
+	// workspace files with group-level permissions.
+	if groups, err := os.Getgroups(); err == nil {
+		primaryGID := os.Getgid()
+		var hostGroups []string
+		for _, g := range groups {
+			if g != primaryGID {
+				hostGroups = append(hostGroups, strconv.Itoa(g))
+			}
+		}
+		if len(hostGroups) > 0 {
+			args = append(args, "-e", "PGIDS="+strings.Join(hostGroups, ","))
+		}
 	}
 
 	if !cfg.once && volume != "" {
@@ -80,11 +95,6 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 		for key, value := range svc.EnvVars {
 			if value != "" {
 				args = append(args, "-e", key+"="+value)
-			}
-		}
-		for key := range svc.HostEnvVars {
-			if val, ok := hostEnvVars[key]; ok {
-				args = append(args, "-e", key+"="+val)
 			}
 		}
 		for _, vol := range svc.Volumes {

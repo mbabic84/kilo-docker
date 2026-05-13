@@ -98,7 +98,7 @@ func handleSessions(cfg config) {
 		utils.Log("[kilo-docker] Recreating with stored args: %q, parsed: %v\n", storedArgs, parsedArgs)
 
 		newCfg := parseArgs(parsedArgs)
-		utils.Log("[kilo-docker] Parsed config: remember=%v, ssh=%v, yes=%v, services=%v\n", newCfg.remember, newCfg.ssh, newCfg.yes, newCfg.enabledServices)
+		utils.Log("[kilo-docker] Parsed config: ssh=%v, yes=%v, services=%v\n", newCfg.ssh, newCfg.yes, newCfg.enabledServices)
 		newCfg.command = "" // ensure runContainer creates a new container
 		utils.Log("[kilo-docker] Recreate config after normalization: yes=%v, serialized=%q\n", newCfg.yes, serializeArgs(newCfg, newCfg.ssh))
 
@@ -191,23 +191,9 @@ func handleSessions(cfg config) {
 	}
 
 	state := dockerState(containerToAttach)
-	rememberFlag := ""
-	for _, s := range sessions {
-		if s.Name == containerToAttach {
-			if strings.Contains(s.Args, "--remember") {
-				rememberFlag = "--remember"
-			}
-			break
-		}
-	}
 	switch state {
 	case "running":
-		// Pass --remember BEFORE zellij-attach so flag.Parse() catches it
-		if rememberFlag != "" {
-			_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", rememberFlag, "zellij-attach")
-		} else {
-			_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
-		}
+		_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerToAttach, false)
 	case "exited", "created":
 		needsSSH := false
@@ -224,12 +210,7 @@ func handleSessions(cfg config) {
 			}
 		}
 		_, _ = dockerRun("start", "-d", containerToAttach)
-		// Pass --remember BEFORE zellij-attach so flag.Parse() catches it
-		if rememberFlag != "" {
-			_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", rememberFlag, "zellij-attach")
-		} else {
-			_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
-		}
+		_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerToAttach, false)
 	default:
 		fmt.Fprintf(os.Stderr, "Error: Container '%s' is in state '%s'.\n", containerToAttach, state)

@@ -22,6 +22,11 @@
       "type": "remote",
       "url": "http://kilo-playwright-mcp:8931/mcp",
       "enabled": false
+    },
+    "gitnexus": {
+      "type": "local",
+      "command": ["gitnexus", "mcp"],
+      "enabled": false
     }
   },
   "instructions": [

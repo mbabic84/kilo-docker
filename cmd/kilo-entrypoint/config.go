@@ -27,20 +27,21 @@ func applyMCPEnabledFromEnv(homeDir string) error {
 		}
 	}
 
-	// Determine enabled states
-	// playwright is controlled by env var (not stored in encrypted tokens)
-	playwrightEnabled := os.Getenv("PLAYWRIGHT_ENABLED") == "1"
+	// Determine enabled states for env-var-controlled servers
+	enabled := map[string]bool{
+		"playwright": os.Getenv("PLAYWRIGHT_ENABLED") == "1",
+		"gitnexus":   os.Getenv("GITNEXUS_ENABLED") == "1",
+	}
 
 	// context7 and ainstruct tokens are read from encrypted storage only
 	var context7Token, ainstructToken string
 
 	if homeDir != "" {
-		// We need userID to decrypt
 		_, _, _, userID := loadUserConfig()
 		if userID != "" {
 			if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); err == nil {
 				if decrypted, err := decryptAES(encData, userID); err == nil {
-					c7, aInst, _, _, _, _ := parseTokenEnv(string(decrypted))
+					c7, aInst, _, _, _, _, _ := parseTokenEnv(string(decrypted))
 					context7Token = c7
 					ainstructToken = aInst
 					utils.Log("[MCP Config] Loaded tokens from encrypted storage\n")
@@ -57,17 +58,16 @@ func applyMCPEnabledFromEnv(homeDir string) error {
 		utils.Log("[MCP Config] No homeDir available to load encrypted tokens\n")
 	}
 
-	context7Enabled := context7Token != ""
-	context7TokenLen := len(context7Token)
+	enabled["context7"] = context7Token != ""
+	enabled["ainstruct"] = ainstructToken != ""
 
-	ainstructEnabled := ainstructToken != ""
+	context7TokenLen := len(context7Token)
 	aintTokenLen := len(ainstructToken)
 
-	// Log what we found (token lengths only, not actual values)
-	utils.Log("[MCP Config] Environment check - PLAYWRIGHT_ENABLED=%v, context7=[%d chars], ainstruct=[%d chars]\n",
-		playwrightEnabled, context7TokenLen, aintTokenLen)
-	utils.Log("[MCP Config] Determined enabled states - playwright=%v, context7=%v, ainstruct=%v\n",
-		playwrightEnabled, context7Enabled, ainstructEnabled)
+	utils.Log("[MCP Config] Environment check - PLAYWRIGHT_ENABLED=%v, GITNEXUS_ENABLED=%v, context7=[%d chars], ainstruct=[%d chars]\n",
+		enabled["playwright"], enabled["gitnexus"], context7TokenLen, aintTokenLen)
+	utils.Log("[MCP Config] Determined enabled states - playwright=%v, gitnexus=%v, context7=%v, ainstruct=%v\n",
+		enabled["playwright"], enabled["gitnexus"], enabled["context7"], enabled["ainstruct"])
 
 	// Check if we have homeDir for config update
 	if homeDir == "" {
@@ -75,10 +75,10 @@ func applyMCPEnabledFromEnv(homeDir string) error {
 		return nil
 	}
 
-	configPath := filepath.Join(homeDir, ".config", "kilo", "opencode.json")
+	configPath := filepath.Join(homeDir, ".config", "kilo", "kilo.jsonc")
 	utils.Log("[MCP Config] Target config file: %s\n", configPath)
 
-	if err := updateMCPEnabledStates(configPath, playwrightEnabled, context7Enabled, ainstructEnabled); err != nil {
+	if err := updateMCPEnabledStates(configPath, enabled); err != nil {
 		utils.LogWarn("[MCP Config] Failed to update %s: %v\n", configPath, err)
 		return err
 	}
@@ -89,15 +89,15 @@ func applyMCPEnabledFromEnv(homeDir string) error {
 
 // updateMCPEnabledStates rewrites opencode.json with updated MCP enabled states.
 // It preserves all other configuration fields (url, headers, type, etc).
-// Servers are enabled/disabled based solely on the boolean parameters passed.
-func updateMCPEnabledStates(configPath string, playwrightEnabled, context7Enabled, ainstructEnabled bool) error {
+// Servers are enabled/disabled based on the enabled map passed in.
+func updateMCPEnabledStates(configPath string, enabled map[string]bool) error {
 	utils.Log("[MCP Config] Reading config file: %s\n", configPath)
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			utils.LogWarn("[MCP Config] Config file does not exist: %s\n", configPath)
-			return nil // Config doesn't exist, nothing to update
+			return nil
 		}
 		utils.LogError("[MCP Config] Failed to read config file: %v\n", err)
 		return err
@@ -114,12 +114,12 @@ func updateMCPEnabledStates(configPath string, playwrightEnabled, context7Enable
 	mcpRaw, ok := config["mcp"]
 	if !ok {
 		utils.LogWarn("[MCP Config] No 'mcp' section found in config, nothing to update\n")
-		return nil // No MCP section, nothing to update
+		return nil
 	}
 	mcp, ok := mcpRaw.(map[string]any)
 	if !ok {
 		utils.LogError("[MCP Config] 'mcp' section is not an object\n")
-		return nil // MCP section is not an object
+		return nil
 	}
 	utils.Log("[MCP Config] Found MCP section with %d server(s)\n", len(mcp))
 
@@ -133,21 +133,11 @@ func updateMCPEnabledStates(configPath string, playwrightEnabled, context7Enable
 
 		oldEnabled := entry["enabled"]
 
-		// Update enabled state based on server type
-		switch key {
-		case "playwright":
-			entry["enabled"] = playwrightEnabled
-			utils.Log("[MCP Config] playwright: enabled=%v (was %v)\n", playwrightEnabled, oldEnabled)
+		if val, known := enabled[key]; known {
+			entry["enabled"] = val
+			utils.Log("[MCP Config] %s: enabled=%v (was %v)\n", key, val, oldEnabled)
 			updatedCount++
-		case "context7":
-			entry["enabled"] = context7Enabled
-			utils.Log("[MCP Config] context7: enabled=%v (was %v)\n", context7Enabled, oldEnabled)
-			updatedCount++
-		case "ainstruct":
-			entry["enabled"] = ainstructEnabled
-			utils.Log("[MCP Config] ainstruct: enabled=%v (was %v)\n", ainstructEnabled, oldEnabled)
-			updatedCount++
-		default:
+		} else {
 			utils.Log("[MCP Config] Skipping unknown MCP server '%s'\n", key)
 		}
 
@@ -160,7 +150,6 @@ func updateMCPEnabledStates(configPath string, playwrightEnabled, context7Enable
 		return err
 	}
 
-	// Atomic write: write to temp file first, then rename
 	tmpPath := configPath + ".tmp"
 	utils.Log("[MCP Config] Writing to temp file: %s\n", tmpPath)
 	if err := os.WriteFile(tmpPath, out, 0o600); err != nil {

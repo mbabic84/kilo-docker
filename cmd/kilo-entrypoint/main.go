@@ -6,7 +6,6 @@
 //
 // When invoked with a subcommand, it delegates to the appropriate handler:
 //
-//	ainstruct-login Authenticate with Ainstruct API, output structured result
 //	update-config   Download config template, merge with existing config
 //	backup          Create tar.gz of KILO_HOME
 //	restore         Extract tar.gz into KILO_HOME with ownership fix
@@ -31,7 +30,6 @@ import (
 // Any argument NOT in this map is passed through to exec.LookPath for
 // direct binary execution (e.g. "kilo", "sh", "bash").
 var subcommands = map[string]bool{
-	"ainstruct-login": true,
 	"update-config":   true,
 	"backup":          true,
 	"restore":         true,
@@ -63,16 +61,12 @@ func runHelp() {
 	const w = 40
 	fmt.Println("kilo-entrypoint - Container entrypoint for kilo-docker")
 	fmt.Println("")
-	fmt.Println("Usage: kilo-entrypoint [flags] [subcommand]")
+	fmt.Println("Usage: kilo-entrypoint [subcommand]")
 	fmt.Println("")
 	fmt.Println("With no arguments, runs container initialization.")
 	fmt.Println("")
-	fmt.Println("Flags:")
-	fmt.Printf("  %-*s %s\n", w, "--remember", "Remember Ainstruct login for auto-login on session attach")
-	fmt.Println("")
 	fmt.Println("Subcommands:")
 	fmt.Printf("  %-*s %s\n", w, "help", "Show this help message")
-	fmt.Printf("  %-*s %s\n", w, "ainstruct-login", "Authenticate with Ainstruct API, output structured result")
 	fmt.Printf("  %-*s %s\n", w, "update-config", "Download config template, merge with existing config")
 	fmt.Printf("  %-*s %s\n", w, "backup [path]", "Create tar.gz of KILO_HOME (default: /tmp/backup.tar.gz)")
 	fmt.Printf("  %-*s %s\n", w, "restore [path]", "Extract tar.gz into KILO_HOME with ownership fix")
@@ -86,7 +80,7 @@ func runHelp() {
 	fmt.Printf("  %-*s %s\n", w, "print-env", "Print export statements for current tokens")
 	fmt.Println("")
 	fmt.Println("Examples:")
-	fmt.Println("  kilo-entrypoint --remember zellij-attach")
+	fmt.Println("  kilo-entrypoint zellij-attach")
 	fmt.Println("  kilo-entrypoint sync")
 	fmt.Println("")
 	fmt.Println("Any other argument is passed through to exec.LookPath for")
@@ -99,19 +93,23 @@ func runPrintEnv() {
 		return
 	}
 
-	context7, ainstruct, _, _, _, err := loadEncryptedTokens(homeDir, userID)
+	context7, ainstruct, _, _, _, patExpiry, err := loadEncryptedTokens(homeDir, userID)
 	if err != nil {
 		return
 	}
 
 	fmt.Printf("export KD_MCP_CONTEXT7_TOKEN=%q\n", context7)
 	fmt.Printf("export KD_MCP_AINSTRUCT_TOKEN=%q\n", ainstruct)
+	if patExpiry != "" {
+		fmt.Printf("export KD_AINSTRUCT_PAT_EXPIRY=%q\n", patExpiry)
+	} else {
+		fmt.Printf("# KD_AINSTRUCT_PAT_EXPIRY not set\n")
+	}
 }
 
 func main() {
-	remember := flag.Bool("remember", false, "Remember login credentials for future sessions")
 	flag.Parse()
-	utils.Log("[main] Entrypoint started, os.Args=%v, remember=%v\n", os.Args, *remember)
+	utils.Log("[main] Entrypoint started, os.Args=%v\n", os.Args)
 
 	remaining := flag.Args()
 	hasSubcommand := len(remaining) > 0 && !strings.HasPrefix(remaining[0], "-")
@@ -123,13 +121,13 @@ func main() {
 
 	if onlyFlags && !hasSubcommand {
 		if alreadyInitialized() {
-			if err := runZellijAttach(*remember); err != nil {
+			if err := runZellijAttach(); err != nil {
 				utils.LogError("[main] zellij-attach error: %v\n", err, utils.WithOutput())
 				os.Exit(1)
 			}
 			return
 		}
-		if err := runInit(*remember); err != nil {
+		if err := runInit(); err != nil {
 			utils.LogError("[main] init error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
@@ -151,11 +149,6 @@ func main() {
 	}
 
 	switch name {
-	case "ainstruct-login":
-		if err := runAinstructLogin(); err != nil {
-			utils.LogError("[main] STATUS=error\nERROR=%v\n", err, utils.WithOutput())
-			os.Exit(1)
-		}
 	case "update-config":
 		if err := runUpdateConfig(); err != nil {
 			utils.LogError("[main] update-config error: %v\n", err, utils.WithOutput())
@@ -225,7 +218,7 @@ func main() {
 		s.pushAll()
 		utils.Log("[main] Resync complete.\n")
 	case "zellij-attach":
-		if err := runZellijAttach(*remember); err != nil {
+		if err := runZellijAttach(); err != nil {
 			utils.LogError("[main] zellij-attach error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}

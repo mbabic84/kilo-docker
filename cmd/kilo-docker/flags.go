@@ -18,7 +18,6 @@ var kiloVersion = "unknown"
 
 type config struct {
 	once                    bool
-	remember                bool
 	playwright              bool
 	playwrightRecreateVolume bool
 	ssh                     bool
@@ -71,12 +70,6 @@ var boolFlags = []boolFlag{
 		Description: "Run a one-time session without persisting data (no volume)",
 		setField:    func(c *config) { c.once = true },
 		serialize:   func(c config) (string, bool) { return "--once", c.once },
-	},
-	{
-		Names:       []string{"--remember"},
-		Description: "Remember Ainstruct login for auto-login on future sessions",
-		setField:    func(c *config) { c.remember = true },
-		serialize:   func(c config) (string, bool) { return "--remember", c.remember },
 	},
 	{
 		Names:       []string{"--playwright"},

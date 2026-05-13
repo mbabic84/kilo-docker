@@ -215,3 +215,29 @@ func TestRcloneServiceHasRequiredFields(t *testing.T) {
 		t.Errorf("expected RequiresSocket to be empty for rclone, got %q", svc.RequiresSocket)
 	}
 }
+
+func TestGitNexusServiceHasRequiredFields(t *testing.T) {
+	svc := getService("gitnexus")
+	if svc == nil {
+		t.Fatal("gitnexus service not found")
+	}
+
+	if svc.Name != "gitnexus" {
+		t.Errorf("expected Name 'gitnexus', got %q", svc.Name)
+	}
+	if svc.Flag != "--gitnexus" {
+		t.Errorf("expected Flag '--gitnexus', got %q", svc.Flag)
+	}
+	if len(svc.Install) != 0 {
+		t.Errorf("expected 0 Install commands for gitnexus, got %d", len(svc.Install))
+	}
+	if len(svc.UserInstall) != 1 {
+		t.Errorf("expected 1 UserInstall command for gitnexus, got %d", len(svc.UserInstall))
+	}
+	if svc.RequiresSocket != "" {
+		t.Errorf("expected RequiresSocket to be empty for gitnexus, got %q", svc.RequiresSocket)
+	}
+	if _, ok := svc.EnvVars["GITNEXUS_ENABLED"]; !ok {
+		t.Error("expected GITNEXUS_ENABLED in EnvVars")
+	}
+}

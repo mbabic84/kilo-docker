@@ -22,20 +22,15 @@ const initReadyMarker = "/tmp/.kilo-init-ready"
 //   - Installs enabled services from KD_SERVICES env var
 //   - Sets up service groups for socket access
 //   - Validates SSH agent socket
-//   - Auto-login if --remember and valid stored tokens exist
 //
 // User creation, home directory, and privilege drop are handled by
 // runUserInit() when docker exec calls kilo-entrypoint zellij-attach.
-func runInit(remember bool) error {
-	utils.Log("[init] Container initializing (remember=%v)\n", remember)
+func runInit() error {
+	utils.Log("[init] Container initializing\n")
 	if os.Getuid() == 0 {
 		utils.Log("[init] Running as root (UID=0)\n")
 		if err := installServices(); err != nil {
 			utils.LogWarn("[init] service installation error: %v\n", err)
-		}
-
-		if err := setupServiceGroups(); err != nil {
-			utils.LogWarn("[init] group setup error: %v\n", err)
 		}
 
 		if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
@@ -73,21 +68,6 @@ func runInit(remember bool) error {
 	if len(args) == 0 || (len(args) > 0 && strings.HasPrefix(args[0], "-")) {
 		utils.Log("[init] Init complete, waiting for exec\n")
 		return syscall.Exec("/bin/sleep", []string{"sleep", "infinity"}, os.Environ())
-	}
-
-	// Preserve --remember flag when execing to zellij-attach
-	if remember && len(args) > 0 && args[0] == "zellij-attach" {
-		hasRemember := false
-		for _, arg := range args {
-			if arg == "--remember" {
-				hasRemember = true
-				break
-			}
-		}
-		if !hasRemember {
-			args = append(args, "--remember")
-			utils.Log("[init] Preserving --remember flag for zellij-attach\n")
-		}
 	}
 
 	return syscall.Exec(binaryPath, args, os.Environ())
@@ -314,44 +294,6 @@ func expandHome(path, home string) string {
 		return filepath.Join(home, path[2:])
 	}
 	return path
-}
-
-// setupServiceGroups reads KD_SERVICES and DOCKER_GID env vars, then sets up
-// group membership for services that require socket access.
-func setupServiceGroups() error {
-	servicesEnv := os.Getenv("KD_SERVICES")
-	if servicesEnv == "" {
-		utils.Log("[init] setupServiceGroups: no services enabled\n")
-		return nil
-	}
-	utils.Log("[init] setupServiceGroups: services=%s\n", servicesEnv)
-
-	for _, svcName := range strings.Split(servicesEnv, ",") {
-		svc := getService(svcName)
-		if svc == nil || svc.RequiresSocket == "" {
-			utils.Log("[init] setupServiceGroups: skipping %s (no socket required)\n", svcName)
-			continue
-		}
-		gid := os.Getenv(svc.GIDEnvVar)
-		if gid == "" {
-			utils.Log("[init] setupServiceGroups: skipping %s (no GID env var)\n", svcName)
-			continue
-		}
-		utils.Log("[init] setupServiceGroups: creating group %s with GID %s\n", svc.Name, gid)
-		// Try to create the group; if it fails (e.g., GID already exists),
-		// joinServiceGroups will handle adding the user to the existing group.
-		cmd := exec.Command("addgroup", "--gid", gid, svc.Name)
-		if err := cmd.Run(); err != nil {
-			utils.Log("[init] setupServiceGroups: failed to create group %s (GID %s): %v\n", svc.Name, gid, err)
-			// Check what group already has this GID
-			if out, err := exec.Command("getent", "group", gid).Output(); err == nil {
-				utils.Log("[init] setupServiceGroups: GID %s already assigned to: %s\n", gid, strings.TrimSpace(string(out)))
-			}
-		} else {
-			utils.Log("[init] setupServiceGroups: created group %s with GID %s\n", svc.Name, gid)
-		}
-	}
-	return nil
 }
 
 // setupKnownHosts runs ssh-keyscan to pre-populate ~/.ssh/known_hosts

@@ -179,11 +179,6 @@ func TestEnsureRunArgsBrokenPatternsFromBugReport(t *testing.T) {
 		wantFull string // full joined command
 	}{
 		{
-			name:     "ainstruct.go login call",
-			args:     []string{"-e", "USERNAME=user", "-e", "PASSWORD=pass", "-e", "API_URL=https://example.com", "image", "ainstruct-login"},
-			wantFull: "run --rm -e USERNAME=user -e PASSWORD=pass -e API_URL=https://example.com image ainstruct-login",
-		},
-		{
 			name:     "tokens.go loadTokens encrypted call",
 			args:     []string{"-v", "vol:/home/kd", "image", "cat", "/home/kd/.tokens.env.enc"},
 			wantFull: "run --rm -v vol:/home/kd image cat /home/kd/.tokens.env.enc",
