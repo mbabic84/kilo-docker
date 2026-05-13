@@ -102,7 +102,7 @@ linters:
 
   settings:
     dupl:
-      threshold: 60
+      threshold: 50
     
     gocyclo:
       min-complexity: 20
