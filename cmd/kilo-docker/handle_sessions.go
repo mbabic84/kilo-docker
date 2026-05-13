@@ -8,13 +8,14 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
-// handleSessions lists, attaches to, recreates, or cleans up kilo-docker sessions.
+// handleSessions lists, attaches to, recreates, stops, or cleans up kilo-docker sessions.
 func handleSessions(cfg config) {
 	args := cfg.args
 	cleanupMode := false
 	cleanupYes := false
 	cleanupAll := false
 	recreateMode := false
+	stopMode := false
 	attachTarget := ""
 
 	if cfg.help {
@@ -24,6 +25,10 @@ func handleSessions(cfg config) {
 		}
 		if len(args) > 0 && args[0] == "recreate" {
 			printCommandHelp("sessions recreate")
+			return
+		}
+		if len(args) > 0 && args[0] == "stop" {
+			printCommandHelp("sessions stop")
 			return
 		}
 		printCommandHelp("sessions")
@@ -52,6 +57,11 @@ func handleSessions(cfg config) {
 		args = args[1:]
 	}
 
+	if len(args) > 0 && args[0] == "stop" {
+		stopMode = true
+		args = args[1:]
+	}
+
 	if len(args) > 0 {
 		attachTarget = args[0]
 	}
@@ -60,6 +70,41 @@ func handleSessions(cfg config) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Auto-remove any exited --once sessions to prevent restarting one-time containers
+	for _, s := range sessions {
+		if dockerState(s.Name) != "running" && strings.Contains(s.Args, "--once") {
+			_, _ = dockerRun("rm", "-f", s.Name)
+		}
+	}
+
+	if stopMode {
+		if attachTarget == "" {
+			fmt.Fprintf(os.Stderr, "Error: specify a session to stop (name or index)\n")
+			os.Exit(1)
+		}
+		containerName, err := resolveTarget(attachTarget)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		state := dockerState(containerName)
+		if state != "running" {
+			fmt.Fprintf(os.Stderr, "Session '%s' is not running (current state: %s). Nothing to stop.\n", containerName, state)
+			os.Exit(0)
+		}
+
+		utils.Log("[kilo-docker] Stopping session '%s'...\n", containerName, utils.WithOutput())
+		_, err = dockerRun("stop", containerName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error stopping session '%s': %v\n", containerName, err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "Session '%s' stopped. Ports are now free.\n", containerName)
+		fmt.Fprintf(os.Stderr, "To restart: kilo-docker sessions %s\n", containerName)
+		return
 	}
 
 	if recreateMode {
