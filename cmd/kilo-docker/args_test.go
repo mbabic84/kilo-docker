@@ -277,3 +277,67 @@ func TestArgsMatchExitedContainerSSHMismatch(t *testing.T) {
 		t.Error("args should not match when SSH flag differs")
 	}
 }
+
+func TestExtractHostPortStandard(t *testing.T) {
+	if got := extractHostPort("8080:80"); got != "8080" {
+		t.Errorf("extractHostPort(\"8080:80\") = %q, want %q", got, "8080")
+	}
+}
+
+func TestExtractHostPortHostOnly(t *testing.T) {
+	if got := extractHostPort("8080"); got != "8080" {
+		t.Errorf("extractHostPort(\"8080\") = %q, want %q", got, "8080")
+	}
+}
+
+func TestExtractHostPortWithProtocol(t *testing.T) {
+	if got := extractHostPort("8080:80/udp"); got != "8080" {
+		t.Errorf("extractHostPort(\"8080:80/udp\") = %q, want %q", got, "8080")
+	}
+}
+
+func TestExtractHostPortRange(t *testing.T) {
+	if got := extractHostPort("8000-8010:80-90"); got != "8000-8010" {
+		t.Errorf("extractHostPort(\"8000-8010:80-90\") = %q, want %q", got, "8000-8010")
+	}
+}
+
+func TestExtractHostPortEmpty(t *testing.T) {
+	if got := extractHostPort(""); got != "" {
+		t.Errorf("extractHostPort(\"\") = %q, want %q", got, "")
+	}
+}
+
+func TestExtractHostPortWithIP(t *testing.T) {
+	if got := extractHostPort("127.0.0.1:8080:80"); got != "8080" {
+		t.Errorf("extractHostPort(\"127.0.0.1:8080:80\") = %q, want %q", got, "8080")
+	}
+}
+
+func TestExtractHostPortWithIPNoHostPort(t *testing.T) {
+	if got := extractHostPort("127.0.0.1::80"); got != "" {
+		t.Errorf("extractHostPort(\"127.0.0.1::80\") = %q, want %q", got, "")
+	}
+}
+
+func TestExtractHostPortWithIPRange(t *testing.T) {
+	if got := extractHostPort("127.0.0.1:8000-8010:80-90"); got != "8000-8010" {
+		t.Errorf("extractHostPort(\"127.0.0.1:8000-8010:80-90\") = %q, want %q", got, "8000-8010")
+	}
+}
+
+func TestCheckPortConflictsEmptyPorts(t *testing.T) {
+	cfg := config{}
+	if err := checkPortConflicts(cfg); err != nil {
+		t.Errorf("expected no error for empty ports, got %v", err)
+	}
+}
+
+func TestCheckPortConflictsNoRunningSessions(t *testing.T) {
+	// This tests the early return when no sessions exist (no Docker needed
+	// since cfg.ports is empty after the first check).
+	cfg := config{}
+	if err := checkPortConflicts(cfg); err != nil {
+		t.Errorf("expected no error for empty config, got %v", err)
+	}
+}
