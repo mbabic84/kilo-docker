@@ -108,7 +108,7 @@ func NewSyncer() *Syncer {
 		if encData, err := os.ReadFile(encPath); err == nil {
 			if decrypted, err := decryptAES(encData, userID); err == nil {
 				var expiryStr string
-				_, _, accessToken, refreshToken, expiryStr, _ = parseTokenEnv(string(decrypted))
+				_, _, accessToken, refreshToken, expiryStr, _, _ = parseTokenEnv(string(decrypted))
 				if expiryStr != "" {
 					expiry, _ = strconv.ParseInt(expiryStr, 10, 64)
 				}

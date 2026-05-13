@@ -31,16 +31,17 @@ type profileResponse struct {
 
 // loginResult holds the outcome of a completed login flow.
 type loginResult struct {
-	UserID       string
-	AccessToken  string
-	RefreshToken string
-	ExpiresIn    int64
-	MCPToken     string
+	UserID            string
+	AccessToken       string
+	RefreshToken      string
+	ExpiresIn         int64
+	AinstructPAT       string
+	AinstructPATExpiry int64
 }
 
-// --- PAT management ---
+// --- Ainstruct PAT management ---
 
-const patRotationThreshold = 7 * 24 * time.Hour // rotate if expiring within 7 days
+const ainstructPATRotationThreshold = 24 * time.Hour // rotate if expiring within 1 day
 
 // flexTime handles timestamps with or without timezone info.
 // The API returns timestamps like "2026-04-02T13:37:06.201389" (no TZ),
@@ -126,110 +127,136 @@ func listPATs(apiURL, accessToken string) ([]patListItem, error) {
 	return listResp.Tokens, nil
 }
 
-func ensurePAT(apiURL, accessToken, label, storedToken string) (string, error) {
-utils.Log("[login] Ensuring PAT with label: %q\n", label)
-	pats, err := listPATs(apiURL, accessToken)
+func rotatePAT(apiURL, accessToken, patID string) (string, int64, error) {
+	rotateReq := map[string]interface{}{
+		"expires_in_days": 7,
+	}
+	rotateJSON, _ := json.Marshal(rotateReq)
+	req, err := http.NewRequest("POST", apiURL+"/auth/pat/"+patID+"/rotate", bytes.NewReader(rotateJSON))
 	if err != nil {
-		return "", err
-	}
-
-	for _, pat := range pats {
-		if pat.Label == label {
-			// PAT exists.  If we have a stored token and the PAT is not
-			// expired or expiring soon, return the stored value — no
-			// rotation needed.
-			if storedToken != "" {
-				if pat.ExpiresAt == nil || time.Until(pat.ExpiresAt.Time) <= patRotationThreshold {
-					utils.LogWarn("[login] Existing PAT expiring soon or no expiry, rotating\n")
-				} else {
-				utils.Log("[login] Existing PAT still valid (expires %s), using stored token\n", pat.ExpiresAt.Format("2006-01-02"))
-					return storedToken, nil
-				}
-			} else {
-			// No stored token — must rotate to obtain the value.
-			if pat.ExpiresAt != nil {
-				utils.Log("[login] No stored token, rotating existing PAT (expires %s)\n", pat.ExpiresAt.Format("2006-01-02"))
-				} else {
-					utils.Log("[login] No stored token, rotating existing PAT (no expiry)\n")
-				}
-			}
-			rotateReq := map[string]interface{}{
-				"expires_in_days": 30,
-			}
-			rotateJSON, _ := json.Marshal(rotateReq)
-			req, err := http.NewRequest("POST", apiURL+"/auth/pat/"+pat.PatID+"/rotate", bytes.NewReader(rotateJSON))
-			if err != nil {
-				return "", err
-			}
-			req.Header.Set("Authorization", "Bearer "+accessToken)
-			req.Header.Set("Content-Type", "application/json")
-
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				utils.LogError("[login] PAT rotate request failed: %v\n", err)
-				return "", err
-			}
-
-			if resp.StatusCode != 200 {
-				body, _ := io.ReadAll(resp.Body)
-				_ = resp.Body.Close()
-				utils.Log("[login] PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
-				return "", fmt.Errorf("rotate PAT failed with status %d", resp.StatusCode)
-			}
-
-			var rotateResp patResponse
-			body, _ := io.ReadAll(resp.Body)
-			_ = resp.Body.Close()
-			if err := json.Unmarshal(body, &rotateResp); err != nil {
-				return "", err
-			}
-			utils.Log("[login] PAT rotated successfully (id=%s)\n", rotateResp.PatID)
-			return rotateResp.Token, nil
-		}
-	}
-
-utils.Log("[login] No existing PAT found, creating new one...\n")
-	createReq := map[string]interface{}{
-		"label":           label,
-		"expires_in_days": 30,
-	}
-	createJSON, _ := json.Marshal(createReq)
-	req, err := http.NewRequest("POST", apiURL+"/auth/pat", bytes.NewReader(createJSON))
-	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-			utils.LogError("[login] PAT create request failed: %v\n", err)
-		return "", err
+		utils.LogError("[login] PAT rotate request failed: %v\n", err)
+		return "", 0, err
+	}
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		utils.Log("[login] PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+		return "", 0, fmt.Errorf("rotate PAT failed with status %d", resp.StatusCode)
+	}
+
+	var rotateResp patResponse
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err := json.Unmarshal(body, &rotateResp); err != nil {
+		return "", 0, err
+	}
+
+	expiry := int64(0)
+	if rotateResp.ExpiresAt != nil {
+		expiry = rotateResp.ExpiresAt.Unix()
+	}
+	utils.Log("[login] PAT rotated successfully (id=%s, expiry=%d)\n", rotateResp.PatID, expiry)
+	return rotateResp.Token, expiry, nil
+}
+
+func createPAT(apiURL, accessToken, label string) (string, int64, error) {
+	createReq := map[string]interface{}{
+		"label":           label,
+		"expires_in_days": 7,
+	}
+	createJSON, _ := json.Marshal(createReq)
+	req, err := http.NewRequest("POST", apiURL+"/auth/pat", bytes.NewReader(createJSON))
+	if err != nil {
+		return "", 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		utils.LogError("[login] PAT create request failed: %v\n", err)
+		return "", 0, err
 	}
 
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-			utils.Log("[login] PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
-		return "", fmt.Errorf("create PAT failed with status %d", resp.StatusCode)
+		utils.Log("[login] PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
+		return "", 0, fmt.Errorf("create PAT failed with status %d", resp.StatusCode)
 	}
 
 	var createResp patResponse
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if err := json.Unmarshal(body, &createResp); err != nil {
-		return "", err
+		return "", 0, err
 	}
-	utils.Log("[login] PAT created successfully (id=%s)\n", createResp.PatID)
-	return createResp.Token, nil
+
+	expiry := int64(0)
+	if createResp.ExpiresAt != nil {
+		expiry = createResp.ExpiresAt.Unix()
+	}
+	utils.Log("[login] PAT created successfully (id=%s, expiry=%d)\n", createResp.PatID, expiry)
+	return createResp.Token, expiry, nil
+}
+
+func ensureAinstructPAT(apiURL, accessToken, label, storedToken, storedExpiry string) (string, int64, error) {
+	utils.Log("[login] Ensuring Ainstruct PAT with label: %q\n", label)
+
+	// Always check the server — local expiry is only used to decide
+	// whether to rotate, not to skip the server call entirely.
+	pats, err := listPATs(apiURL, accessToken)
+	if err != nil {
+		return "", 0, err
+	}
+
+	// If no stored token but we DO have a stored expiry, we might have
+	// a stale cache. Clear the expiry to force a fresh decision.
+	if storedToken == "" && storedExpiry != "" {
+		storedExpiry = ""
+	}
+
+	for _, pat := range pats {
+		if pat.Label == label {
+			if storedToken != "" {
+				if pat.ExpiresAt == nil || time.Until(pat.ExpiresAt.Time) <= ainstructPATRotationThreshold {
+					utils.LogWarn("[login] Existing PAT expiring soon or no expiry, rotating\n")
+				} else {
+					expiry := pat.ExpiresAt.Unix()
+					utils.Log("[login] Existing PAT still valid (expires %s), using stored token\n", pat.ExpiresAt.Format("2006-01-02"))
+					return storedToken, expiry, nil
+				}
+			return rotatePAT(apiURL, accessToken, pat.PatID)
+			} else {
+				if pat.ExpiresAt != nil {
+					utils.Log("[login] No stored token, rotating existing PAT (expires %s)\n", pat.ExpiresAt.Format("2006-01-02"))
+				} else {
+utils.Log("[login] No stored token, rotating existing PAT (no expiry)\n")
+				}
+
+				return rotatePAT(apiURL, accessToken, pat.PatID)
+			}
+		}
+	}
+
+utils.Log("[login] No existing PAT found, creating new one...\n")
+	return createPAT(apiURL, accessToken, label)
 }
 
 // --- Interactive login ---
 
 // runLoginInteractive prompts for username/password via TTY, authenticates
 // with the Ainstruct API, fetches the user profile, and obtains an MCP PAT.
-// If remember is true, SYNC tokens are saved to encrypted storage.
-func runLoginInteractive(remember bool) (loginResult, error) {
+// SYNC tokens are always saved to encrypted storage for persistent sync.
+func runLoginInteractive() (loginResult, error) {
 	var result loginResult
 
 	utils.Log("[kilo-docker] === Ainstruct Authentication ===\n", utils.WithOutput())
@@ -306,24 +333,25 @@ func runLoginInteractive(remember bool) (loginResult, error) {
 	homeDir := "/home/" + deriveHomeName(result.UserID)
 	_ = os.MkdirAll(homeDir, 0o700)
 
-	var storedAinstruct string
+	var storedAinstruct, storedPatExpiry string
 	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
 	if encData, err := os.ReadFile(encPath); err == nil {
 		if decrypted, decErr := decryptAES(encData, result.UserID); decErr == nil {
-			_, storedAinstruct, _, _, _, _ = parseTokenEnv(string(decrypted))
+			_, storedAinstruct, _, _, _, storedPatExpiry, _ = parseTokenEnv(string(decrypted))
 		}
 	}
 
-	patLabel := buildPATLabel()
-	patToken, patErr := ensurePAT(constants.AinstructAPIBaseURL, loginResp.AccessToken, patLabel, storedAinstruct)
-	if patErr != nil {
-		utils.LogWarn("[login] Warning: Failed to create Ainstruct MCP token: %v\n", patErr)
+	ainstructPATLabel := buildAinstructPATLabel()
+	ainstructPAT, ainstructPATExpiry, ainstructPATErr := ensureAinstructPAT(constants.AinstructAPIBaseURL, loginResp.AccessToken, ainstructPATLabel, storedAinstruct, storedPatExpiry)
+	if ainstructPATErr != nil {
+		utils.LogWarn("[login] Warning: Failed to create Ainstruct PAT: %v\n", ainstructPATErr)
 		utils.Log("[kilo-docker] Ainstruct MCP server will be disabled.\n", utils.WithOutput())
-	} else if patToken != "" {
-		result.MCPToken = patToken
+	} else if ainstructPAT != "" {
+		result.AinstructPAT = ainstructPAT
+		result.AinstructPATExpiry = ainstructPATExpiry
 	}
 
-	if remember && loginResp.AccessToken != "" {
+	if loginResp.AccessToken != "" {
 		syncExpiry := strconv.FormatInt(time.Now().Unix()+loginResp.ExpiresIn, 10)
 		if err := saveSyncTokensToEncrypted(homeDir, result.UserID, loginResp.AccessToken, loginResp.RefreshToken, syncExpiry); err != nil {
 			utils.LogWarn("[login] Failed to save sync tokens: %v\n", err)
@@ -374,7 +402,7 @@ func promptPassword() string {
 
 
 
-func buildPATLabel() string {
+func buildAinstructPATLabel() string {
 	username := os.Getenv("PAT_USERNAME")
 	hostname := os.Getenv("PAT_HOSTNAME")
 	if username == "" {
@@ -386,107 +414,6 @@ func buildPATLabel() string {
 	return fmt.Sprintf("kilo-docker | %s@%s", username, hostname)
 }
 
-// --- Env-var-based login (for ainstruct-login subcommand) ---
 
-// runAinstructLogin authenticates with the Ainstruct API using credentials
-// from environment variables (USERNAME, PASSWORD, API_URL). It performs a
-// two-step flow: POST /auth/login to get tokens, then GET /auth/profile to
-// get the user_id. Results are written to stdout as KEY=VALUE lines.
-func runAinstructLogin() error {
-	username := os.Getenv("USERNAME")
-	password := os.Getenv("PASSWORD")
-	apiURL := os.Getenv("API_URL")
-	patLabel := os.Getenv("PAT_LABEL")
 
-	if username == "" || password == "" || apiURL == "" {
-		return fmt.Errorf("missing required env vars: USERNAME, PASSWORD, API_URL")
-	}
 
-	loginBody := map[string]string{
-		"username": username,
-		"password": password,
-	}
-	loginJSON, _ := json.Marshal(loginBody)
-
-	resp, err := http.Post(apiURL+"/auth/login", "application/json", bytes.NewReader(loginJSON))
-	if err != nil {
-		return fmt.Errorf("connection failed")
-	}
-
-	loginResp, _ := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-
-	switch resp.StatusCode {
-	case 200:
-		var loginResult struct {
-			AccessToken  string `json:"access_token"`
-			RefreshToken string `json:"refresh_token"`
-			ExpiresIn    int64  `json:"expires_in"`
-		}
-		if err := json.Unmarshal(loginResp, &loginResult); err != nil {
-			return fmt.Errorf("failed to parse login response: %w", err)
-		}
-		if loginResult.AccessToken == "" {
-			return fmt.Errorf("login succeeded but no access_token in response")
-		}
-
-		req, _ := http.NewRequest("GET", apiURL+"/auth/profile", nil)
-		req.Header.Set("Authorization", "Bearer "+loginResult.AccessToken)
-		profileResp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("connection failed")
-		}
-
-		if profileResp.StatusCode != 200 {
-			_ = profileResp.Body.Close()
-			return fmt.Errorf("profile fetch failed with status %d", profileResp.StatusCode)
-		}
-
-		var profileResult struct {
-			UserID string `json:"user_id"`
-		}
-		profileBody, _ := io.ReadAll(profileResp.Body)
-		_ = profileResp.Body.Close()
-		if err := json.Unmarshal(profileBody, &profileResult); err != nil {
-			return fmt.Errorf("failed to parse profile response: %w", err)
-		}
-		if profileResult.UserID == "" {
-			return fmt.Errorf("profile fetched but no user_id in response")
-		}
-
-		fmt.Printf("STATUS=success\n")
-		fmt.Printf("USER_ID=%s\n", profileResult.UserID)
-		fmt.Printf("ACCESS_TOKEN=%s\n", loginResult.AccessToken)
-		fmt.Printf("REFRESH_TOKEN=%s\n", loginResult.RefreshToken)
-		if loginResult.ExpiresIn > 0 {
-			fmt.Printf("EXPIRES_IN=%d\n", loginResult.ExpiresIn)
-		}
-
-		if patLabel != "" {
-			mcpToken, err := ensurePAT(apiURL, loginResult.AccessToken, patLabel, "")
-			if err == nil && mcpToken != "" {
-				fmt.Printf("MCP_TOKEN=%s\n", mcpToken)
-			}
-		}
-
-		return nil
-	case 401:
-		return fmt.Errorf("invalid credentials")
-	case 403:
-		return fmt.Errorf("account disabled")
-	case 0:
-		return fmt.Errorf("connection failed")
-	default:
-		var errResp struct {
-			Detail struct {
-				Message string `json:"message"`
-			} `json:"detail"`
-		}
-		_ = json.Unmarshal(loginResp, &errResp)
-		msg := errResp.Detail.Message
-		if msg == "" {
-			msg = "unknown error"
-		}
-		return fmt.Errorf("login failed with status %d: %s", resp.StatusCode, msg)
-	}
-}

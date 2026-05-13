@@ -23,9 +23,9 @@ const defaultInitReadyTimeout = 5 * time.Minute
 
 // runZellijAttach is the entry point for the "zellij-attach" subcommand.
 // If the container is already initialized, it execs zellij directly.
-// Otherwise it runs the first-time user init flow (which handles auto-login if remember=true).
-func runZellijAttach(remember bool) error {
-	utils.Log("[zellijattach] Entry: remember=%v\n", remember)
+// Otherwise it runs the first-time user init flow.
+func runZellijAttach() error {
+	utils.Log("[zellijattach] Entry\n")
 
 	if err := waitForMarker(initReadyMarker, initReadyTimeout(),
 		"[kilo-docker] Waiting for container initialization to finish...\n"); err != nil {
@@ -33,9 +33,10 @@ func runZellijAttach(remember bool) error {
 	}
 
 	if _, err := os.Stat(initMarker); err == nil {
-		utils.Log("[zellijattach] Init marker exists, skipping userinit\n")
-		if !remember {
-			clearStoredSyncTokens()
+		utils.Log("[zellijattach] Init marker exists, checking PAT expiry\n")
+		if needsAinstructPATRefresh() {
+			utils.Log("[kilo-docker] Ainstruct PAT expiring soon, re-authentication required\n", utils.WithOutput())
+			return runUserInit()
 		}
 		return execZellij()
 	}
@@ -48,18 +49,56 @@ func runZellijAttach(remember bool) error {
 		if err := waitForCompletedUserInit(initReadyTimeout()); err != nil {
 			return err
 		}
-		if !remember {
-			clearStoredSyncTokens()
-		}
 		return execZellij()
 	}
 	defer func() { _ = os.Remove(userInitInProgressMarker) }()
 
 	// Container not initialized - run full user init
-	// runUserInit handles auto-login if remember=true and tokens are valid
-	return runUserInit(remember)
+	return runUserInit()
 }
 
+// needsAinstructPATRefresh checks whether the stored Ainstruct PAT is
+// expiring within the rotation threshold or is missing entirely.
+func needsAinstructPATRefresh() bool {
+	homeDir, _, _, userID := loadUserConfig()
+	if homeDir == "" || userID == "" {
+		utils.Log("[zellijattach] No user config, cannot check PAT expiry\n")
+		return false
+	}
+
+	_, _, _, _, _, patExpiryStr, err := loadEncryptedTokens(homeDir, userID)
+	if err != nil {
+		utils.Log("[zellijattach] Cannot load encrypted tokens: %v\n", err)
+		return false
+	}
+	if patExpiryStr == "" {
+		utils.Log("[zellijattach] No PAT expiry stored, refreshing proactively\n")
+		return true
+	}
+
+	expUnix, parseErr := strconv.ParseInt(patExpiryStr, 10, 64)
+	if parseErr != nil {
+		utils.Log("[zellijattach] Invalid PAT expiry: %v\n", parseErr)
+		return false
+	}
+
+	remaining := expUnix - time.Now().Unix()
+	utils.Log("[zellijattach] PAT remaining: %ds (threshold: %ds)\n", remaining, int64(ainstructPATRotationThreshold.Seconds()))
+
+	if remaining <= 0 {
+		utils.Log("[zellijattach] PAT already expired\n")
+		return true
+	}
+	if remaining <= int64(ainstructPATRotationThreshold.Seconds()) {
+		utils.Log("[zellijattach] PAT expiring within rotation threshold\n")
+		return true
+	}
+
+	return false
+}
+
+// initReadyTimeout returns the timeout duration for waiting on init markers.
+// Uses KD_INIT_READY_TIMEOUT env var if set, otherwise defaults to 5 minutes.
 func initReadyTimeout() time.Duration {
 	value := strings.TrimSpace(os.Getenv(initReadyTimeoutEnvVar))
 	if value == "" {
@@ -79,6 +118,8 @@ func initReadyTimeout() time.Duration {
 	return timeout
 }
 
+// waitForMarker polls for the existence of a marker file, printing a waiting
+// message every 10 seconds, and returns an error after the timeout expires.
 func waitForMarker(marker string, timeout time.Duration, waitingMsg string) error {
 	if _, err := os.Stat(marker); err == nil {
 		return nil
@@ -96,6 +137,8 @@ func waitForMarker(marker string, timeout time.Duration, waitingMsg string) erro
 	return fmt.Errorf("initialization marker %q did not appear in %s", marker, timeout)
 }
 
+// claimUserInit atomically creates a user-init-in-progress marker file using
+// O_EXCL. Returns true if this process won the race, false otherwise.
 func claimUserInit() (bool, error) {
 	f, err := os.OpenFile(userInitInProgressMarker, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err == nil {
@@ -109,6 +152,8 @@ func claimUserInit() (bool, error) {
 	return false, fmt.Errorf("failed to claim user initialization: %w", err)
 }
 
+// waitForCompletedUserInit polls for the /tmp/.kilo-initialized marker file
+// which signals that the winning zellij-attach process has finished user init.
 func waitForCompletedUserInit(timeout time.Duration) error {
 	if _, err := os.Stat(initMarker); err == nil {
 		return nil
@@ -127,28 +172,6 @@ func waitForCompletedUserInit(timeout time.Duration) error {
 	}
 
 	return fmt.Errorf("user initialization did not complete in %s", timeout)
-}
-
-// clearStoredSyncTokens clears sync tokens from encrypted storage if they exist.
-// Called when --remember is not used to ensure no leftover tokens.
-func clearStoredSyncTokens() {
-	homeDir, _, _, userID := loadUserConfig()
-	if homeDir == "" || userID == "" {
-		return
-	}
-	_, _, storedSync, storedRefresh, _, loadErr := loadEncryptedTokens(homeDir, userID)
-	if loadErr != nil {
-		return
-	}
-	if storedSync == "" && storedRefresh == "" {
-		utils.Log("[zellijattach] No stored sync tokens to clear\n")
-		return
-	}
-	if err := clearSyncTokensFromEncrypted(homeDir, userID); err != nil {
-		utils.LogWarn("[zellijattach] Failed to clear sync tokens: %v\n", err)
-	} else {
-		utils.Log("[zellijattach] Cleared stored sync tokens\n")
-	}
 }
 
 // loadUserConfig loads the persisted user configuration from the volume.
@@ -207,6 +230,14 @@ func execZellij() error {
 	// Load user configuration to set environment variables and drop privileges
 	homeDir, username, shell, _ := loadUserConfig()
 
+	// Determine session name from current working directory before any chdir
+	sessionName := "kilo-docker"
+	if wd, err := os.Getwd(); err == nil {
+		if base := filepath.Base(wd); base != "" && base != "/" {
+			sessionName = base
+		}
+	}
+
 	// If no user config found, we can't properly run as user
 	if homeDir == "" || username == "" {
 		utils.LogWarn("[zellijattach] No user config found, running as root\n")
@@ -237,6 +268,10 @@ func execZellij() error {
 		}
 	}
 
+	// Keep the current working directory (the workspace set by -w from docker run).
+	// It is bind-mounted and should be accessible after privilege drop since the
+	// container UID matches the host UID.
+
 	// Create a copy of the environment
 	env := os.Environ()
 
@@ -258,12 +293,6 @@ func execZellij() error {
 
 	utils.Log("[zellijattach] Executing zellij with HOME=%s, USER=%s\n", homeDir, username)
 
-	sessionName := "kilo-docker"
-	if wd, err := os.Getwd(); err == nil {
-		if base := filepath.Base(wd); base != "" && base != "/" {
-			sessionName = base
-		}
-	}
 	return syscall.Exec("/usr/local/bin/zellij", []string{"zellij", "attach", "--create", sessionName}, env)
 }
 

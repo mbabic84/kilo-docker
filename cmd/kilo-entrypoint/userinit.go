@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -31,8 +29,8 @@ import (
 //   - Sync startup
 //   - Privilege drop to the created user
 //   - Exec zellij
-func runUserInit(remember bool) error {
-	utils.Log("[userinit] starting initialization (remember=%v)\n", remember)
+func runUserInit() error {
+	utils.Log("[userinit] starting initialization\n")
 
 	puidStr := os.Getenv("PUID")
 	if puidStr == "" {
@@ -71,22 +69,10 @@ func runUserInit(remember bool) error {
 		}
 	}
 
-	// Try auto-login if remember is set and we have stored credentials
-	if remember && existingUser != "" && userID != "" {
-		utils.Log("[kilo-docker] Attempting auto-login with saved session...\n", utils.WithOutput())
-		autoRes, autoLogin, autoErr := checkAutoLogin(homeDir, userID)
-		if autoLogin && autoErr == nil {
-			loginRes = autoRes
-			utils.Log("[kilo-docker] Signed in automatically using saved session\n", utils.WithOutput())
-		} else if autoErr != nil {
-			utils.Log("[kilo-docker] Auto-login failed, please sign in again\n", utils.WithOutput())
-		}
-	}
-
-	// Fall back to interactive login if auto-login didn't work
+	// Interactive login (required every time)
 	if loginRes.UserID == "" {
 		utils.Log("[kilo-docker] Starting Ainstruct authentication\n", utils.WithOutput())
-		newLoginRes, err := runLoginInteractive(remember)
+		newLoginRes, err := runLoginInteractive()
 		if err != nil {
 			return fmt.Errorf("login failed: %w", err)
 		}
@@ -107,8 +93,9 @@ func runUserInit(remember bool) error {
 		return fmt.Errorf("failed to create user %s: %w", username, err)
 	}
 
-	// Add user to service groups
-	joinServiceGroups(username)
+	// Add user to host supplementary groups so workspace files with
+	// group-level permissions are accessible after privilege drop.
+	joinHostGroups(username)
 
 	// Create home directory and config structure
 	utils.Log("[userinit] Creating home directory: %s\n", homeDir)
@@ -334,58 +321,51 @@ func copyFileIfMissing(src, dst string) {
 	utils.Log("[userinit] Copied %s\n", filepath.Base(src))
 }
 
-// joinServiceGroups adds the user to service groups for socket access.
-// If a group with the target GID already exists (different name), uses that group.
-func joinServiceGroups(username string) {
-	servicesEnv := os.Getenv("KD_SERVICES")
-	if servicesEnv == "" {
-		utils.Log("[userinit] joinServiceGroups: no services enabled\n")
+// joinHostGroups adds the container user to supplementary groups matching
+// the host user's group IDs (passed via PGIDS env var). This enables access
+// to workspace files with group-level permissions after privilege drop.
+func joinHostGroups(username string) {
+	pgidsStr := os.Getenv("PGIDS")
+	if pgidsStr == "" {
+		utils.Log("[userinit] joinHostGroups: no PGIDS env var\n")
 		return
 	}
-	utils.Log("[userinit] joinServiceGroups: services=%s, user=%s\n", servicesEnv, username)
-	for _, svcName := range strings.Split(servicesEnv, ",") {
-		svc := getService(svcName)
-		if svc == nil || svc.RequiresSocket == "" {
-			utils.Log("[userinit] joinServiceGroups: skipping %s (no socket required)\n", svcName)
+	utils.Log("[userinit] joinHostGroups: host supplementary groups: %s\n", pgidsStr)
+
+	var groupNames []string
+	for _, gidStr := range strings.Split(pgidsStr, ",") {
+		gidStr = strings.TrimSpace(gidStr)
+		if gidStr == "" {
 			continue
 		}
-
-		// First try to add to the service-named group
-		utils.Log("[userinit] joinServiceGroups: trying addgroup %s %s\n", username, svc.Name)
-		cmd1 := exec.Command("addgroup", username, svc.Name)
-		if out, err := cmd1.CombinedOutput(); err == nil {
-			utils.Log("[userinit] joinServiceGroups: added %s to %s\n", username, svc.Name)
-			continue
-		} else {
-			utils.Log("[userinit] joinServiceGroups: failed to add %s to %s: %v, output: %s\n", username, svc.Name, err, strings.TrimSpace(string(out)))
-		}
-
-		// If that failed, check if a group with the target GID already exists
-		gid := os.Getenv(svc.GIDEnvVar)
-		if gid == "" {
-			utils.Log("[userinit] joinServiceGroups: no GID env var for %s\n", svc.Name)
-			continue
-		}
-		utils.Log("[userinit] joinServiceGroups: looking up GID %s for service %s\n", gid, svc.Name)
-
-		cmd := exec.Command("getent", "group", gid)
-		out, err := cmd.Output()
-		if err != nil {
-			utils.Log("[userinit] joinServiceGroups: getent group %s failed: %v\n", gid, err)
-			continue
-		}
-
-		parts := strings.SplitN(string(out), ":", 2)
-		utils.Log("[userinit] joinServiceGroups: getent returned: %s\n", strings.TrimSpace(string(out)))
-		if len(parts) > 0 && parts[0] != "" && parts[0] != svc.Name {
-			// Add user to the existing group with matching GID
-			utils.Log("[userinit] joinServiceGroups: adding %s to existing group %s\n", username, parts[0])
-			if err := exec.Command("addgroup", username, parts[0]).Run(); err != nil {
-				utils.Log("[userinit] joinServiceGroups: failed to add %s to %s: %v\n", username, parts[0], err)
-			} else {
-				utils.Log("[userinit] joinServiceGroups: successfully added %s to %s\n", username, parts[0])
+		out, err := exec.Command("getent", "group", gidStr).Output()
+		if err == nil {
+			parts := strings.SplitN(strings.TrimSpace(string(out)), ":", 2)
+			if len(parts) > 0 && parts[0] != "" {
+				groupNames = append(groupNames, parts[0])
 			}
+		} else {
+			groupName := "kilo-host-gid-" + gidStr
+			if err := exec.Command("addgroup", "--gid", gidStr, groupName).Run(); err != nil {
+				utils.LogWarn("[userinit] joinHostGroups: failed to create group %s (GID %s): %v\n", groupName, gidStr, err)
+				continue
+			}
+			utils.Log("[userinit] joinHostGroups: created group %s with GID %s\n", groupName, gidStr)
+			groupNames = append(groupNames, groupName)
 		}
+	}
+
+	if len(groupNames) == 0 {
+		utils.Log("[userinit] joinHostGroups: no groups to join\n")
+		return
+	}
+
+	joined := strings.Join(groupNames, ",")
+	utils.Log("[userinit] joinHostGroups: adding %s to groups: %s\n", username, joined)
+	if err := exec.Command("usermod", "--append", "--groups", joined, username).Run(); err != nil {
+		utils.LogWarn("[userinit] joinHostGroups: failed to add %s to groups: %v\n", username, err)
+	} else {
+		utils.Log("[userinit] joinHostGroups: added %s to groups: %s\n", username, joined)
 	}
 }
 
@@ -426,122 +406,16 @@ func getUserGroups(username string) []int {
 	return groups
 }
 
-// checkAutoLogin attempts to auto-login using stored sync tokens.
-// Returns (loginResult, autoLoggedIn bool, error).
-// If auto-login fails, caller should fall back to interactive login.
-func checkAutoLogin(homeDir, userID string) (loginResult, bool, error) {
-	utils.Log("[checkAutoLogin] userID=%s, homeDir=%s\n", userID, homeDir)
-
-	tokenPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
-	info, statErr := os.Stat(tokenPath)
-	if statErr != nil {
-		utils.LogWarn("[checkAutoLogin] token file not found at %s: %v\n", tokenPath, statErr)
-		return loginResult{}, false, fmt.Errorf("token file not found: %w", statErr)
-	}
-	utils.Log("[checkAutoLogin] token file found: size=%d, mode=%s\n", info.Size(), info.Mode())
-
-	_, _, storedSync, storedRefresh, storedExpiry, loadErr := loadEncryptedTokens(homeDir, userID)
-	if loadErr != nil {
-		utils.LogWarn("[checkAutoLogin] loadEncryptedTokens failed (likely decryption error — wrong userID?): %v\n", loadErr)
-		return loginResult{}, false, fmt.Errorf("no stored tokens: %w", loadErr)
-	}
-
-	maskVal := func(s string) string {
-		if len(s) > 8 {
-			return s[:4] + "..." + s[len(s)-4:]
-		}
-		return "***"
-	}
-	utils.Log("[checkAutoLogin] storedSync=%s, storedRefresh=%s, storedExpiry=%s\n",
-		maskVal(storedSync), maskVal(storedRefresh), storedExpiry)
-
-	if storedSync == "" || storedRefresh == "" {
-		utils.LogWarn("[checkAutoLogin] missing sync or refresh token (syncEmpty=%v, refreshEmpty=%v)\n",
-			storedSync == "", storedRefresh == "")
-		return loginResult{}, false, fmt.Errorf("missing sync or refresh token")
-	}
-
-	if storedExpiry != "" {
-		expiryUnix, parseErr := strconv.ParseInt(storedExpiry, 10, 64)
-		if parseErr != nil {
-			utils.LogWarn("[checkAutoLogin] failed to parse expiry %q: %v\n", storedExpiry, parseErr)
-		} else if time.Now().Unix() > expiryUnix {
-			utils.Log("[checkAutoLogin] access token expired (expiry=%d, now=%d), attempting refresh\n", expiryUnix, time.Now().Unix())
-			newAccess, newRefresh, newExpiry, refreshErr := refreshSyncTokens(homeDir, userID, storedRefresh)
-			if refreshErr != nil {
-				utils.LogWarn("[checkAutoLogin] token refresh failed: %v\n", refreshErr)
-				return loginResult{}, false, refreshErr
-			}
-			if err := saveSyncTokensToEncrypted(homeDir, userID, newAccess, newRefresh, strconv.FormatInt(newExpiry, 10)); err != nil {
-				utils.LogWarn("[checkAutoLogin] failed to save refreshed tokens: %v\n", err)
-			}
-			// Update ALL stored values including the new refresh token
-			// to ensure the returned loginResult has the correct tokens.
-			storedSync = newAccess
-			storedRefresh = newRefresh
-			storedExpiry = strconv.FormatInt(newExpiry, 10)
-		} else {
-			utils.Log("[checkAutoLogin] access token still valid (expiry=%d, now=%d, remaining=%ds)\n",
-				expiryUnix, time.Now().Unix(), expiryUnix-time.Now().Unix())
-		}
-	} else {
-		utils.Log("[checkAutoLogin] no expiry set, skipping expiration check\n")
-	}
-
-	result := loginResult{
-		AccessToken:  storedSync,
-		RefreshToken: storedRefresh,
-		UserID:       userID,
-	}
-	if storedExpiry != "" {
-		expiryUnix, _ := strconv.ParseInt(storedExpiry, 10, 64)
-		result.ExpiresIn = expiryUnix - time.Now().Unix()
-	}
-
-	utils.Log("[userinit] checkAutoLogin: auto-login successful\n")
-	return result, true, nil
-}
-
-// refreshSyncTokens calls POST /auth/refresh and returns new tokens.
-func refreshSyncTokens(homeDir, userID, refreshToken string) (access, refresh string, expiry int64, err error) {
-	baseURL := os.Getenv("KD_AINSTRUCT_BASE_URL")
-	if baseURL == "" {
-		baseURL = constants.AinstructBaseURL
-	}
-
-	body, _ := json.Marshal(map[string]string{"refresh_token": refreshToken})
-	resp, err := http.Post(baseURL+"/auth/refresh", "application/json", bytes.NewReader(body))
-	if err != nil {
-		return "", "", 0, fmt.Errorf("refresh request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != 200 {
-		respBody, _ := io.ReadAll(resp.Body)
-		return "", "", 0, fmt.Errorf("refresh returned status %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	var result struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		ExpiresIn    int64  `json:"expires_in"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", "", 0, fmt.Errorf("failed to decode refresh response: %w", err)
-	}
-
-	return result.AccessToken, result.RefreshToken, time.Now().Unix() + result.ExpiresIn, nil
-}
-
 // initTokens merges the MCP token from login with any existing encrypted
 // tokens on the volume and re-saves them. Also stores sync JWT tokens for
 // the file sync subsystem.
 func initTokens(homeDir, userID string, loginRes loginResult) error {
 	var context7Token, ainstructToken string
 	var syncToken, syncRefreshToken, syncTokenExpiry string
+	var ainstructPATExpiry string
 
-	if loginRes.MCPToken != "" {
-		ainstructToken = loginRes.MCPToken
+	if loginRes.AinstructPAT != "" {
+		ainstructToken = loginRes.AinstructPAT
 	}
 	if loginRes.AccessToken != "" {
 		syncToken = loginRes.AccessToken
@@ -552,40 +426,25 @@ func initTokens(homeDir, userID string, loginRes loginResult) error {
 	if loginRes.ExpiresIn > 0 {
 		syncTokenExpiry = strconv.FormatInt(time.Now().Unix()+loginRes.ExpiresIn, 10)
 	}
-
-	storedContext7, storedAinstruct, storedSync, storedSyncRefresh, storedSyncExpiry, loadErr := loadEncryptedTokens(homeDir, userID)
-	if loadErr == nil {
-		// Prefer login's PAT over stored ainstruct token.
-		// ensurePAT() may have rotated the old token, making it invalid.
-		if ainstructToken == "" && storedAinstruct != "" {
-			ainstructToken = storedAinstruct
-		}
-		if storedContext7 != "" {
-			context7Token = storedContext7
-		}
-		if storedSync != "" {
-			syncToken = storedSync
-		}
-		if storedSyncRefresh != "" {
-			syncRefreshToken = storedSyncRefresh
-		}
-		if storedSyncExpiry != "" {
-			syncTokenExpiry = storedSyncExpiry
-		}
+	if loginRes.AinstructPATExpiry > 0 {
+		ainstructPATExpiry = strconv.FormatInt(loginRes.AinstructPATExpiry, 10)
 	}
 
-	// Check env var for newly prompted context7 token (set in runUserInit)
-	if context7Token == "" {
-		if envC7 := os.Getenv("KD_MCP_CONTEXT7_TOKEN"); envC7 != "" {
-			context7Token = envC7
-		}
+	storedContext7, storedAinstruct, storedSync, storedSyncRefresh, storedSyncExpiry, storedPatExpiry, loadErr := loadEncryptedTokens(homeDir, userID)
+	if loadErr == nil {
+		ainstructToken = coalesce(ainstructToken, storedAinstruct)
+		context7Token = coalesce(context7Token, storedContext7)
+		syncToken = coalesce(syncToken, storedSync)
+		syncRefreshToken = coalesce(syncRefreshToken, storedSyncRefresh)
+		syncTokenExpiry = coalesce(syncTokenExpiry, storedSyncExpiry)
+		ainstructPATExpiry = coalesce(ainstructPATExpiry, storedPatExpiry)
 	}
 
 	if context7Token == "" && ainstructToken == "" && syncToken == "" {
 		return nil
 	}
 
-	return saveEncryptedTokens(homeDir, userID, context7Token, ainstructToken, syncToken, syncRefreshToken, syncTokenExpiry)
+	return saveEncryptedTokens(homeDir, userID, context7Token, ainstructToken, syncToken, syncRefreshToken, syncTokenExpiry, ainstructPATExpiry)
 }
 
 // clearZellijSessions removes all zellij sessions to prevent stale
@@ -597,6 +456,16 @@ func clearZellijSessions() {
 	if err := cmd.Run(); err != nil {
 		utils.LogWarn("[userinit] failed to delete zellij sessions: %v\n", err)
 	}
+}
+
+// coalesce returns the first non-empty string from the given values.
+func coalesce(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // deriveHomeName returns a deterministic username and directory name from a user ID.
@@ -645,6 +514,8 @@ func startSyncWithTokens(homeDir, userID string) error {
 	return nil
 }
 
+// runMCPTokens interactively prompts for Context7 and Ainstruct MCP tokens
+// and saves them to encrypted storage alongside existing sync tokens.
 func runMCPTokens() error {
 	homeDir, _, _, userID := loadUserConfig()
 	if homeDir == "" || userID == "" {
@@ -657,7 +528,7 @@ func runMCPTokens() error {
 
 	if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); err == nil {
 		if decrypted, err := decryptAES(encData, userID); err == nil {
-			c7, aInst, sTok, sRef, sExp, _ := parseTokenEnv(string(decrypted))
+			c7, aInst, sTok, sRef, sExp, _, _ := parseTokenEnv(string(decrypted))
 			context7Token = c7
 			if ainstructToken == "" {
 				ainstructToken = aInst
@@ -694,7 +565,7 @@ func runMCPTokens() error {
 		utils.Log("[kilo-docker] Context7 token updated\n", utils.WithOutput())
 	}
 
-	if err := saveEncryptedTokens(homeDir, userID, context7Token, ainstructToken, syncToken, syncRefresh, syncExpiry); err != nil {
+	if err := saveEncryptedTokens(homeDir, userID, context7Token, ainstructToken, syncToken, syncRefresh, syncExpiry, ""); err != nil {
 		utils.LogWarn("[userinit] failed to save tokens: %v\n", err)
 	}
 
@@ -702,6 +573,9 @@ func runMCPTokens() error {
 	return nil
 }
 
+// checkRemoteHasConfig queries the ainstruct API to determine whether a
+// kilo.jsonc config file already exists in the remote collection. Used during
+// first-time init to decide whether to push the local config template.
 func checkRemoteHasConfig(homeDir, userID string) (bool, error) {
 	utils.Log("[userinit] checkRemote: Checking remote for kilo.jsonc (first time init)\n")
 
@@ -718,7 +592,7 @@ func checkRemoteHasConfig(homeDir, userID string) (bool, error) {
 		return false, fmt.Errorf("failed to decrypt tokens: %w", err)
 	}
 
-	_, _, syncToken, _, _, _ := parseTokenEnv(string(decrypted))
+	_, _, syncToken, _, _, _, _ := parseTokenEnv(string(decrypted))
 	if syncToken == "" {
 		utils.LogWarn("[userinit] checkRemote: no sync token available\n")
 		return false, fmt.Errorf("no sync token available")
@@ -842,7 +716,7 @@ func deleteRemoteOpencode(homeDir, userID string) error {
 		return err
 	}
 
-	_, _, syncToken, _, _, _ := parseTokenEnv(string(decrypted))
+	_, _, syncToken, _, _, _, _ := parseTokenEnv(string(decrypted))
 	if syncToken == "" {
 		return fmt.Errorf("no sync token")
 	}
@@ -948,6 +822,8 @@ func deleteRemoteOpencode(homeDir, userID string) error {
 	return nil
 }
 
+// maskToken truncates and masks a token string for safe logging.
+// Returns "***" for tokens shorter than 8 chars.
 func maskToken(token string) string {
 	if len(token) <= 8 {
 		return strings.Repeat("*", len(token))

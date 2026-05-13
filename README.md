@@ -60,7 +60,6 @@ kilo-docker
 | Option | Description |
 |--------|-------------|
 | `--once` | Run a one-time session without persistence (no volume) |
-| `--remember` | Remember Ainstruct login for auto-login on future sessions |
 | `--volume`, `-v` | Mount a volume (host_path:container_path), repeatable |
 | `--workspace`, `-w` | Set custom workspace path (default: current directory) |
 | `--port`, `-p` | Map port (host_port:container_port), repeatable |
@@ -113,26 +112,6 @@ kilo-docker --once
 ```
 
 This is useful for CI pipelines, ephemeral environments, or when you don't want to leave any state on the host.
-
-## Remember Login
-
-Use `--remember` to save your Ainstruct credentials for auto-login on future sessions:
-
-```bash
-kilo-docker --remember
-```
-
-On first run with `--remember`, you'll be prompted for credentials. On subsequent runs, you'll be signed in automatically:
-
-```
-Signed in automatically using saved session
-```
-
-**How it works:**
-- SYNC tokens (access/refresh) are saved to encrypted storage in the volume
-- Only SYNC tokens are affected — MCP server tokens (Context7, Ainstruct PAT) are always saved
-- If you restart the container without `--remember`, saved SYNC tokens are cleared
-- If tokens expire, you'll be prompted to re-authenticate
 
 ## Browser Automation
 

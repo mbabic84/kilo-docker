@@ -14,7 +14,7 @@ import (
 func serializeArgs(cfg config, sshEnabled bool) string {
 	var parts []string
 
-	utils.Log("[serializeArgs] cfg.remember=%v, cfg.ssh=%v, cfg.once=%v, cfg.yes=%v\n", cfg.remember, cfg.ssh, cfg.once, cfg.yes)
+	utils.Log("[serializeArgs] cfg.ssh=%v, cfg.once=%v, cfg.yes=%v\n", cfg.ssh, cfg.once, cfg.yes)
 
 	for _, f := range boolFlags {
 		if serialized, ok := f.serialize(cfg); ok {

@@ -16,7 +16,6 @@ import (
 // internal subcommands are registered in the subcommands map.
 func TestSubcommandsContainsAllInternal(t *testing.T) {
 	expected := []string{
-		"ainstruct-login",
 		"update-config",
 		"backup",
 		"restore",
@@ -83,7 +82,6 @@ func TestSubcommandsExcludesPassThroughCommands(t *testing.T) {
 // NOT passed through to exec.
 func TestResolveCommandInternalSubcommands(t *testing.T) {
 	internal := []string{
-		"ainstruct-login",
 		"update-config",
 		"backup",
 		"restore",
