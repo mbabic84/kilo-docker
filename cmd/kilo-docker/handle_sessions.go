@@ -254,6 +254,15 @@ func handleSessions(cfg config) {
 				defer cleanupSSH(os.Getenv("SSH_AGENT_PID"))
 			}
 		}
+		// Check port conflicts before starting
+		storedLabel := getContainerLabel(containerToAttach, "kilo.args")
+		if storedLabel != "" {
+			storedCfg := parseArgs(strings.Fields(storedLabel))
+			if err := checkPortConflicts(storedCfg); err != nil {
+				utils.LogError("[kilo-docker] %v\n", err, utils.WithOutput())
+				os.Exit(1)
+			}
+		}
 		utils.Log("[kilo-docker] Starting session '%s'...\n", containerToAttach, utils.WithOutput())
 		if err := startAndWaitForRunning(containerToAttach); err != nil {
 			utils.LogError("[kilo-docker] %v\n", err, utils.WithOutput())
