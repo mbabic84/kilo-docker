@@ -1,3 +1,9 @@
+## [3.19.1](https://github.com/mbabic84/kilo-docker/compare/v3.19.0...v3.19.1) (2026-05-14)
+
+### Bug Fixes
+
+* check port conflicts when starting sessions via 'kilo-docker sessions' ([e072c5c](https://github.com/mbabic84/kilo-docker/commit/e072c5cfcfb0124393a8e1b509b31720ce66fa5c))
+
 ## [3.19.0](https://github.com/mbabic84/kilo-docker/compare/v3.18.0...v3.19.0) (2026-05-14)
 
 ### Features
