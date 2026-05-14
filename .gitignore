@@ -33,3 +33,6 @@ docker-compose.override.yml
 kilo-docker-linux-*
 kilo-docker-darwin-*
 *.exe
+
+# Plans directory (local planning)
+plans/
