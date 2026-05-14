@@ -1,3 +1,14 @@
+## [3.19.0](https://github.com/mbabic84/kilo-docker/compare/v3.18.0...v3.19.0) (2026-05-14)
+
+### Features
+
+* add port conflict detection for sessions ([1deb716](https://github.com/mbabic84/kilo-docker/commit/1deb7168eec6ff462f0e210a940715acef8f3852))
+* add sessions stop subcommand ([ace33e6](https://github.com/mbabic84/kilo-docker/commit/ace33e6ac7ea6c6e60415ef606a383ded8b1add6))
+
+### Bug Fixes
+
+* handle exited session re-attach via docker start ([7863f20](https://github.com/mbabic84/kilo-docker/commit/7863f208c213995cb3fd919905dd86be60dd8caa))
+
 ## [3.18.0](https://github.com/mbabic84/kilo-docker/compare/v3.17.0...v3.18.0) (2026-05-13)
 
 ### Features
