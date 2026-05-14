@@ -39,34 +39,28 @@ func normalizeNetworks(networks []string, includeShared bool) []string {
 	return result
 }
 
-// EnsureSharedNetwork creates the shared network if it doesn't exist.
-func EnsureSharedNetwork() error {
-	if _, err := dockerRun("network", "inspect", SharedNetworkName); err == nil {
+func ensureDockerResource(resourceType, name, description string) error {
+	if _, err := dockerRun(resourceType, "inspect", name); err == nil {
 		return nil
 	}
 
-	output, err := dockerRun("network", "create", SharedNetworkName)
+	output, err := dockerRun(resourceType, "create", name)
 	if err != nil {
-		return fmt.Errorf("failed to create shared network %s: %w", SharedNetworkName, err)
+		return fmt.Errorf("failed to create %s %s: %w", description, name, err)
 	}
-	utils.LogWarn("[network] Created shared network: %s\n", SharedNetworkName)
+	utils.LogWarn("[network] Created %s: %s\n", description, name)
 	_ = output
 	return nil
 }
 
+// EnsureSharedNetwork creates the shared network if it doesn't exist.
+func EnsureSharedNetwork() error {
+	return ensureDockerResource("network", SharedNetworkName, "shared network")
+}
+
 // EnsurePlaywrightVolume creates the Playwright output volume if it doesn't exist.
 func EnsurePlaywrightVolume() error {
-	if _, err := dockerRun("volume", "inspect", PlaywrightVolumeName); err == nil {
-		return nil
-	}
-
-	output, err := dockerRun("volume", "create", PlaywrightVolumeName)
-	if err != nil {
-		return fmt.Errorf("failed to create Playwright volume %s: %w", PlaywrightVolumeName, err)
-	}
-	utils.LogWarn("[network] Created Playwright volume: %s\n", PlaywrightVolumeName)
-	_ = output
-	return nil
+	return ensureDockerResource("volume", PlaywrightVolumeName, "Playwright volume")
 }
 
 // selectNetwork displays an interactive list of available Docker networks

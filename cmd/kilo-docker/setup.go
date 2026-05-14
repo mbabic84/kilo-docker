@@ -113,12 +113,13 @@ func printCommandHelp(command string) {
 	case "sessions":
 		help = `Usage: kilo-docker sessions [command] [options]
 
-List sessions or attach to one.
+List sessions, attach to one, or stop a running session.
 
 Commands:
   (no command)          List all sessions and attach interactively
   cleanup               Remove sessions
   recreate              Recreate a session with the same flags
+  stop                  Stop a running session (frees ports, preserves container)
 
 Options:
   -h, --help            Show this help message
@@ -159,6 +160,19 @@ Examples:
   kilo-docker sessions recreate 1               # recreate session 1
   kilo-docker sessions recreate my-session     # recreate by name
   kilo-docker sessions recreate -h             # show this help
+`
+	case "sessions stop":
+		help = `Usage: kilo-docker sessions stop <name|index>
+
+Stop a running session, freeing its ports while preserving the
+container and volume for later restart.
+
+Use 'kilo-docker sessions <name>' to restart the session.
+
+Examples:
+  kilo-docker sessions stop 1                   # stop session 1
+  kilo-docker sessions stop my-session          # stop by name
+  kilo-docker sessions stop -h                  # show this help
 `
 	case "networks":
 		help = `Usage: kilo-docker networks

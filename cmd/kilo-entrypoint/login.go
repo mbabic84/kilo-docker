@@ -127,12 +127,9 @@ func listPATs(apiURL, accessToken string) ([]patListItem, error) {
 	return listResp.Tokens, nil
 }
 
-func rotatePAT(apiURL, accessToken, patID string) (string, int64, error) {
-	rotateReq := map[string]interface{}{
-		"expires_in_days": 7,
-	}
-	rotateJSON, _ := json.Marshal(rotateReq)
-	req, err := http.NewRequest("POST", apiURL+"/auth/pat/"+patID+"/rotate", bytes.NewReader(rotateJSON))
+func ainstructPATRequest(accessToken, url string, body map[string]interface{}, action string, validStatus func(int) bool) (string, int64, error) {
+	jsonBody, _ := json.Marshal(body)
+	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return "", 0, err
 	}
@@ -141,71 +138,48 @@ func rotatePAT(apiURL, accessToken, patID string) (string, int64, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		utils.LogError("[login] PAT rotate request failed: %v\n", err)
+		utils.LogError("[login] Ainstruct PAT %s request failed: %v\n", action, err)
 		return "", 0, err
 	}
+	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		utils.Log("[login] PAT rotate returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
-		return "", 0, fmt.Errorf("rotate PAT failed with status %d", resp.StatusCode)
+	respBody, _ := io.ReadAll(resp.Body)
+	if !validStatus(resp.StatusCode) {
+		utils.Log("[login] Ainstruct PAT %s returned status %d: %s\n", action, resp.StatusCode, utils.Redact(string(respBody)))
+		return "", 0, fmt.Errorf("%s Ainstruct PAT failed with status %d", action, resp.StatusCode)
 	}
 
-	var rotateResp patResponse
-	body, _ := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err := json.Unmarshal(body, &rotateResp); err != nil {
+	var result patResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		return "", 0, err
 	}
 
 	expiry := int64(0)
-	if rotateResp.ExpiresAt != nil {
-		expiry = rotateResp.ExpiresAt.Unix()
+	if result.ExpiresAt != nil {
+		expiry = result.ExpiresAt.Unix()
 	}
-	utils.Log("[login] PAT rotated successfully (id=%s, expiry=%d)\n", rotateResp.PatID, expiry)
-	return rotateResp.Token, expiry, nil
+	utils.Log("[login] Ainstruct PAT %sd successfully (id=%s, expiry=%d)\n", action, result.PatID, expiry)
+	return result.Token, expiry, nil
 }
 
-func createPAT(apiURL, accessToken, label string) (string, int64, error) {
-	createReq := map[string]interface{}{
-		"label":           label,
-		"expires_in_days": 7,
-	}
-	createJSON, _ := json.Marshal(createReq)
-	req, err := http.NewRequest("POST", apiURL+"/auth/pat", bytes.NewReader(createJSON))
-	if err != nil {
-		return "", 0, err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
+func rotateAinstructPAT(apiURL, accessToken, patID string) (string, int64, error) {
+	return ainstructPATRequest(
+		accessToken,
+		apiURL+"/auth/pat/"+patID+"/rotate",
+		map[string]interface{}{"expires_in_days": 7},
+		"rotate",
+		func(code int) bool { return code == 200 },
+	)
+}
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		utils.LogError("[login] PAT create request failed: %v\n", err)
-		return "", 0, err
-	}
-
-	if resp.StatusCode != 201 && resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		utils.Log("[login] PAT create returned status %d: %s\n", resp.StatusCode, utils.Redact(string(body)))
-		return "", 0, fmt.Errorf("create PAT failed with status %d", resp.StatusCode)
-	}
-
-	var createResp patResponse
-	body, _ := io.ReadAll(resp.Body)
-	_ = resp.Body.Close()
-	if err := json.Unmarshal(body, &createResp); err != nil {
-		return "", 0, err
-	}
-
-	expiry := int64(0)
-	if createResp.ExpiresAt != nil {
-		expiry = createResp.ExpiresAt.Unix()
-	}
-	utils.Log("[login] PAT created successfully (id=%s, expiry=%d)\n", createResp.PatID, expiry)
-	return createResp.Token, expiry, nil
+func createAinstructPAT(apiURL, accessToken, label string) (string, int64, error) {
+	return ainstructPATRequest(
+		accessToken,
+		apiURL+"/auth/pat",
+		map[string]interface{}{"label": label, "expires_in_days": 7},
+		"create",
+		func(code int) bool { return code == 200 || code == 201 },
+	)
 }
 
 func ensureAinstructPAT(apiURL, accessToken, label, storedToken, storedExpiry string) (string, int64, error) {
@@ -234,7 +208,7 @@ func ensureAinstructPAT(apiURL, accessToken, label, storedToken, storedExpiry st
 					utils.Log("[login] Existing PAT still valid (expires %s), using stored token\n", pat.ExpiresAt.Format("2006-01-02"))
 					return storedToken, expiry, nil
 				}
-			return rotatePAT(apiURL, accessToken, pat.PatID)
+			return rotateAinstructPAT(apiURL, accessToken, pat.PatID)
 			} else {
 				if pat.ExpiresAt != nil {
 					utils.Log("[login] No stored token, rotating existing PAT (expires %s)\n", pat.ExpiresAt.Format("2006-01-02"))
@@ -242,13 +216,13 @@ func ensureAinstructPAT(apiURL, accessToken, label, storedToken, storedExpiry st
 utils.Log("[login] No stored token, rotating existing PAT (no expiry)\n")
 				}
 
-				return rotatePAT(apiURL, accessToken, pat.PatID)
+				return rotateAinstructPAT(apiURL, accessToken, pat.PatID)
 			}
 		}
 	}
 
 utils.Log("[login] No existing PAT found, creating new one...\n")
-	return createPAT(apiURL, accessToken, label)
+	return createAinstructPAT(apiURL, accessToken, label)
 }
 
 // --- Interactive login ---
@@ -403,8 +377,8 @@ func promptPassword() string {
 
 
 func buildAinstructPATLabel() string {
-	username := os.Getenv("PAT_USERNAME")
-	hostname := os.Getenv("PAT_HOSTNAME")
+	username := os.Getenv("KD_USERNAME")
+	hostname := os.Getenv("KD_HOSTNAME")
 	if username == "" {
 		username = "unknown"
 	}

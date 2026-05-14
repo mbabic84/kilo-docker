@@ -35,7 +35,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"os/user"
 	"strings"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
@@ -131,6 +133,7 @@ func runContainer(cfg config) {
 	}
 	containerName := deriveContainerName(workspace)
 	containerState := dockerState(containerName)
+
 	if cfg.once {
 		if containerState != "not_found" {
 			_, _ = dockerRun("rm", "-f", containerName)
@@ -138,7 +141,20 @@ func runContainer(cfg config) {
 		containerState = "not_found"
 	} else {
 		switch containerState {
-		case "exited", "dead", "created":
+		case "exited", "created":
+			currentFlags := serializeForDisplay(cfg, cfg.ssh)
+			storedFlags := getContainerLabel(containerName, "kilo.args")
+			displayedStoredFlags := serializeStoredArgs(storedFlags)
+			if !argsMatch(currentFlags, storedFlags) {
+				utils.Log("[kilo-docker] Existing session uses different flags.\n", utils.WithOutput())
+				utils.Log("[kilo-docker]   Existing: %s\n", displayedStoredFlags, utils.WithOutput())
+				utils.Log("[kilo-docker]   Current:  %s\n", currentFlags, utils.WithOutput())
+				if cfg.yes || promptConfirm("Recreate with new flags? [y/N]: ", cfg.yes) {
+					_, _ = dockerRun("rm", "-f", containerName)
+					containerState = "not_found"
+				}
+			}
+		case "dead":
 			_, _ = dockerRun("rm", "-f", containerName)
 			containerState = "not_found"
 		}
@@ -214,12 +230,22 @@ func runContainer(cfg config) {
 	}
 
 	image := repoURL + ":latest"
+
+	if err := checkPortConflicts(cfg); err != nil {
+		utils.LogError("%v\n", err)
+		os.Exit(1)
+	}
+
 	switch containerState {
 	case "running":
 		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerName, cfg.once)
 	case "exited", "created":
-		_, _ = dockerRun("start", "-d", containerName)
+		utils.Log("[kilo-docker] Restarting existing session '%s' (use 'sessions recreate' to pick up image updates).\n", containerName, utils.WithOutput())
+		if err := startAndWaitForRunning(containerName); err != nil {
+			utils.LogError("[kilo-docker] %v\n", err, utils.WithOutput())
+			os.Exit(1)
+		}
 		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerName, cfg.once)
 	default:
@@ -259,6 +285,79 @@ func handleSessionEnd(containerName string, onceMode bool) {
 		utils.Log("[kilo-docker] Detached from session '%s'.\n", containerName, utils.WithOutput())
 		utils.Log("[kilo-docker] To re-attach, run: kilo-docker sessions %s\n", containerName, utils.WithOutput())
 	}
+}
+
+// extractHostPort extracts the host-side port from a port mapping string.
+// Supported Docker formats:
+//
+//	"8080"              -> "8080"        (container port only)
+//	"8080:80"           -> "8080"        (hostPort:containerPort)
+//	"127.0.0.1:8080:80" -> "8080"        (ip:hostPort:containerPort)
+//	"127.0.0.1::80"     -> ""            (ip::containerPort, no host binding)
+func extractHostPort(port string) string {
+	parts := strings.Split(port, ":")
+	if len(parts) >= 3 {
+		return parts[len(parts)-2]
+	}
+	hostPort, _, _ := strings.Cut(port, ":")
+	return hostPort
+}
+
+// checkPortConflicts checks if any requested port is already in use by another
+// running session. If the conflicting session is owned by the same user, prompts
+// to stop it. If owned by a different user, returns an error.
+func checkPortConflicts(cfg config) error {
+	if len(cfg.ports) == 0 {
+		return nil
+	}
+
+	sessions, err := getSessions()
+	if err != nil {
+		return err
+	}
+
+	currentUser := "unknown"
+	if u, err := user.Current(); err == nil {
+		currentUser = u.Username
+	}
+
+	for _, s := range sessions {
+		if dockerState(s.Name) != "running" {
+			continue
+		}
+
+		storedLabel := getContainerLabel(s.Name, "kilo.args")
+		if storedLabel == "" {
+			continue
+		}
+		storedCfg := parseArgs(strings.Fields(storedLabel))
+		if len(storedCfg.ports) == 0 {
+			continue
+		}
+
+		for _, reqPort := range cfg.ports {
+			reqHostPort := extractHostPort(reqPort)
+			for _, storedPort := range storedCfg.ports {
+				storedHostPort := extractHostPort(storedPort)
+				if reqHostPort != storedHostPort {
+					continue
+				}
+
+				if s.User == currentUser {
+					if !promptConfirm(fmt.Sprintf("Port %s is in use by your session '%s'. Stop it? [y/N]: ", reqHostPort, s.Name), cfg.yes) {
+						return fmt.Errorf("port %s is already in use by session '%s'", reqHostPort, s.Name)
+					}
+					if _, err := dockerRun("stop", s.Name); err != nil {
+						return fmt.Errorf("failed to stop session '%s': %w", s.Name, err)
+					}
+					fmt.Fprintf(os.Stderr, "Session '%s' stopped.\n", s.Name)
+				} else {
+					return fmt.Errorf("port %s is already in use by session '%s' (owner: %s)", reqHostPort, s.Name, s.User)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func handlePlaywright(cfg config) {

@@ -121,8 +121,9 @@ func main() {
 
 	if onlyFlags && !hasSubcommand {
 		if alreadyInitialized() {
-			if err := runZellijAttach(); err != nil {
-				utils.LogError("[main] zellij-attach error: %v\n", err, utils.WithOutput())
+			utils.Log("[main] Container already initialized, sleeping for exec\n")
+			if err := syscall.Exec("/bin/sleep", []string{"sleep", "infinity"}, os.Environ()); err != nil {
+				utils.LogError("[main] sleep exec failed: %v\n", err, utils.WithOutput())
 				os.Exit(1)
 			}
 			return
