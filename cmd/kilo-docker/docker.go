@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // dockerSubcommands lists recognized docker CLI subcommands. If the first
@@ -96,6 +97,32 @@ func dockerState(container string) string {
 func containerExists(container string) bool {
 	_, err := dockerRun("inspect", container)
 	return err == nil
+}
+
+// startAndWaitForRunning starts a container and polls until it reaches
+// "running" state. Returns an error if the container fails to start or
+// exits before becoming running.
+func startAndWaitForRunning(container string) error {
+	if _, err := dockerRun("start", container); err != nil {
+		return fmt.Errorf("failed to start container '%s': %w", container, err)
+	}
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		state := dockerState(container)
+		switch state {
+		case "running":
+			return nil
+		case "exited":
+			logs, _ := dockerRun("logs", "--tail", "20", container)
+			return fmt.Errorf("container '%s' started but exited immediately.\nContainer logs:\n%s", container, logs)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	state := dockerState(container)
+	logs, _ := dockerRun("logs", "--tail", "20", container)
+	return fmt.Errorf("container '%s' did not reach running state within 10s (current: %s).\nContainer logs:\n%s", container, state, logs)
 }
 
 // execDockerInteractive replaces the current process with a docker exec

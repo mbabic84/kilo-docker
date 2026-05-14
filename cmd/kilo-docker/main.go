@@ -242,7 +242,10 @@ func runContainer(cfg config) {
 		handleSessionEnd(containerName, cfg.once)
 	case "exited", "created":
 		utils.Log("[kilo-docker] Restarting existing session '%s' (use 'sessions recreate' to pick up image updates).\n", containerName, utils.WithOutput())
-		_, _ = dockerRun("start", "-d", containerName)
+		if err := startAndWaitForRunning(containerName); err != nil {
+			utils.LogError("[kilo-docker] %v\n", err, utils.WithOutput())
+			os.Exit(1)
+		}
 		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerName, cfg.once)
 	default:

@@ -254,7 +254,11 @@ func handleSessions(cfg config) {
 				defer cleanupSSH(os.Getenv("SSH_AGENT_PID"))
 			}
 		}
-		_, _ = dockerRun("start", "-d", containerToAttach)
+		utils.Log("[kilo-docker] Starting session '%s'...\n", containerToAttach, utils.WithOutput())
+		if err := startAndWaitForRunning(containerToAttach); err != nil {
+			utils.LogError("[kilo-docker] %v\n", err, utils.WithOutput())
+			os.Exit(1)
+		}
 		_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerToAttach, false)
 	default:
