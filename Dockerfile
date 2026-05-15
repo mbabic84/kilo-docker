@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/kilo-entrypoint ./cmd/kilo-e
 # ── Builder: download Kilo binary ──
 FROM debian:bookworm-slim AS builder
 
-ARG KILO_VERSION=7.2.52
+ARG KILO_VERSION=7.3.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl tar ca-certificates \
      && rm -rf /var/lib/apt/lists/* \
