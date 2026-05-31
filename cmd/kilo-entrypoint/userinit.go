@@ -115,6 +115,29 @@ func runUserInit() error {
 		_ = os.WriteFile(bashrc, []byte("# ~/.bashrc\n"), 0o600)
 	}
 
+	// Create .bash_profile that sources .bashrc for login shells (e.g. zellij panes).
+	bashProfile := filepath.Join(homeDir, ".bash_profile")
+	if _, err := os.Stat(bashProfile); os.IsNotExist(err) {
+		profileContent := "# Source .bashrc for login shells (e.g. zellij panes)\n" +
+			"if [ -f \"$HOME/.bashrc\" ]; then\n" +
+			"    . \"$HOME/.bashrc\"\n" +
+			"fi\n"
+		_ = os.WriteFile(bashProfile, []byte(profileContent), 0o600)
+	}
+
+	// Create .bash_env bootstrap for non-interactive bash shells (BASH_ENV).
+	// When Kilo's Bash tool runs `bash -c`, it creates a non-interactive shell
+	// that does not source .bashrc. BASH_ENV bridges this gap by loading NVM.
+	bashEnv := filepath.Join(homeDir, ".bash_env")
+	if _, err := os.Stat(bashEnv); os.IsNotExist(err) {
+		envContent := "# Bootstrap for non-interactive bash shells (BASH_ENV)\n" +
+			"if [ -f \"$HOME/.nvm/nvm.sh\" ]; then\n" +
+			"    export NVM_DIR=\"$HOME/.nvm\"\n" +
+			"    . \"$HOME/.nvm/nvm.sh\"\n" +
+			"fi\n"
+		_ = os.WriteFile(bashEnv, []byte(envContent), 0o600)
+	}
+
 	// Copy default config templates if user doesn't have them.
 	// Templates use 'template-' prefix to avoid being read as system configs.
 	localKilo := filepath.Join(homeDir, ".config/kilo/kilo.jsonc")
@@ -252,6 +275,7 @@ func runUserInit() error {
 	_ = os.Setenv("USER", username)
 	_ = os.Setenv("LOGNAME", username)
 	_ = os.Setenv("SHELL", userConfig["shell"])
+	_ = os.Setenv("BASH_ENV", filepath.Join(homeDir, ".bash_env"))
 
 	// Chown everything to the new user (after all root-level file writes)
 	utils.Log("[userinit] Setting ownership: %s\n", homeDir)

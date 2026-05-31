@@ -98,9 +98,7 @@ var BuiltInServices = []Service{
 		},
 		VersionCheck:  "[ -d \"$HOME/.nvm\" ] && git -C \"$HOME/.nvm\" describe --tags 2>/dev/null | sed 's/v//' || echo \"\"",
 		LatestVersion: "curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep '\"tag_name\":' | sed 's/.*v\\([0-9.]*\\).*/\\1/'",
-		EnvVars: map[string]string{
-			"NVM_NODEJS_ORG_MIRROR": "https://unofficial-builds.nodejs.org/download/release",
-		},
+		EnvVars: map[string]string{},
 		Volumes:        []string{},
 		RequiresSocket: "",
 	},
