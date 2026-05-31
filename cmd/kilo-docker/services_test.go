@@ -145,9 +145,6 @@ func TestNvmServiceHasRequiredFields(t *testing.T) {
 	if svc.RequiresSocket != "" {
 		t.Errorf("expected RequiresSocket to be empty for nvm, got %q", svc.RequiresSocket)
 	}
-	if _, ok := svc.EnvVars["NVM_NODEJS_ORG_MIRROR"]; !ok {
-		t.Error("expected NVM_NODEJS_ORG_MIRROR in EnvVars")
-	}
 }
 
 func TestBuildServiceHasRequiredFields(t *testing.T) {

@@ -275,9 +275,10 @@ func execZellij() error {
 	// Create a copy of the environment
 	env := os.Environ()
 
-	// Set HOME, USER, LOGNAME, SHELL from persisted config
+	// Set HOME, USER, LOGNAME, SHELL, BASH_ENV from persisted config
 	if homeDir != "" {
 		env = appendOrReplaceEnv(env, "HOME", homeDir)
+		env = appendOrReplaceEnv(env, "BASH_ENV", filepath.Join(homeDir, ".bash_env"))
 	}
 	if username != "" {
 		env = appendOrReplaceEnv(env, "USER", username)
