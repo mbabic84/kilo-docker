@@ -1,3 +1,9 @@
+## [3.23.1](https://github.com/mbabic84/kilo-docker/compare/v3.23.0...v3.23.1) (2026-05-31)
+
+### Bug Fixes
+
+* **nvm:** ensure NVM is accessible in all shell contexts ([9281025](https://github.com/mbabic84/kilo-docker/commit/9281025197af2827b8d24fdff92d04b5fc37a5b8))
+
 ## [3.23.0](https://github.com/mbabic84/kilo-docker/compare/v3.22.0...v3.23.0) (2026-05-30)
 
 ### Features
