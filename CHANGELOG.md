@@ -1,3 +1,9 @@
+## [3.24.0](https://github.com/mbabic84/kilo-docker/compare/v3.23.1...v3.24.0) (2026-06-02)
+
+### Features
+
+* bump Kilo CLI to v7.3.21 ([95db7a0](https://github.com/mbabic84/kilo-docker/commit/95db7a0948643549980595358d20403d5a3765dd))
+
 ## [3.23.1](https://github.com/mbabic84/kilo-docker/compare/v3.23.0...v3.23.1) (2026-05-31)
 
 ### Bug Fixes
