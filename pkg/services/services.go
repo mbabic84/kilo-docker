@@ -96,7 +96,7 @@ var BuiltInServices = []Service{
 		UserInstall: []string{
 			"curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash",
 		},
-		VersionCheck:  "[ -d \"$HOME/.nvm\" ] && git -C \"$HOME/.nvm\" describe --tags 2>/dev/null | sed 's/v//' || echo \"\"",
+		VersionCheck:  "[ -f \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\" && nvm --version 2>/dev/null || echo \"\"",
 		LatestVersion: "curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep '\"tag_name\":' | sed 's/.*v\\([0-9.]*\\).*/\\1/'",
 		EnvVars: map[string]string{},
 		Volumes:        []string{},
