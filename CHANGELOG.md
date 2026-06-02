@@ -1,3 +1,9 @@
+## [3.24.1](https://github.com/mbabic84/kilo-docker/compare/v3.24.0...v3.24.1) (2026-06-02)
+
+### Bug Fixes
+
+* **nvm:** use nvm --version for existing installation detection ([8050d28](https://github.com/mbabic84/kilo-docker/commit/8050d2830fd25505c09520b86eda4984bae0ef20))
+
 ## [3.24.0](https://github.com/mbabic84/kilo-docker/compare/v3.23.1...v3.24.0) (2026-06-02)
 
 ### Features
