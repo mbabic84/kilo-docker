@@ -87,7 +87,7 @@ linters:
         text: 'G(107|204|704|703|122|115|702):'
         linters:
           - gosec
-      - path: cmd/kilo-entrypoint/(config|tokens|sync_content|zellijattach)\.go
+      - path: cmd/kilo-entrypoint/(config|tokens|sync_content|zellijattach|customenv)\.go
         text: 'G304:'
         linters:
           - gosec

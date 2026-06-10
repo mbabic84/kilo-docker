@@ -6,11 +6,17 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/services"
 )
 
-func TestGetServiceDocker(t *testing.T) {
-	svc := getService("docker")
+func mustGetService(t *testing.T, name string) *services.Service {
+	t.Helper()
+	svc := getService(name)
 	if svc == nil {
-		t.Fatal("expected docker service, got nil")
+		t.Fatalf("service %q not found", name)
 	}
+	return svc
+}
+
+func TestGetServiceDocker(t *testing.T) {
+	svc := mustGetService(t, "docker")
 	if svc.Name != "docker" {
 		t.Errorf("expected name 'docker', got %q", svc.Name)
 	}
@@ -18,8 +24,6 @@ func TestGetServiceDocker(t *testing.T) {
 		t.Errorf("expected flag '--docker', got %q", svc.Flag)
 	}
 }
-
-
 
 func TestGetServiceUnknown(t *testing.T) {
 	svc := getService("nonexistent")
@@ -59,10 +63,7 @@ func TestBuiltInServicesCount(t *testing.T) {
 }
 
 func TestDockerServiceHasRequiredFields(t *testing.T) {
-	svc := getService("docker")
-	if svc == nil {
-		t.Fatal("docker service not found")
-	}
+	svc := mustGetService(t, "docker")
 
 	if svc.Name != "docker" {
 		t.Errorf("expected Name 'docker', got %q", svc.Name)
@@ -85,10 +86,7 @@ func TestDockerServiceHasRequiredFields(t *testing.T) {
 }
 
 func TestGhServiceHasRequiredFields(t *testing.T) {
-	svc := getService("gh")
-	if svc == nil {
-		t.Fatal("gh service not found")
-	}
+	svc := mustGetService(t, "gh")
 
 	if svc.Name != "gh" {
 		t.Errorf("expected Name 'gh', got %q", svc.Name)
@@ -105,10 +103,7 @@ func TestGhServiceHasRequiredFields(t *testing.T) {
 }
 
 func TestGoServiceHasRequiredFields(t *testing.T) {
-	svc := getService("go")
-	if svc == nil {
-		t.Fatal("go service not found")
-	}
+	svc := mustGetService(t, "go")
 
 	if svc.Name != "go" {
 		t.Errorf("expected Name 'go', got %q", svc.Name)
@@ -125,10 +120,7 @@ func TestGoServiceHasRequiredFields(t *testing.T) {
 }
 
 func TestNvmServiceHasRequiredFields(t *testing.T) {
-	svc := getService("nvm")
-	if svc == nil {
-		t.Fatal("nvm service not found")
-	}
+	svc := mustGetService(t, "nvm")
 
 	if svc.Name != "nvm" {
 		t.Errorf("expected Name 'nvm', got %q", svc.Name)
@@ -148,10 +140,7 @@ func TestNvmServiceHasRequiredFields(t *testing.T) {
 }
 
 func TestBuildServiceHasRequiredFields(t *testing.T) {
-	svc := getService("build")
-	if svc == nil {
-		t.Fatal("build service not found")
-	}
+	svc := mustGetService(t, "build")
 
 	if svc.Name != "build" {
 		t.Errorf("expected Name 'build', got %q", svc.Name)
@@ -171,10 +160,7 @@ func TestBuildServiceHasRequiredFields(t *testing.T) {
 }
 
 func TestPythonServiceHasRequiredFields(t *testing.T) {
-	svc := getService("python")
-	if svc == nil {
-		t.Fatal("python service not found")
-	}
+	svc := mustGetService(t, "python")
 
 	if svc.Name != "python" {
 		t.Errorf("expected Name 'python', got %q", svc.Name)
@@ -194,10 +180,7 @@ func TestPythonServiceHasRequiredFields(t *testing.T) {
 }
 
 func TestRcloneServiceHasRequiredFields(t *testing.T) {
-	svc := getService("rclone")
-	if svc == nil {
-		t.Fatal("rclone service not found")
-	}
+	svc := mustGetService(t, "rclone")
 
 	if svc.Name != "rclone" {
 		t.Errorf("expected Name 'rclone', got %q", svc.Name)
@@ -214,10 +197,7 @@ func TestRcloneServiceHasRequiredFields(t *testing.T) {
 }
 
 func TestGitNexusServiceHasRequiredFields(t *testing.T) {
-	svc := getService("gitnexus")
-	if svc == nil {
-		t.Fatal("gitnexus service not found")
-	}
+	svc := mustGetService(t, "gitnexus")
 
 	if svc.Name != "gitnexus" {
 		t.Errorf("expected Name 'gitnexus', got %q", svc.Name)

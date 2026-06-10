@@ -25,6 +25,7 @@ func TestSubcommandsContainsAllInternal(t *testing.T) {
 		"resync",
 		"zellij-attach",
 		"print-env",
+		"custom-envs",
 		"help",
 	}
 
@@ -90,6 +91,8 @@ func TestResolveCommandInternalSubcommands(t *testing.T) {
 		"sync",
 		"resync",
 		"zellij-attach",
+		"print-env",
+		"custom-envs",
 		"help",
 	}
 
