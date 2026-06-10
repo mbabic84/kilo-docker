@@ -9,7 +9,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 - **Token persistence** - MCP server tokens are prompted once and saved in the volume
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
-- **Built-in services** - Extensible service system with `--docker`, `--go`, `--node`, and more (see [Services](#services))
+- **Built-in services** - Extensible service system with `--docker`, `--go`, `--nvm`, and more (see [Services](#services))
 
 ## Quick Start
 
@@ -42,16 +42,17 @@ kilo-docker
 | Command | Description |
 |---------|-------------|
 | `sessions [name\|index]` | List sessions or attach to one by name or index |
+| `sessions stop <name\|index>` | Stop a running session, freeing its ports |
 | `sessions cleanup [-y] [name\|index]` | Remove a session (interactive if no name given) |
 | `sessions cleanup -y -a` | Remove all exited sessions |
 | `sessions recreate <name\|index>` | Recreate a session with the same flags (preserves volume) |
 | `networks` | List available Docker networks |
+| `playwright` | Recreate the Playwright MCP sidecar container |
 | `backup [-f]` | Create backup of volume to tar.gz |
 | `restore <file> [-f] [-v\|--volume <name>]` | Restore volume from backup |
 | `init` | Reset configuration (remove volume, re-enter tokens) |
 | `cleanup` | Remove volume, containers, image, and installed binary |
-| `update` | Pull the latest Docker image and update the binary |
-| `update-config` | Download latest opencode.json template and merge with existing config |
+| `update [config]` | Pull latest Docker image and update binary, or merge config template |
 | `version` | Show kilo-docker and kilo versions |
 | `help` | Show help message |
 
@@ -59,6 +60,7 @@ kilo-docker
 
 | Option | Description |
 |--------|-------------|
+| `--help`, `-h` | Show help message |
 | `--once` | Run a one-time session without persistence (no volume) |
 | `--volume`, `-v` | Mount a volume (host_path:container_path), repeatable |
 | `--workspace`, `-w` | Set custom workspace path (default: current directory) |
@@ -67,7 +69,6 @@ kilo-docker
 | `--ssh` | Enable SSH agent forwarding into the container |
 | `--network <name>` | Attach to a Docker network (repeatable, `kilo-shared` is always included) |
 | `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
-| `--version` | Print kilo-docker version |
 
 ### Volume Mounts
 
@@ -97,11 +98,13 @@ The current working directory is always mounted at the same path automatically.
 |--------|-------------|
 | `--docker` | Mount Docker socket for container management from within Kilo |
 | `--go` | Install Go (latest stable) for development |
-| `--node` | Install Node.js LTS for development |
+| `--build` | Install build essentials (gcc, g++, make) for compiling native extensions |
 | `--gh` | Install GitHub CLI for interacting with GitHub |
 | `--uv` | Install uv for fast Python package management |
 | `--nvm` | Install NVM (Node Version Manager) for managing Node.js versions |
 | `--python` | Install Python 3 for general purpose use |
+| `--rclone` | Install rclone, a universal CLI for S3 and 40+ cloud storage backends |
+| `--gitnexus` | Install GitNexus for codebase knowledge graph indexing and MCP-based code intelligence |
 
 ## One-Time Sessions
 
@@ -123,7 +126,7 @@ kilo-docker --playwright
 
 The sidecar runs headless Chromium in HTTP mode on port 8931 inside the shared Docker network (`kilo-shared`). The Playwright container is shared across sessions — if already running, it's reused rather than recreated.
 
-Screenshots and output files are saved to a shared volume (`kilo-playwright-output`) mounted at `/home/kd-<hash>/playwright-output` inside the Kilo container.
+Screenshots and output files are saved to a shared volume (`kilo-playwright-output`) mounted at `/mnt/playwright-output` inside the Kilo container.
 
 ## SSH Agent Forwarding
 
@@ -182,14 +185,14 @@ Inside the container, the entrypoint reads `KD_SERVICES`, runs installation comm
 The host binary uses a named Docker volume mounted at `/home`. Inside the container, the user home directory is dynamically generated as `/home/kd-<hash>`. This stores:
 
 - SQLite database, auth state, logs
-- Configuration (`opencode.json` — model selection, provider connections, MCP settings)
+- Configuration (`kilo.jsonc` — model selection, provider connections, MCP settings)
 - Custom commands (`.config/kilo/commands/*.md`) and agents (`.config/kilo/agents/*.md`)
 - Plugins (`.config/kilo/plugins/*.{js,ts}`), skills (`.config/kilo/skills/*/SKILL.md`), tools (`.config/kilo/tools/*.{js,ts}`)
 - Instruction files (`.config/kilo/rules/*.md`)
 - Session state and snapshots
 - Cache
 
-**Default mode** — Volume name: `kilo-data-<username>`. Tokens stored in plaintext.
+**Default mode** — Volume name: `kilo-docker-data`. Tokens stored in plaintext.
 
 The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, image, and installed binary).
 
@@ -198,10 +201,10 @@ The volume persists across container restarts. Use `kilo-docker init` to reset t
 When a new Kilo Docker image adds MCP servers or config changes, run:
 
 ```bash
-kilo-docker update-config
+kilo-docker update config
 ```
 
-This downloads the latest `opencode.json` template from the repository and merges it with your existing config. New servers are added, existing customizations are preserved.
+This downloads the latest `kilo.jsonc` template from the repository and merges it with your existing config. New servers are added, existing customizations are preserved.
 
 ## Backup and Restore
 
@@ -240,6 +243,9 @@ kilo-docker sessions cleanup <name-or-index>
 # Remove all exited sessions
 kilo-docker sessions cleanup -a
 
+# Stop a running session (frees ports, preserves container)
+kilo-docker sessions stop <name-or-index>
+
 # Recreate a session with the same flags (preserves volume)
 kilo-docker sessions recreate <name-or-index>
 ```
@@ -255,6 +261,7 @@ When attaching to a session, `kilo-docker` detects the container state: if runni
 | `context7` | Library documentation lookup | Bearer token |
 | `ainstruct` | Document storage and semantic search | Bearer token (auto-created) |
 | `playwright` | Browser automation (screenshots, navigation) | None (local sidecar) |
+| `gitnexus` | Codebase knowledge graph indexing and MCP-based code intelligence | None (local) |
 
 `context7` requires a Bearer token. Use `kilo-entrypoint mcp-tokens` to manage tokens interactively.
 
@@ -288,6 +295,7 @@ Host remote
 | `latest` | Most recent stable release (base) |
 | `v{version}` | Exact semantic version (e.g., `v1.2.3`) |
 | `v{major}.{minor}` | Minor track (e.g., `v1.2`) |
+| `v{major}` | Major track (e.g., `v1`) |
 
 ## Building Locally
 
@@ -299,7 +307,7 @@ scripts/build.sh all
 scripts/build.sh docker
 
 # Test
-docker run --rm kilo-docker --version
+docker run --rm kilo-docker version
 
 # Interactive
 docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-docker
