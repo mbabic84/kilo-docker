@@ -16,14 +16,38 @@ const (
 	SharedPlaywrightContainerName = "kilo-playwright-mcp"
 )
 
+// containsNet returns true if name is in the networks slice.
+func containsNet(networks []string, name string) bool {
+	for _, n := range networks {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
 // normalizeNetworks ensures kilo-shared is always present if includeShared is true,
 // removes duplicates, and returns a deterministic order (shared first, then user-provided).
+// When "host" is present, it takes precedence and all other networks are dropped,
+// because Docker does not allow combining --network host with other networks.
 func normalizeNetworks(networks []string, includeShared bool) []string {
+	hasHost := false
+	for _, n := range networks {
+		if n == "host" {
+			hasHost = true
+			break
+		}
+	}
+
+	if hasHost {
+		return []string{"host"}
+	}
+
 	seen := make(map[string]bool)
 	var result []string
 
-	// Always include shared network first if requested
-	if includeShared && SharedNetworkName != "" {
+	// Always include shared network first if requested, unless host network is used
+	if includeShared && SharedNetworkName != "" && !hasHost {
 		result = append(result, SharedNetworkName)
 		seen[SharedNetworkName] = true
 	}

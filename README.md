@@ -67,7 +67,7 @@ kilo-docker
 | `--port`, `-p` | Map port (host_port:container_port), repeatable |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--ssh` | Enable SSH agent forwarding into the container |
-| `--network <name>` | Attach to a Docker network (repeatable, `kilo-shared` is always included) |
+| `--network <name>` | Attach to a Docker network (repeatable, `kilo-shared` included by default). Use `host` to share the host network stack |
 | `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
 
 ### Volume Mounts
@@ -161,6 +161,18 @@ kilo-docker --network net1 --network net2
 ```
 
 The `kilo-shared` network is always included implicitly — it doesn't need to be specified and won't trigger flag mismatch detection when comparing stored vs current args.
+
+### Host Network Mode
+
+Use `--network host` to share the host's network stack. The container's `localhost` becomes the host's `localhost`, giving direct access to any services or other containers running on the host:
+
+```bash
+kilo-docker --network host
+```
+
+When `host` is specified, all other networks (including `kilo-shared`) are ignored, and a warning is printed if additional `--network` flags were passed. This matches Docker's restriction that host networking cannot be combined with other networks.
+
+Host networking also bypasses port mapping — all host ports are directly accessible inside the container without needing `--port` / `-p`.
 
 Kilo Docker uses a data-driven service architecture. Services are defined as structured data, making it easy to add new capabilities without modifying core logic.
 

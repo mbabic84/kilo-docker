@@ -216,6 +216,17 @@ func runContainer(cfg config) {
 		}
 	}
 
+	// Warn if host network is combined with other networks (Docker forbids this)
+	if containsNet(cfg.networks, "host") && len(cfg.networks) > 1 {
+		var others []string
+		for _, n := range cfg.networks {
+			if n != "host" {
+				others = append(others, n)
+			}
+		}
+		utils.LogWarn("[kilo-docker] --network host cannot be combined with other networks; ignoring %v\n", others, utils.WithOutput())
+	}
+
 	if !cfg.once {
 		if strings.HasPrefix(workspace, "/home/kd-") {
 			utils.LogWarn("[kilo-docker] Current directory (%s) overlaps with the container's home path.\n", workspace)
