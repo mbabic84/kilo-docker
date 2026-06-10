@@ -15,6 +15,9 @@ node_modules/
 *.swo
 *~
 
+# Kilo local config (may contain API keys)
+.kilo/
+
 # OS
 .DS_Store
 Thumbs.db

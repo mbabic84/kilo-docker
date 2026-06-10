@@ -231,12 +231,18 @@ func execZellij() error {
 	homeDir, username, shell, _ := loadUserConfig()
 
 	// Determine session name from current working directory before any chdir
-	sessionName := "kilo-docker"
+	workspace := "kilo-docker"
 	if wd, err := os.Getwd(); err == nil {
 		if base := filepath.Base(wd); base != "" && base != "/" {
-			sessionName = base
+			workspace = base
 		}
 	}
+
+	hostname := os.Getenv("KD_HOSTNAME")
+	if hostname == "" {
+		hostname = "unknown"
+	}
+	sessionName := fmt.Sprintf("%s | %s", hostname, workspace)
 
 	// If no user config found, we can't properly run as user
 	if homeDir == "" || username == "" {
