@@ -1,3 +1,9 @@
+## [3.29.0](https://github.com/mbabic84/kilo-docker/compare/v3.28.0...v3.29.0) (2026-06-10)
+
+### Features
+
+* add custom-envs CLI for user-defined encrypted environment variables ([7572d33](https://github.com/mbabic84/kilo-docker/commit/7572d3331401c995f056b1d8886cafc8bffdc167))
+
 ## [3.28.0](https://github.com/mbabic84/kilo-docker/compare/v3.27.0...v3.28.0) (2026-06-10)
 
 ### Features
