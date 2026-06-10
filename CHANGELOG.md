@@ -1,3 +1,9 @@
+## [3.27.0](https://github.com/mbabic84/kilo-docker/compare/v3.26.0...v3.27.0) (2026-06-10)
+
+### Features
+
+* **zellij:** include hostname in session name ([668d2b9](https://github.com/mbabic84/kilo-docker/commit/668d2b9cf4cb1d60a90dc23f6fe92b901f48cb19))
+
 ## [3.26.0](https://github.com/mbabic84/kilo-docker/compare/v3.25.0...v3.26.0) (2026-06-09)
 
 ### Features
