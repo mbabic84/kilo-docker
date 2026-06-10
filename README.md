@@ -6,7 +6,8 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 
 - **Non-root user** - Runs as `kilo` user with dynamic `PUID`/`PGID` mapping to match host user
 - **Persistent database** - SQLite database and auth state survive container restarts via named volume
-- **Token persistence** - MCP server tokens are prompted once and saved in the volume
+- **Token persistence** - MCP server tokens are prompted once and saved in encrypted volume storage
+- **Custom environment variables** - Store your own API keys and config values in encrypted storage, available in all sessions
 - **One-time sessions** - `--once` flag for ephemeral runs without persistence
 - **Browser automation** - `--playwright` flag starts a Playwright MCP sidecar for screenshots, navigation, and web interaction
 - **Built-in services** - Extensible service system with `--docker`, `--go`, `--nvm`, and more (see [Services](#services))
@@ -275,9 +276,39 @@ When attaching to a session, `kilo-docker` detects the container state: if runni
 | `playwright` | Browser automation (screenshots, navigation) | None (local sidecar) |
 | `gitnexus` | Codebase knowledge graph indexing and MCP-based code intelligence | None (local) |
 
-`context7` requires a Bearer token. Use `kilo-entrypoint mcp-tokens` to manage tokens interactively.
+`context7` requires a Bearer token. Use `kilo-entrypoint mcp-tokens` to manage MCP tokens interactively. Use `kilo-entrypoint custom-envs` to manage your own environment variables (see [Custom Environment Variables](#custom-environment-variables)).
 
 `playwright` is only available when using the `--playwright` flag. It runs as a separate container on a shared Docker network with no authentication required.
+
+## Custom Environment Variables
+
+Store your own API keys, config values, or any environment variables in AES-256 encrypted storage. Values are loaded automatically into every Kilo session alongside the built-in MCP tokens.
+
+```bash
+# List all custom envs (values are masked)
+kilo-entrypoint custom-envs list
+
+# Add a new variable
+kilo-entrypoint custom-envs add MY_API_KEY "sk-abc123"
+
+# Edit an existing variable
+kilo-entrypoint custom-envs edit MY_API_KEY "sk-new-value"
+
+# Get raw value (for scripting)
+kilo-entrypoint custom-envs get MY_API_KEY
+
+# Remove a variable
+kilo-entrypoint custom-envs remove MY_API_KEY
+```
+
+Custom envs use the same encryption as MCP tokens (`AES-256-CBC`, keyed by your user ID) and are stored at `.local/share/kilo/.custom-envs.env.enc`.
+
+To use custom envs from a subshell or script inside a Kilo session:
+
+```bash
+eval $(kilo-entrypoint print-env 2>/dev/null)
+echo $MY_API_KEY
+```
 
 ## Usage on Remote Hosts
 
@@ -286,7 +317,7 @@ When attaching to a session, `kilo-docker` detects the container state: if runni
 ssh remote-host 'curl -fsSL -o ~/.local/bin/kilo-docker https://github.com/mbabic84/kilo-docker/releases/latest/download/kilo-docker-linux-amd64 && chmod +x ~/.local/bin/kilo-docker && ~/.local/bin/kilo-docker'
 ```
 
-> Use `kilo-entrypoint mcp-tokens` to manage MCP server tokens.
+> Use `kilo-entrypoint mcp-tokens` to manage MCP server tokens and `kilo-entrypoint custom-envs` for custom environment variables.
 
 ### SSH Alias for Convenience
 

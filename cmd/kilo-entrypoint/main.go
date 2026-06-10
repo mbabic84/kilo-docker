@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -39,6 +40,7 @@ var subcommands = map[string]bool{
 	"resync":          true,
 	"zellij-attach":   true,
 	"print-env":       true,
+	"custom-envs":     true,
 	"help":            true,
 }
 
@@ -77,7 +79,15 @@ func runHelp() {
 	fmt.Printf("  %-*s %s\n", w, "sync rm <file>", "Remove a specific sync file (local and remote)")
 	fmt.Printf("  %-*s %s\n", w, "resync", "Delete all remote documents and re-push local files")
 	fmt.Printf("  %-*s %s\n", w, "zellij-attach", "Attach to existing zellij session")
-	fmt.Printf("  %-*s %s\n", w, "print-env", "Print export statements for current tokens")
+	fmt.Printf("  %-*s %s\n", w, "print-env", "Print export statements for current tokens and custom envs")
+	fmt.Printf("  %-*s %s\n", w, "custom-envs", "Manage user-defined custom environment variables")
+	fmt.Println("")
+	fmt.Println("Custom Envs Subcommands:")
+	fmt.Printf("  %-*s %s\n", w, "custom-envs list", "List all custom envs (keys + masked values)")
+	fmt.Printf("  %-*s %s\n", w, "custom-envs get <key>", "Print raw value of a custom env to stdout")
+	fmt.Printf("  %-*s %s\n", w, "custom-envs add <key> <value>", "Add a new custom env")
+	fmt.Printf("  %-*s %s\n", w, "custom-envs edit <key> <value>", "Edit an existing custom env")
+	fmt.Printf("  %-*s %s\n", w, "custom-envs remove <key>", "Remove a custom env")
 	fmt.Println("")
 	fmt.Println("Examples:")
 	fmt.Println("  kilo-entrypoint zellij-attach")
@@ -104,6 +114,29 @@ func runPrintEnv() {
 		fmt.Printf("export KD_AINSTRUCT_PAT_EXPIRY=%q\n", patExpiry)
 	} else {
 		fmt.Printf("# KD_AINSTRUCT_PAT_EXPIRY not set\n")
+	}
+
+	customEnvs, err := loadCustomEnvs(homeDir, userID)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			utils.Log("[kilo-docker] Failed to load custom envs: %v\n", err)
+		}
+		return
+	}
+
+	if len(customEnvs) == 0 {
+		return
+	}
+
+	utils.Log("[kilo-docker] Loading %d custom envs\n", len(customEnvs))
+
+	keys := make([]string, 0, len(customEnvs))
+	for k := range customEnvs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Printf("export %s=%q\n", k, customEnvs[k])
 	}
 }
 
@@ -225,6 +258,47 @@ func main() {
 		}
 	case "print-env":
 		runPrintEnv()
+	case "custom-envs":
+		homeDir, _, _, userID := loadUserConfig()
+		if homeDir == "" || userID == "" {
+			utils.LogError("[kilo-docker] No user config found\n", utils.WithOutput())
+			os.Exit(1)
+		}
+		if len(remaining) < 2 {
+			utils.LogError("[kilo-docker] custom-envs requires a subcommand: list, get, add, edit, remove\n", utils.WithOutput())
+			os.Exit(1)
+		}
+		switch remaining[1] {
+		case "list":
+			runCustomEnvsList(homeDir, userID)
+		case "get":
+			if len(remaining) < 3 {
+				utils.LogError("[kilo-docker] custom-envs get requires a key\n", utils.WithOutput())
+				os.Exit(1)
+			}
+			runCustomEnvsGet(homeDir, userID, remaining[2])
+		case "add":
+			if len(remaining) < 4 {
+				utils.LogError("[kilo-docker] custom-envs add requires a key and value\n", utils.WithOutput())
+				os.Exit(1)
+			}
+			runCustomEnvsAdd(homeDir, userID, remaining[2], remaining[3])
+		case "edit":
+			if len(remaining) < 4 {
+				utils.LogError("[kilo-docker] custom-envs edit requires a key and value\n", utils.WithOutput())
+				os.Exit(1)
+			}
+			runCustomEnvsEdit(homeDir, userID, remaining[2], remaining[3])
+		case "remove":
+			if len(remaining) < 3 {
+				utils.LogError("[kilo-docker] custom-envs remove requires a key\n", utils.WithOutput())
+				os.Exit(1)
+			}
+			runCustomEnvsRemove(homeDir, userID, remaining[2])
+		default:
+			utils.LogError("[kilo-docker] unknown custom-envs subcommand: %s\n", remaining[1], utils.WithOutput())
+			os.Exit(1)
+		}
 	case "help":
 		runHelp()
 	}
