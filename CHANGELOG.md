@@ -1,3 +1,9 @@
+## [3.28.0](https://github.com/mbabic84/kilo-docker/compare/v3.27.0...v3.28.0) (2026-06-10)
+
+### Features
+
+* **network:** support --network host mode ([2184864](https://github.com/mbabic84/kilo-docker/commit/2184864c0a28b674b2e1ef8925cdce460ada25be))
+
 ## [3.27.0](https://github.com/mbabic84/kilo-docker/compare/v3.26.0...v3.27.0) (2026-06-10)
 
 ### Features
