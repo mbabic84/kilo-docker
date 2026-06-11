@@ -1,3 +1,9 @@
+## [3.31.1](https://github.com/mbabic84/kilo-docker/compare/v3.31.0...v3.31.1) (2026-06-11)
+
+### Bug Fixes
+
+* skip --hostname in host network mode ([a2aff0f](https://github.com/mbabic84/kilo-docker/commit/a2aff0f6e3f5ea367b563028e893e42433972e3b))
+
 ## [3.31.0](https://github.com/mbabic84/kilo-docker/compare/v3.30.0...v3.31.0) (2026-06-11)
 
 ### Features
