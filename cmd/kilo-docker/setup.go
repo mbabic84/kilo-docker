@@ -12,11 +12,11 @@ import (
 	"golang.org/x/term"
 )
 
-func resolveVolume(cfg config) string {
+func resolveVolume(cfg config, username string) string {
 	if cfg.once {
 		return ""
 	}
-	return "kilo-docker-data"
+	return deriveVolumeName(username)
 }
 
 func isTerminal() bool {
@@ -217,6 +217,7 @@ Create a backup of the kilo-docker volume.
 
 Options:
   -f, --force             Overwrite existing backup file
+  --legacy-volume         Backup the legacy shared volume (kilo-docker-data)
   -h, --help              Show this help message
 
 Creates a tar.gz archive of the volume data. By default,
@@ -225,6 +226,7 @@ auto-generates a timestamped filename.
 Examples:
   kilo-docker backup                     # backup with auto-generated name
   kilo-docker backup -f my-backup.tar.gz # backup to specific file
+  kilo-docker backup --legacy-volume     # backup the legacy shared volume
   kilo-docker backup -h                  # show this help
 `
 	case "restore":
@@ -237,13 +239,15 @@ Arguments:
 
 Options:
   -f, --force            Overwrite existing data
-  -v, --volume <name>    Restore to a specific volume (default: kilo-docker-data)
+  -v, --volume <name>    Restore to a specific volume (default: per-user volume)
+  --legacy-volume        Restore to the legacy shared volume (kilo-docker-data)
   -h, --help            Show this help message
 
 Examples:
   kilo-docker restore backup.tar.gz
   kilo-docker restore backup.tar.gz -f
   kilo-docker restore backup.tar.gz -v my-volume
+  kilo-docker restore backup.tar.gz --legacy-volume
   kilo-docker restore -h
 `
 	case "init":
@@ -268,7 +272,7 @@ Examples:
 Remove all kilo-docker artifacts from the system.
 
 WARNING: This removes:
-  - The kilo-docker-data volume
+  - The per-user data volume
   - All kilo-docker containers
   - The kilo-docker image
   - The kilo-docker binary

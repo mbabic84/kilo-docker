@@ -49,8 +49,8 @@ kilo-docker
 | `sessions recreate <name\|index>` | Recreate a session with the same flags (preserves volume) |
 | `networks` | List available Docker networks |
 | `playwright` | Recreate the Playwright MCP sidecar container |
-| `backup [-f]` | Create backup of volume to tar.gz |
-| `restore <file> [-f] [-v\|--volume <name>]` | Restore volume from backup |
+| `backup [-f] [--legacy-volume]` | Create backup of volume to tar.gz |
+| `restore <file> [-f] [-v\|--volume <name>] [--legacy-volume]` | Restore volume from backup |
 | `init` | Reset configuration (remove volume, re-enter tokens) |
 | `cleanup` | Remove volume, containers, image, and installed binary |
 | `update [config]` | Pull latest Docker image and update binary, or merge config template |
@@ -195,7 +195,7 @@ Inside the container, the entrypoint reads `KD_SERVICES`, runs installation comm
 
 ## Data Persistence
 
-The host binary uses a named Docker volume mounted at `/home`. Inside the container, the user home directory is dynamically generated as `/home/kd-<hash>`. This stores:
+The host binary uses a per-user named Docker volume mounted at `/home`. Each user gets their own volume (named by SHA-256 hash of the username, e.g. `kilo-a1b2c3d4e5f6-data`), providing data isolation between users. All sessions for the same user share this volume. Inside the container, the user home directory is dynamically generated as `/home/kd-<hash>`. This stores:
 
 - SQLite database, auth state, logs
 - Configuration (`kilo.jsonc` — model selection, provider connections, MCP settings)
@@ -205,9 +205,15 @@ The host binary uses a named Docker volume mounted at `/home`. Inside the contai
 - Session state and snapshots
 - Cache
 
-**Default mode** — Volume name: `kilo-docker-data`. Tokens stored in plaintext.
-
 The volume persists across container restarts. Use `kilo-docker init` to reset tokens, or `kilo-docker cleanup` to remove all state (volume, containers, image, and installed binary).
+
+### Automatic migration from shared volume
+
+If you previously used a shared `kilo-docker-data` volume, `kilo-docker` will automatically copy your data to a new per-user volume on first run. The legacy volume is left intact so you can verify the migration succeeded. Remove it manually once confirmed:
+
+```bash
+docker volume rm kilo-docker-data
+```
 
 ### Updating config from template
 
@@ -234,7 +240,17 @@ kilo-docker backup ~/my-kilo-backup.tar.gz
 kilo-docker restore ~/my-kilo-backup.tar.gz
 ```
 
-Backups are portable tar.gz archives containing all volume data. The restore command validates the archive and preserves file ownership (UID 1000).
+During the transition from the shared volume, use `--legacy-volume` to back up or restore the old shared volume:
+
+```bash
+# Backup the legacy shared volume
+kilo-docker backup --legacy-volume
+
+# Restore to the legacy shared volume
+kilo-docker restore ~/my-kilo-backup.tar.gz --legacy-volume
+```
+
+Backups are portable tar.gz archives containing all volume data. The restore command validates the archive and preserves file ownership.
 
 ## Session Management
 

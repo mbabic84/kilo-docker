@@ -8,11 +8,12 @@ import (
 
 // session represents a running or stopped kilo-docker container with its metadata.
 type session struct {
-	Name      string
-	Status    string
-	Workspace string
-	Args      string
-	User      string
+	Name              string
+	Status            string
+	Workspace         string
+	Args              string
+	User              string
+	UsesLegacyVolume  bool
 }
 
 // getSessions queries Docker for all containers labeled with kilo.workspace.
@@ -51,6 +52,13 @@ func getSessions() ([]session, error) {
 		}
 		sessions = append(sessions, s)
 	}
+
+	_, currentUsername := resolveWorkspaceAndUsername()
+	expectedVolume := deriveVolumeName(currentUsername)
+	for i := range sessions {
+		sessions[i].UsesLegacyVolume = containerUsesLegacyVolume(sessions[i].Name, expectedVolume)
+	}
+
 	return sessions, nil
 }
 
@@ -59,7 +67,11 @@ func showSessions(sessions []session) {
 	fmt.Fprintf(os.Stderr, "%-4s %-22s %-32s %-52s %s\n", "#", "NAME", "STATUS", "WORKSPACE", "ARGS")
 	fmt.Fprintf(os.Stderr, "%-4s %-22s %-32s %-52s %s\n", "---", "----------------------", "--------------------------------", "----------------------------------------------------", "-----")
 	for i, s := range sessions {
-		fmt.Fprintf(os.Stderr, "%-4d %-22s %-32s %-52s %s\n", i+1, s.Name, s.Status, s.Workspace, s.Args)
+		status := s.Status
+		if s.UsesLegacyVolume {
+			status += " (legacy)"
+		}
+		fmt.Fprintf(os.Stderr, "%-4d %-22s %-32s %-52s %s\n", i+1, s.Name, status, s.Workspace, s.Args)
 	}
 }
 

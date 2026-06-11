@@ -19,17 +19,26 @@ func handleBackup(cfg config) {
 	args := cfg.args
 	backupFile := ""
 	forceBackup := false
+	legacyVolume := false
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "-f", "--force":
 			forceBackup = true
+		case "--legacy-volume":
+			legacyVolume = true
 		default:
 			backupFile = args[i]
 		}
 	}
 
-	dataVolume := resolveVolume(cfg)
+	var dataVolume string
+	if legacyVolume {
+		dataVolume = legacyVolumeName
+	} else {
+		_, username := resolveWorkspaceAndUsername()
+		dataVolume = resolveVolume(cfg, username)
+	}
 	if dataVolume == "" {
 		fmt.Fprintf(os.Stderr, "Error: backup is not available in --once mode.\n")
 		os.Exit(1)
@@ -154,6 +163,7 @@ func handleRestore(cfg config) {
 	backupFile := ""
 	forceRestore := false
 	targetVolume := ""
+	legacyVolume := false
 
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -164,18 +174,25 @@ func handleRestore(cfg config) {
 				targetVolume = args[i+1]
 				i++
 			}
+		case "--legacy-volume":
+			legacyVolume = true
 		default:
 			backupFile = args[i]
 		}
 	}
 
-	dataVolume := resolveVolume(cfg)
 	if targetVolume == "" {
-		if dataVolume == "" {
-			fmt.Fprintf(os.Stderr, "Error: no volume specified. Use --once mode or provide --volume.\n")
-			os.Exit(1)
+		if legacyVolume {
+			targetVolume = legacyVolumeName
+		} else {
+			_, username := resolveWorkspaceAndUsername()
+			dataVolume := resolveVolume(cfg, username)
+			if dataVolume == "" {
+				fmt.Fprintf(os.Stderr, "Error: no volume specified. Use --once mode or provide --volume.\n")
+				os.Exit(1)
+			}
+			targetVolume = dataVolume
 		}
-		targetVolume = dataVolume
 	}
 
 	if backupFile == "" {

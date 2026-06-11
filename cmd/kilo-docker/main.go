@@ -144,6 +144,20 @@ func runContainer(cfg config) {
 	containerName := deriveContainerName(workspace, username)
 	containerState := dockerState(containerName)
 
+	if containerExists(containerName) && !cfg.once && containerUsesLegacyVolume(containerName, deriveVolumeName(username)) {
+		oldVolume := containerHomeVolume(containerName)
+		utils.Log("[kilo-docker] Session '%s' uses an outdated volume (%s).\n", containerName, oldVolume, utils.WithOutput())
+		utils.Log("[kilo-docker] Per-user volumes are now used for data isolation between users.\n", utils.WithOutput())
+		if cfg.yes || promptConfirm("Recreate session with current per-user volume? [y/N]: ", cfg.yes) {
+			_, _ = dockerRun("rm", "-f", containerName)
+			containerState = "not_found"
+			expectedVolume := deriveVolumeName(username)
+			if oldVolume != "" && oldVolume != expectedVolume && !volumeExists(expectedVolume) {
+				copyVolumeData(oldVolume, expectedVolume)
+			}
+		}
+	}
+
 	if cfg.once {
 		if containerState != "not_found" {
 			_, _ = dockerRun("rm", "-f", containerName)
@@ -210,7 +224,10 @@ func runContainer(cfg config) {
 		}
 	}
 
-	dataVolume := resolveVolume(cfg)
+	dataVolume := resolveVolume(cfg, username)
+	if dataVolume != "" {
+		migrateVolumeIfNeeded(dataVolume)
+	}
 
 	if cfg.playwright {
 		if err := startPlaywright(); err != nil {
