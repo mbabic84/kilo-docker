@@ -113,7 +113,13 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 	}
 
 	args = append(args, "--name", containerName)
-	args = append(args, "--hostname", containerName)
+	// In host network mode, Docker shares the host's /etc/hosts and does
+	// not add the container hostname. Setting --hostname to the container
+	// name causes "unable to resolve host" warnings from sudo and other
+	// tools. Skip it so the container inherits the host's hostname.
+	if !containsNet(cfg.networks, "host") {
+		args = append(args, "--hostname", containerName)
+	}
 
 	for _, f := range valueFlags {
 		if dockerArgs := f.buildDockerArgs(cfg); len(dockerArgs) > 0 {
