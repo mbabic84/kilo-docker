@@ -7,10 +7,12 @@ import (
 )
 
 // deriveContainerName returns the Docker container name for a given working
-// directory. The name is derived from the SHA-256 hash (first 6 bytes) to
-// ensure one session per directory.
-func deriveContainerName(pwd string) string {
-	hash := sha256.Sum256([]byte(pwd))
+// directory and username. The name is derived from the SHA-256 hash (first 6 bytes)
+// of "workspace:username" to ensure one session per user per directory.
+// Both workspace and username are used so that two different users working in
+// the same directory get distinct container names.
+func deriveContainerName(pwd, username string) string {
+	hash := sha256.Sum256([]byte(pwd + ":" + username))
 	return fmt.Sprintf("kilo-%x", hash[:6])
 }
 

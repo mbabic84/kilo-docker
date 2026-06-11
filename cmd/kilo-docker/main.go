@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
@@ -131,7 +132,16 @@ func runContainer(cfg config) {
 			os.Exit(1)
 		}
 	}
-	containerName := deriveContainerName(workspace)
+	// Resolve to absolute path so the hash is stable regardless of how the path was specified
+	workspace, _ = filepath.Abs(workspace)
+
+	u, _ := user.Current()
+	username := "unknown"
+	if u != nil {
+		username = u.Username
+	}
+
+	containerName := deriveContainerName(workspace, username)
 	containerState := dockerState(containerName)
 
 	if cfg.once {
