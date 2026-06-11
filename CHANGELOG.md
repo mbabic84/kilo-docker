@@ -1,3 +1,10 @@
+## [3.31.0](https://github.com/mbabic84/kilo-docker/compare/v3.30.0...v3.31.0) (2026-06-11)
+
+### Features
+
+* scope data volumes by workspace and username ([4a24287](https://github.com/mbabic84/kilo-docker/commit/4a242871124ea954da5efaf8555edcbff98abb0f))
+* scope data volumes per user with automatic migration from legacy shared volume ([61c51eb](https://github.com/mbabic84/kilo-docker/commit/61c51ebc145cbce7fbf99a474bfe368c9259484b))
+
 ## [3.30.0](https://github.com/mbabic84/kilo-docker/compare/v3.29.0...v3.30.0) (2026-06-11)
 
 ### Features
