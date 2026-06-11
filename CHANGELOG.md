@@ -1,3 +1,9 @@
+## [3.30.0](https://github.com/mbabic84/kilo-docker/compare/v3.29.0...v3.30.0) (2026-06-11)
+
+### Features
+
+* scope container names by workspace and username ([63a26b1](https://github.com/mbabic84/kilo-docker/commit/63a26b1cc5287abe54f32865b3c162339238e126))
+
 ## [3.29.0](https://github.com/mbabic84/kilo-docker/compare/v3.28.0...v3.29.0) (2026-06-10)
 
 ### Features
