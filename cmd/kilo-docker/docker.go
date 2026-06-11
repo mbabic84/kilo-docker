@@ -99,6 +99,26 @@ func containerExists(container string) bool {
 	return err == nil
 }
 
+// containerUsesLegacyVolume reports whether a container's /home mount uses a
+// volume different from the expected per-user volume. This catches both the
+// original shared volume (kilo-docker-data) and old workspace-scoped volumes.
+func containerUsesLegacyVolume(container, expectedVolume string) bool {
+	return containerHomeVolume(container) != expectedVolume
+}
+
+// containerHomeVolume returns the name of the volume mounted at /home in the
+// container, or empty string if no /home volume is mounted.
+func containerHomeVolume(container string) string {
+	mounts, _ := dockerInspect(container, "{{range .Mounts}}{{.Name}}:{{.Destination}}\n{{end}}")
+	for _, line := range strings.Split(strings.TrimSpace(mounts), "\n") {
+		parts := strings.SplitN(strings.TrimSpace(line), ":", 2)
+		if len(parts) == 2 && parts[1] == "/home" {
+			return parts[0]
+		}
+	}
+	return ""
+}
+
 // startAndWaitForRunning starts a container and polls until it reaches
 // "running" state. Returns an error if the container fails to start or
 // exits before becoming running.

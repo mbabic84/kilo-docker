@@ -36,8 +36,8 @@ func handleBackup(cfg config) {
 	if legacyVolume {
 		dataVolume = legacyVolumeName
 	} else {
-		workspace, username := resolveWorkspaceAndUsername()
-		dataVolume = resolveVolume(cfg, workspace, username)
+		_, username := resolveWorkspaceAndUsername()
+		dataVolume = resolveVolume(cfg, username)
 	}
 	if dataVolume == "" {
 		fmt.Fprintf(os.Stderr, "Error: backup is not available in --once mode.\n")
@@ -185,8 +185,8 @@ func handleRestore(cfg config) {
 		if legacyVolume {
 			targetVolume = legacyVolumeName
 		} else {
-			workspace, username := resolveWorkspaceAndUsername()
-			dataVolume := resolveVolume(cfg, workspace, username)
+			_, username := resolveWorkspaceAndUsername()
+			dataVolume := resolveVolume(cfg, username)
 			if dataVolume == "" {
 				fmt.Fprintf(os.Stderr, "Error: no volume specified. Use --once mode or provide --volume.\n")
 				os.Exit(1)

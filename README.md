@@ -195,7 +195,7 @@ Inside the container, the entrypoint reads `KD_SERVICES`, runs installation comm
 
 ## Data Persistence
 
-The host binary uses a per-user named Docker volume mounted at `/home`. Each `workspace:username` combination gets its own volume (named by SHA-256 hash, e.g. `kilo-a1b2c3d4e5f6-data`), providing data isolation between users and workspaces. Inside the container, the user home directory is dynamically generated as `/home/kd-<hash>`. This stores:
+The host binary uses a per-user named Docker volume mounted at `/home`. Each user gets their own volume (named by SHA-256 hash of the username, e.g. `kilo-a1b2c3d4e5f6-data`), providing data isolation between users. All sessions for the same user share this volume. Inside the container, the user home directory is dynamically generated as `/home/kd-<hash>`. This stores:
 
 - SQLite database, auth state, logs
 - Configuration (`kilo.jsonc` — model selection, provider connections, MCP settings)

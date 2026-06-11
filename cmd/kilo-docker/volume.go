@@ -24,6 +24,14 @@ func deriveContainerName(pwd, username string) string {
 	return fmt.Sprintf("kilo-%x", hash[:6])
 }
 
+// deriveVolumeName returns the Docker volume name for a given user.
+// Unlike container names (which are per workspace+user), volumes are per user
+// only so that all sessions for the same user share data (tokens, config, etc.).
+func deriveVolumeName(username string) string {
+	hash := sha256.Sum256([]byte(username))
+	return fmt.Sprintf("kilo-%x-data", hash[:6])
+}
+
 // volumeExists reports whether a Docker volume with the given name exists.
 func volumeExists(name string) bool {
 	_, err := exec.Command("docker", "volume", "inspect", name).CombinedOutput()
@@ -67,18 +75,30 @@ func migrateVolumeIfNeeded(newVolume string) {
 	utils.Log("[kilo-docker]   Destination: %s (personal)\n", newVolume, utils.WithOutput())
 	utils.Log("[kilo-docker] This only happens once. Your data on the old volume is not deleted.\n\n", utils.WithOutput())
 
-	utils.Log("[kilo-docker] Creating new volume '%s'...\n", newVolume, utils.WithOutput())
-	if _, err := dockerRun("volume", "create", newVolume); err != nil {
-		utils.LogError("[kilo-docker] Migration failed: could not create volume: %v\n", err)
-		utils.LogError("[kilo-docker] You can retry by running 'kilo-docker' again, or manually create the volume.\n")
-		os.Exit(1)
+	copyVolumeData(legacyVolumeName, newVolume)
+
+	utils.Log("[kilo-docker] Migration complete. Your personal volume '%s' is ready.\n", newVolume, utils.WithOutput())
+	utils.Log("[kilo-docker] The legacy volume '%s' was left intact. Remove it manually with:\n", legacyVolumeName, utils.WithOutput())
+	utils.Log("[kilo-docker]   docker volume rm %s\n\n", legacyVolumeName, utils.WithOutput())
+}
+
+// copyVolumeData copies all data from srcVolume to dstVolume using a temporary
+// container. Creates dstVolume if it doesn't exist. Exits on failure.
+func copyVolumeData(srcVolume, dstVolume string) {
+	if !volumeExists(dstVolume) {
+		utils.Log("[kilo-docker] Creating new volume '%s'...\n", dstVolume, utils.WithOutput())
+		if _, err := dockerRun("volume", "create", dstVolume); err != nil {
+			utils.LogError("[kilo-docker] Migration failed: could not create volume: %v\n", err)
+			utils.LogError("[kilo-docker] You can retry by running 'kilo-docker' again, or manually create the volume.\n")
+			os.Exit(1)
+		}
 	}
 
 	tempContainer := fmt.Sprintf("kilo-migrate-temp-%d", os.Getpid())
-	utils.Log("[kilo-docker] Copying data...\n", utils.WithOutput())
+	utils.Log("[kilo-docker] Copying data from '%s' to '%s'...\n", srcVolume, dstVolume, utils.WithOutput())
 	if _, err := dockerRun("run", "--rm", "-d", "--name", tempContainer,
-		"-v", legacyVolumeName+":/src:ro",
-		"-v", newVolume+":/dest",
+		"-v", srcVolume+":/src:ro",
+		"-v", dstVolume+":/dest",
 		"debian:bookworm-slim", "tail", "-f", "/dev/null"); err != nil {
 		utils.LogError("[kilo-docker] Migration failed: could not start copy container: %v\n", err)
 		os.Exit(1)
@@ -91,8 +111,4 @@ func migrateVolumeIfNeeded(newVolume string) {
 		os.Exit(1)
 	}
 	_, _ = dockerRun("rm", "-f", tempContainer)
-
-	utils.Log("[kilo-docker] Migration complete. Your personal volume '%s' is ready.\n", newVolume, utils.WithOutput())
-	utils.Log("[kilo-docker] The legacy volume '%s' was left intact. Remove it manually with:\n", legacyVolumeName, utils.WithOutput())
-	utils.Log("[kilo-docker]   docker volume rm %s\n\n", legacyVolumeName, utils.WithOutput())
 }

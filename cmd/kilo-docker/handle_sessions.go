@@ -235,6 +235,46 @@ func handleSessions(cfg config) {
 		os.Exit(1)
 	}
 
+	_, username := resolveWorkspaceAndUsername()
+	if containerUsesLegacyVolume(containerToAttach, deriveVolumeName(username)) {
+		oldVolume := containerHomeVolume(containerToAttach)
+		utils.Log("[kilo-docker] Session '%s' uses an outdated volume (%s).\n", containerToAttach, oldVolume, utils.WithOutput())
+		utils.Log("[kilo-docker] Per-user volumes are now used for data isolation between users.\n", utils.WithOutput())
+		if cfg.yes || promptConfirm("Recreate session with current per-user volume? [y/N]: ", cfg.yes) {
+			var targetSession session
+			for _, s := range sessions {
+				if s.Name == containerToAttach {
+					targetSession = s
+					break
+				}
+			}
+
+			if targetSession.Workspace != "" {
+				if err := os.Chdir(targetSession.Workspace); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: cannot change to workspace '%s': %v\n", targetSession.Workspace, err)
+					os.Exit(1)
+				}
+				utils.Log("[kilo-docker] Recreating session in workspace: %s\n", targetSession.Workspace, utils.WithOutput())
+			}
+
+			storedArgs := targetSession.Args
+			parsedArgs := strings.Fields(storedArgs)
+			newCfg := parseArgs(parsedArgs)
+			newCfg.command = ""
+
+			utils.Log("[kilo-docker] Removing legacy container '%s'...\n", containerToAttach, utils.WithOutput())
+			_, _ = dockerRun("rm", "-f", containerToAttach)
+
+			expectedVolume := deriveVolumeName(username)
+			if oldVolume != "" && oldVolume != expectedVolume && !volumeExists(expectedVolume) {
+				copyVolumeData(oldVolume, expectedVolume)
+			}
+
+			runContainer(newCfg)
+			return
+		}
+	}
+
 	state := dockerState(containerToAttach)
 	switch state {
 	case "running":

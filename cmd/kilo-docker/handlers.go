@@ -194,8 +194,8 @@ func handleCleanup(cfg config) {
 	}
 
 	home, _ := os.UserHomeDir()
-	workspace, username := resolveWorkspaceAndUsername()
-	dataVolume := resolveVolume(cfg, workspace, username)
+	_, username := resolveWorkspaceAndUsername()
+	dataVolume := resolveVolume(cfg, username)
 	if dataVolume != "" && volumeExists(dataVolume) {
 		_ = removeVolume(dataVolume)
 	}
@@ -214,8 +214,8 @@ func handleInit(cfg config) {
 		printCommandHelp("init")
 		return
 	}
-	workspace, username := resolveWorkspaceAndUsername()
-	dataVolume := resolveVolume(cfg, workspace, username)
+	_, username := resolveWorkspaceAndUsername()
+	dataVolume := resolveVolume(cfg, username)
 	if dataVolume == "" {
 		utils.Log("[kilo-docker] Nothing to reset in --once mode.\n", utils.WithOutput())
 		os.Exit(0)
@@ -238,8 +238,8 @@ func handleUpdateConfig(cfg config) {
 		printCommandHelp("update config")
 		return
 	}
-	workspace, username := resolveWorkspaceAndUsername()
-	dataVolume := resolveVolume(cfg, workspace, username)
+	_, username := resolveWorkspaceAndUsername()
+	dataVolume := resolveVolume(cfg, username)
 	if dataVolume == "" {
 		utils.Log("[kilo-docker] Nothing to update in --once mode.\n", utils.WithOutput())
 		os.Exit(0)

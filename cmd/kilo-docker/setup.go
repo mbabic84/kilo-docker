@@ -12,11 +12,11 @@ import (
 	"golang.org/x/term"
 )
 
-func resolveVolume(cfg config, workspace, username string) string {
+func resolveVolume(cfg config, username string) string {
 	if cfg.once {
 		return ""
 	}
-	return deriveContainerName(workspace, username) + "-data"
+	return deriveVolumeName(username)
 }
 
 func isTerminal() bool {
@@ -272,7 +272,7 @@ Examples:
 Remove all kilo-docker artifacts from the system.
 
 WARNING: This removes:
-  - The per-user data volume for the current workspace
+  - The per-user data volume
   - All kilo-docker containers
   - The kilo-docker image
   - The kilo-docker binary
