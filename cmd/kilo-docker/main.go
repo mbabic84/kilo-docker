@@ -210,7 +210,10 @@ func runContainer(cfg config) {
 		}
 	}
 
-	dataVolume := resolveVolume(cfg)
+	dataVolume := resolveVolume(cfg, workspace, username)
+	if dataVolume != "" {
+		migrateVolumeIfNeeded(dataVolume)
+	}
 
 	if cfg.playwright {
 		if err := startPlaywright(); err != nil {
