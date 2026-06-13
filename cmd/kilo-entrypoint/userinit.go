@@ -109,11 +109,8 @@ func runUserInit() error {
 	_ = os.MkdirAll(filepath.Join(homeDir, ".local/share/kilo"), 0o700)
 	_ = os.MkdirAll(filepath.Join(homeDir, ".ssh"), 0700)
 
-	// Create .bashrc if missing
-	bashrc := filepath.Join(homeDir, ".bashrc")
-	if _, err := os.Stat(bashrc); os.IsNotExist(err) {
-		_ = os.WriteFile(bashrc, []byte("# ~/.bashrc\n"), 0o600)
-	}
+	// Update .bashrc managed section based on KD_SERVICES (nvm, uv)
+	updateBashrcManaged(homeDir)
 
 	// Create .bash_profile that sources .bashrc for login shells (e.g. zellij panes).
 	bashProfile := filepath.Join(homeDir, ".bash_profile")
@@ -123,19 +120,6 @@ func runUserInit() error {
 			"    . \"$HOME/.bashrc\"\n" +
 			"fi\n"
 		_ = os.WriteFile(bashProfile, []byte(profileContent), 0o600)
-	}
-
-	// Create .bash_env bootstrap for non-interactive bash shells (BASH_ENV).
-	// When Kilo's Bash tool runs `bash -c`, it creates a non-interactive shell
-	// that does not source .bashrc. BASH_ENV bridges this gap by loading NVM.
-	bashEnv := filepath.Join(homeDir, ".bash_env")
-	if _, err := os.Stat(bashEnv); os.IsNotExist(err) {
-		envContent := "# Bootstrap for non-interactive bash shells (BASH_ENV)\n" +
-			"if [ -f \"$HOME/.nvm/nvm.sh\" ]; then\n" +
-			"    export NVM_DIR=\"$HOME/.nvm\"\n" +
-			"    . \"$HOME/.nvm/nvm.sh\"\n" +
-			"fi\n"
-		_ = os.WriteFile(bashEnv, []byte(envContent), 0o600)
 	}
 
 	// Copy default config templates if user doesn't have them.
@@ -275,7 +259,7 @@ func runUserInit() error {
 	_ = os.Setenv("USER", username)
 	_ = os.Setenv("LOGNAME", username)
 	_ = os.Setenv("SHELL", userConfig["shell"])
-	_ = os.Setenv("BASH_ENV", filepath.Join(homeDir, ".bash_env"))
+	_ = os.Setenv("BASH_ENV", filepath.Join(homeDir, ".bashrc"))
 
 	// Chown everything to the new user (after all root-level file writes)
 	utils.Log("[userinit] Setting ownership: %s\n", homeDir)
@@ -853,4 +837,73 @@ func maskToken(token string) string {
 		return strings.Repeat("*", len(token))
 	}
 	return token[:4] + strings.Repeat("*", len(token)-8) + token[len(token)-4:]
+}
+
+// updateBashrcManaged writes NVM and Python wrapper functions to a managed
+// section of .bashrc. The section is delimited by "# >>> kilo-managed >>>"
+// and "# <<< kilo-managed <<<". Content is determined by KD_SERVICES env var,
+// which is set when --nvm or --uv flags are used.
+func updateBashrcManaged(homeDir string) {
+	bashrc := filepath.Join(homeDir, ".bashrc")
+	servicesEnv := os.Getenv("KD_SERVICES")
+
+	startMarker := "# >>> kilo-managed >>>"
+	endMarker := "# <<< kilo-managed <<<"
+
+	var sb strings.Builder
+	sb.WriteString(startMarker + "\n")
+
+	for _, svc := range strings.Split(servicesEnv, ",") {
+		svc = strings.TrimSpace(svc)
+		switch svc {
+		case "nvm":
+			sb.WriteString("# NVM support\n")
+			sb.WriteString("if [ -f \"$HOME/.nvm/nvm.sh\" ]; then\n")
+			sb.WriteString("    export NVM_DIR=\"$HOME/.nvm\"\n")
+			sb.WriteString("    . \"$HOME/.nvm/nvm.sh\"\n")
+			sb.WriteString("fi\n")
+			utils.Log("[userinit] Added NVM to .bashrc managed section\n")
+		case "uv":
+			sb.WriteString("# Python wrappers using uv\n")
+			sb.WriteString("if command -v uv &>/dev/null; then\n")
+			sb.WriteString("    python() {\n")
+			sb.WriteString("        uv run python \"$@\"\n")
+			sb.WriteString("    }\n")
+			sb.WriteString("    python3() {\n")
+			sb.WriteString("        uv run python \"$@\"\n")
+			sb.WriteString("    }\n")
+			sb.WriteString("fi\n")
+			utils.Log("[userinit] Added Python uv wrappers to .bashrc managed section\n")
+		}
+	}
+	sb.WriteString(endMarker + "\n")
+	managedContent := sb.String()
+
+	existing, err := os.ReadFile(bashrc)
+	if err != nil {
+		_ = os.WriteFile(bashrc, []byte("# ~/.bashrc\n\n"+managedContent), 0o600)
+		utils.Log("[userinit] Created .bashrc with managed section\n")
+		return
+	}
+
+	existingStr := string(existing)
+
+	// Remove old managed section if present
+	for {
+		start := strings.Index(existingStr, startMarker)
+		if start < 0 {
+			break
+		}
+		end := strings.Index(existingStr[start:], endMarker)
+		if end < 0 {
+			break
+		}
+		end += start + len(endMarker)
+		existingStr = existingStr[:start] + existingStr[end:]
+	}
+
+	existingStr = strings.TrimRight(existingStr, "\n")
+	newBashrc := existingStr + "\n\n" + managedContent
+	_ = os.WriteFile(bashrc, []byte(newBashrc), 0o600)
+	utils.Log("[userinit] Updated .bashrc managed section (KD_SERVICES=%s)\n", servicesEnv)
 }
