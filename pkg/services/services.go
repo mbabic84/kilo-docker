@@ -103,20 +103,6 @@ var BuiltInServices = []Service{
 		RequiresSocket: "",
 	},
 	{
-		Name:        "python",
-		Flag:        "--python",
-		Description: "Install Python 3 with symlink for general purpose use",
-		Install: []string{
-"command -v python3 >/dev/null || apt-get update && apt-get install -y --no-install-recommends python3",
-		"[ -f /usr/local/bin/python ] || ln -sf $(command -v python3) /usr/local/bin/python",
-		},
-		EnvVars: map[string]string{
-			"PYTHON_ENABLED": "1",
-		},
-		Volumes:        []string{},
-		RequiresSocket: "",
-	},
-	{
 		Name:        "rclone",
 		Flag:        "--rclone",
 		Description: "Install rclone, a universal CLI for S3 and 40+ cloud storage backends",
