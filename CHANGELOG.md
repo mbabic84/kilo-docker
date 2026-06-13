@@ -1,3 +1,9 @@
+## [3.32.1](https://github.com/mbabic84/kilo-docker/compare/v3.32.0...v3.32.1) (2026-06-13)
+
+### Bug Fixes
+
+* remove --python service (already covered by uv) ([a508300](https://github.com/mbabic84/kilo-docker/commit/a508300eb513a076b4ccebf350be7a60dd81ba2e))
+
 ## [3.32.0](https://github.com/mbabic84/kilo-docker/compare/v3.31.1...v3.32.0) (2026-06-12)
 
 ### Features
