@@ -30,8 +30,8 @@ func TestGetServiceUnknown(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 9 {
-		t.Errorf("expected 9 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 8 {
+		t.Errorf("expected 8 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
@@ -73,20 +73,6 @@ func TestNvmServiceHasRequiredFields(t *testing.T) {
 	}
 	if svc.RequiresSocket != "" {
 		t.Errorf("expected RequiresSocket to be empty for nvm, got %q", svc.RequiresSocket)
-	}
-}
-
-func TestPythonServiceHasRequiredFields(t *testing.T) {
-	svc := mustGetService(t, "python")
-
-	if svc.Name != "python" {
-		t.Errorf("expected Name 'python', got %q", svc.Name)
-	}
-	if len(svc.Install) != 2 {
-		t.Errorf("expected 2 Install commands for python, got %d", len(svc.Install))
-	}
-	if svc.RequiresSocket != "" {
-		t.Errorf("expected RequiresSocket to be empty for python, got %q", svc.RequiresSocket)
 	}
 }
 

@@ -103,7 +103,6 @@ The current working directory is always mounted at the same path automatically.
 | `--gh` | Install GitHub CLI for interacting with GitHub |
 | `--uv` | Install uv for fast Python package management |
 | `--nvm` | Install NVM (Node Version Manager) for managing Node.js versions |
-| `--python` | Install Python 3 for general purpose use |
 | `--rclone` | Install rclone, a universal CLI for S3 and 40+ cloud storage backends |
 | `--gitnexus` | Install GitNexus for codebase knowledge graph indexing and MCP-based code intelligence |
 
