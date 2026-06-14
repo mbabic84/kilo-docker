@@ -119,7 +119,7 @@ List sessions, attach to one, or stop a running session.
 Commands:
   (no command)          List all sessions and attach interactively
   cleanup               Remove sessions
-  recreate              Recreate a session with the same flags
+  recreate              Recreate a session, optionally overriding its configuration
   stop                  Stop a running session (frees ports, preserves container)
 
 Options:
@@ -150,17 +150,21 @@ Examples:
   kilo-docker sessions cleanup -h              # show this help
 `
 	case "sessions recreate":
-		help = `Usage: kilo-docker sessions recreate <name|index>
+		help = `Usage: kilo-docker sessions recreate <name|index> [flags]
 
-Recreate a session with the same configuration.
+Recreate a session, optionally overriding its configuration.
 
 This removes the old container but preserves the volume,
-then starts a fresh container with the same flags.
+then starts a fresh container with the merged configuration.
+
+If no flags are given, the session is recreated with its original flags.
+Any flags provided after the session name override the stored values.
 
 Examples:
-  kilo-docker sessions recreate 1               # recreate session 1
-  kilo-docker sessions recreate my-session     # recreate by name
-  kilo-docker sessions recreate -h             # show this help
+  kilo-docker sessions recreate 1                    # recreate with stored flags
+  kilo-docker sessions recreate my-session --ssh     # add SSH forwarding
+  kilo-docker sessions recreate my-session --port 9090:80 --profile dev
+  kilo-docker sessions recreate -h                   # show this help
 `
 	case "sessions stop":
 		help = `Usage: kilo-docker sessions stop <name|index>

@@ -286,6 +286,50 @@ func parseArgs(args []string) config {
 	return cfg
 }
 
+func mergeOverrides(base, override config) config {
+	if override.once {
+		base.once = true
+	}
+	if override.playwright {
+		base.playwright = true
+	}
+	if override.playwrightRecreateVolume {
+		base.playwrightRecreateVolume = true
+	}
+	if override.ssh {
+		base.ssh = true
+	}
+	if override.yes {
+		base.yes = true
+	}
+	if override.help {
+		base.help = true
+	}
+
+	if override.profile != "" {
+		base.profile = override.profile
+	}
+	if override.workspace != "" {
+		base.workspace = override.workspace
+	}
+
+	if len(override.ports) > 0 {
+		base.ports = override.ports
+	}
+	if len(override.volumes) > 0 {
+		base.volumes = override.volumes
+	}
+	if override.networkFlag {
+		base.networkFlag = true
+		base.networks = override.networks
+	}
+	if len(override.enabledServices) > 0 {
+		base.enabledServices = override.enabledServices
+	}
+
+	return base
+}
+
 func parseFlags() config {
 	cfg := parseArgs(os.Args[1:])
 
@@ -304,6 +348,18 @@ func parseFlags() config {
 			os.Exit(1)
 		}
 		mergeProfile(&cfg, p)
+	}
+
+	// --network host is incompatible with other networks (Docker restriction)
+	if containsNet(cfg.networks, "host") && len(cfg.networks) > 1 {
+		var others []string
+		for _, n := range cfg.networks {
+			if n != "host" {
+				others = append(others, n)
+			}
+		}
+		utils.LogWarn("[kilo-docker] --network host cannot be combined with other networks; ignoring %v\n", others, utils.WithOutput())
+		cfg.networks = []string{"host"}
 	}
 
 	return cfg

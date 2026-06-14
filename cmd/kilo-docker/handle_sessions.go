@@ -147,8 +147,11 @@ func handleSessions(cfg config) {
 		newCfg.command = "" // ensure runContainer creates a new container
 		utils.Log("[kilo-docker] Recreate config after normalization: yes=%v, serialized=%q\n", newCfg.yes, serializeArgs(newCfg, newCfg.ssh))
 
-		// Change to the session's original workspace
-		if targetSession.Workspace != "" {
+		// Merge any flags the user passed on the command line as overrides
+		newCfg = mergeOverrides(newCfg, cfg)
+
+		// Only chdir to stored workspace if user didn't override --workspace
+		if cfg.workspace == "" && targetSession.Workspace != "" {
 			originalDir, _ := os.Getwd()
 			if err := os.Chdir(targetSession.Workspace); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: cannot change to workspace '%s': %v\n", targetSession.Workspace, err)

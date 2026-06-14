@@ -134,8 +134,8 @@ func TestMergeProfileNetworks(t *testing.T) {
 
 	mergeProfile(cfg, p)
 
-	if len(cfg.networks) != 1 || cfg.networks[0] != "existing" {
-		t.Errorf("expected networks [existing], got %v", cfg.networks)
+	if len(cfg.networks) != 2 || cfg.networks[0] != "existing" || cfg.networks[1] != "profile-net" {
+		t.Errorf("expected networks [existing profile-net], got %v", cfg.networks)
 	}
 }
 
