@@ -17,6 +17,62 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
+// migrateContainerPaths moves persistent data files from the old kilo
+// namespace to the new kilo-docker namespace. Called once during user init
+// after home directory creation, before any read operations on old paths.
+// If the new path already contains a file, the old file is renamed with a
+// .migrated suffix rather than overwritten.
+func migrateContainerPaths(homeDir string) {
+	migrations := []struct {
+		oldRel string
+		newRel string
+		label  string
+	}{
+		{".local/share/kilo/.tokens.env.enc", ".local/share/kilo-docker/.tokens.env.enc", "encrypted tokens"},
+		{".local/share/kilo/.custom-envs.env.enc", ".local/share/kilo-docker/.custom-envs.env.enc", "custom envs"},
+		{".local/share/kilo/.user-config.json", ".local/share/kilo-docker/.user-config.json", "user config"},
+		{".config/kilo/.ainstruct-hashes", ".config/kilo-docker/.ainstruct-hashes", "sync hashes"},
+	}
+
+	for _, m := range migrations {
+		oldPath := filepath.Join(homeDir, m.oldRel)
+		newPath := filepath.Join(homeDir, m.newRel)
+
+		_, oldErr := os.Stat(oldPath)
+		oldExists := oldErr == nil
+
+		_, newErr := os.Stat(newPath)
+		newExists := newErr == nil
+
+		if !oldExists {
+			continue
+		}
+
+		if newExists {
+			utils.Log("[kilo-docker] %s already at new location, renaming old file\n", m.label, utils.WithOutput())
+			utils.Log("[kilo-docker]   Old: %s → %s.migrated\n", oldPath, oldPath, utils.WithOutput())
+			if err := os.Rename(oldPath, oldPath+".migrated"); err != nil {
+				utils.LogWarn("[kilo-docker] Warning: failed to rename old %s: %v\n", m.label, err, utils.WithOutput())
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(newPath), 0o700); err != nil {
+			utils.LogWarn("[kilo-docker] Warning: failed to create directory for %s: %v\n", m.label, err, utils.WithOutput())
+			continue
+		}
+
+		if err := os.Rename(oldPath, newPath); err != nil {
+			utils.LogWarn("[kilo-docker] Warning: failed to migrate %s: %v\n", m.label, err, utils.WithOutput())
+			utils.LogWarn("[kilo-docker]   Old: %s\n", oldPath, utils.WithOutput())
+			utils.LogWarn("[kilo-docker]   New: %s\n", newPath, utils.WithOutput())
+		} else {
+			utils.Log("[kilo-docker] Migrated %s to kilo-docker namespace\n", m.label, utils.WithOutput())
+			utils.Log("[kilo-docker]   %s → %s\n", oldPath, newPath, utils.WithOutput())
+		}
+	}
+}
+
 // runUserInit performs the full first-time initialization inside a container.
 // It runs as root (via docker exec without --user) and handles:
 //   - Interactive Ainstruct login (get user_id)
@@ -58,7 +114,7 @@ func runUserInit() error {
 	if existingUser != "" {
 		username = existingUser
 		homeDir = "/home/" + username
-		userIDPath := filepath.Join(homeDir, ".local/share/kilo/.user-config.json")
+		userIDPath := filepath.Join(homeDir, ".local/share/kilo-docker/.user-config.json")
 		if data, err := os.ReadFile(userIDPath); err == nil {
 			var config map[string]string
 			if json.Unmarshal(data, &config) == nil {
@@ -106,8 +162,10 @@ func runUserInit() error {
 	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/skills"), 0o700)
 	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/tools"), 0o700)
 	_ = os.MkdirAll(filepath.Join(homeDir, ".config/kilo/rules"), 0o700)
-	_ = os.MkdirAll(filepath.Join(homeDir, ".local/share/kilo"), 0o700)
+	_ = os.MkdirAll(filepath.Join(homeDir, ".local/share/kilo-docker"), 0o700)
 	_ = os.MkdirAll(filepath.Join(homeDir, ".ssh"), 0700)
+
+	migrateContainerPaths(homeDir)
 
 	// Update .bashrc managed section based on KD_SERVICES (nvm, uv)
 	updateBashrcManaged(homeDir)
@@ -154,7 +212,7 @@ func runUserInit() error {
 				copyFileIfMissing("/etc/kilo/template-kilo.jsonc", localKilo)
 			}
 		} else {
-			hashFile := filepath.Join(homeDir, ".config/kilo/.ainstruct-hashes")
+			hashFile := filepath.Join(homeDir, ".config/kilo-docker/.ainstruct-hashes")
 			if _, err := os.Stat(hashFile); os.IsNotExist(err) {
 				utils.Log("[userinit] config init: no hash file - first time user\n")
 				hasRemote, checkErr := checkRemoteHasConfig(homeDir, userID)
@@ -225,7 +283,7 @@ func runUserInit() error {
 
 	// Persist user configuration for re-attach
 	// Store info in a file on the volume so it survives container restarts
-	userConfigPath := filepath.Join(homeDir, ".local/share/kilo/.user-config.json")
+	userConfigPath := filepath.Join(homeDir, ".local/share/kilo-docker/.user-config.json")
 	utils.Log("[userinit] Saving user config to: %s\n", userConfigPath)
 	userConfig := map[string]string{
 		"homeDir":  homeDir,
@@ -484,7 +542,7 @@ func deriveHomeName(userID string) string {
 }
 
 // findExistingUser scans /home/ for a kd-* directory containing encrypted
-// tokens, returning the directory name if found.
+// tokens (in either old or new path), returning the directory name if found.
 func findExistingUser() string {
 	baseDir := "/home"
 	entries, err := os.ReadDir(baseDir)
@@ -497,13 +555,17 @@ func findExistingUser() string {
 		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "kd-") {
 			continue
 		}
-		tokenPath := filepath.Join(baseDir, entry.Name(), ".local/share/kilo/.tokens.env.enc")
-		if _, err := os.Stat(tokenPath); err == nil {
-			utils.Log("[findExistingUser] found user %s with token file\n", entry.Name())
+		newPath := filepath.Join(baseDir, entry.Name(), ".local/share/kilo-docker/.tokens.env.enc")
+		oldPath := filepath.Join(baseDir, entry.Name(), ".local/share/kilo/.tokens.env.enc")
+		if _, err := os.Stat(newPath); err == nil {
+			utils.Log("[findExistingUser] found user %s with token file (new path)\n", entry.Name())
 			return entry.Name()
-		} else {
-			utils.Log("[findExistingUser] dir %s exists but no token file: %v\n", entry.Name(), err)
 		}
+		if _, err := os.Stat(oldPath); err == nil {
+			utils.Log("[findExistingUser] found user %s with token file (old path)\n", entry.Name())
+			return entry.Name()
+		}
+		utils.Log("[findExistingUser] dir %s exists but no token file at either path\n", entry.Name())
 	}
 	utils.Log("[findExistingUser] no user with token file found in %s\n", baseDir)
 	return ""
@@ -534,7 +596,7 @@ func runMCPTokens() error {
 	var context7Token string
 	var syncToken, syncRefresh, syncExpiry string
 
-	if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); err == nil {
+	if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")); err == nil {
 		if decrypted, err := decryptAES(encData, userID); err == nil {
 			c7, aInst, sTok, sRef, sExp, _, _ := parseTokenEnv(string(decrypted))
 			context7Token = c7
@@ -587,7 +649,7 @@ func runMCPTokens() error {
 func checkRemoteHasConfig(homeDir, userID string) (bool, error) {
 	utils.Log("[userinit] checkRemote: Checking remote for kilo.jsonc (first time init)\n")
 
-	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
+	encPath := filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")
 	encData, err := os.ReadFile(encPath)
 	if err != nil {
 		utils.LogWarn("[userinit] checkRemote: no encrypted tokens found: %v\n", err)
@@ -711,7 +773,7 @@ func checkRemoteHasConfig(homeDir, userID string) (bool, error) {
 func deleteRemoteOpencode(homeDir, userID string) error {
 	utils.Log("[userinit] deleteRemote: Checking for old opencode.json in remote\n")
 
-	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
+	encPath := filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")
 	encData, err := os.ReadFile(encPath)
 	if err != nil {
 		utils.LogWarn("[userinit] deleteRemote: no encrypted tokens: %v\n", err)

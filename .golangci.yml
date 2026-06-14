@@ -47,6 +47,10 @@ linters:
         source: '^func (main|runContainer)\('
         linters:
           - gocyclo
+      - path: cmd/kilo-docker/profile\.go
+        source: '^func handleProfile\('
+        linters:
+          - gocyclo
       - path: cmd/kilo-entrypoint/api\.go
         source: '^func \(s \*Syncer\) apiRequest\('
         linters:
@@ -76,7 +80,15 @@ linters:
         linters:
           - gosec
       - path: cmd/kilo-docker/(docker|ssh|volume)\.go
-        text: 'G(204|304|703):'
+        text: 'G(204|304|702|703|704):'
+        linters:
+          - gosec
+      - path: cmd/kilo-docker/profile\.go
+        text: 'G(204|304|702):'
+        linters:
+          - gosec
+      - path: pkg/utils/log\.go
+        text: 'G304:'
         linters:
           - gosec
       - path: cmd/kilo-docker/handlers\.go

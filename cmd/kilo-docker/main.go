@@ -18,10 +18,13 @@
 //	--playwright      Start Playwright MCP sidecar
 //	--ssh             Enable SSH agent forwarding
 //	--network <name>  Connect to a Docker network
+//	--profile <name>  Load a named flag profile from ~/.config/kilo-docker/profiles/
 //	--yes, -y         Auto-confirm all prompts
 //
 // Commands:
 //
+//	playwright        Recreate Playwright MCP sidecar
+//	profile           Manage flag profiles (save/list/show/delete/import/export/set-default)
 //	sessions          List/attach to sessions
 //	networks          List Docker networks
 //	backup            Create volume backup
@@ -54,6 +57,8 @@ func main() {
 				printCommandHelp(cfg.command + " " + cfg.args[0])
 			} else if cfg.command == "update" && len(cfg.args) > 0 {
 				printCommandHelp(cfg.command + " " + cfg.args[0])
+			} else if cfg.command == "profile" && len(cfg.args) > 0 {
+				printCommandHelp(cfg.command + " " + cfg.args[0])
 			} else {
 				printCommandHelp(cfg.command)
 			}
@@ -75,6 +80,8 @@ func main() {
 				printCommandHelp(cfg.args[0] + " " + cfg.args[1])
 			} else if cfg.args[0] == "update" && len(cfg.args) > 1 {
 				printCommandHelp(cfg.args[0] + " " + cfg.args[1])
+			} else if cfg.args[0] == "profile" {
+				printHelp()
 			} else {
 				printCommandHelp(cfg.args[0])
 			}
@@ -99,6 +106,8 @@ func main() {
 		handleInit(cfg)
 	case "playwright":
 		handlePlaywright(cfg)
+	case "profile":
+		handleProfile(cfg)
 	default:
 		runContainer(cfg)
 	}

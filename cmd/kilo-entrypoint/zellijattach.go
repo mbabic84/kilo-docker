@@ -189,7 +189,7 @@ func loadUserConfig() (homeDir, username, shell, userID string) {
 		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "kd-") {
 			continue
 		}
-		configPath := filepath.Join(baseDir, entry.Name(), ".local/share/kilo/.user-config.json")
+		configPath := filepath.Join(baseDir, entry.Name(), ".local/share/kilo-docker/.user-config.json")
 		utils.Log("[zellijattach] Checking for user config: %s\n", configPath)
 		if _, err := os.Stat(configPath); err == nil {
 			utils.Log("[zellijattach] Found user config: %s\n", configPath)
@@ -249,7 +249,7 @@ func execZellij() error {
 		utils.LogWarn("[zellijattach] No user config found, running as root\n")
 	} else {
 		// Load UID/GID from config to drop privileges
-		configPath := filepath.Join(homeDir, ".local/share/kilo/.user-config.json")
+		configPath := filepath.Join(homeDir, ".local/share/kilo-docker/.user-config.json")
 		data, err := os.ReadFile(configPath)
 		if err == nil {
 			var config map[string]string

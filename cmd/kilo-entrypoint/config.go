@@ -39,7 +39,7 @@ func applyMCPEnabledFromEnv(homeDir string) error {
 	if homeDir != "" {
 		_, _, _, userID := loadUserConfig()
 		if userID != "" {
-			if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")); err == nil {
+			if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")); err == nil {
 				if decrypted, err := decryptAES(encData, userID); err == nil {
 					c7, aInst, _, _, _, _, _ := parseTokenEnv(string(decrypted))
 					context7Token = c7

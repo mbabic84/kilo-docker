@@ -1,31 +1,84 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/mbabic84/kilo-docker/pkg/constants"
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
+
+// migrateSSHSocket migrates the persistent SSH agent socket from the old
+// ~/.ssh/kilo/ path to ~/.ssh/kilo-docker/. If the old socket is live, it
+// creates a symlink at the new path to avoid breaking existing sessions. If
+// the old socket is stale, it cleans up and lets the caller start fresh.
+func migrateSSHSocket(sshDir string) {
+	oldDir := filepath.Join(sshDir, "kilo")
+	newDir := filepath.Join(sshDir, "kilo-docker")
+	oldSock := filepath.Join(oldDir, "agent.sock")
+	newSock := filepath.Join(newDir, "agent.sock")
+
+	oldDirExists := false
+	if info, err := os.Stat(oldDir); err == nil && info.IsDir() {
+		oldDirExists = true
+	}
+
+	newDirExists := false
+	if info, err := os.Stat(newDir); err == nil && info.IsDir() {
+		newDirExists = true
+	}
+
+	if newDirExists {
+		if oldDirExists {
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Note: old SSH agent directory still exists at %s — remove it manually if no sessions depend on it\n", oldDir)
+		}
+		return
+	}
+
+	if !oldDirExists {
+		return
+	}
+
+	oldSockInfo, err := os.Stat(oldSock)
+	oldSockExists := err == nil && !oldSockInfo.IsDir() && oldSockInfo.Mode()&os.ModeSocket != 0
+
+	if oldSockExists {
+		conn, err := net.Dial("unix", oldSock)
+		if err == nil {
+			_ = conn.Close()
+			fmt.Fprintf(os.Stderr, "[kilo-docker] SSH agent socket path migrated: %s → %s\n", oldDir, newDir)
+			_ = os.MkdirAll(newDir, 0700)
+			_ = os.Symlink(oldSock, newSock)
+			return
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "[kilo-docker] Old SSH agent socket was stale, starting fresh in %s\n", newDir)
+	_ = os.RemoveAll(oldDir)
+}
 
 // setupSSH detects or starts an SSH agent for key forwarding. Returns
 // (authSock, agentRunning, agentStartedByUs). If SSH_AUTH_SOCK is already
 // set and points to a valid socket, it reuses it. Otherwise, it starts a new
 // ssh-agent, discovers private keys in ~/.ssh, and adds them.
 //
-// The socket is placed in ~/.ssh/kilo/agent.sock (a persistent path) rather
-// than a temp directory so that bind mounts in the container survive across
-// SSH agent restarts.
+// The socket is placed in ~/.ssh/kilo-docker/agent.sock (a persistent path)
+// rather than a temp directory so that bind mounts in the container survive
+// across SSH agent restarts.
 func setupSSH() (string, bool, bool) {
-	sshDir := filepath.Join(constants.GetHomeDir(), ".ssh")
-	// Persistent socket path — the parent directory must exist before
-	// ssh-agent -a is called, and must be creatable by us.
-	socketDir := sshDir + "/kilo"
-	socketPath := socketDir + "/agent.sock"
+	sshDir := filepath.Join(os.Getenv("HOME"), ".ssh")
+	if h := os.Getenv("HOME"); h == "" {
+		sshDir = filepath.Join("/home/kd-default", ".ssh")
+	}
+	socketDir := filepath.Join(sshDir, "kilo-docker")
+	socketPath := filepath.Join(socketDir, "agent.sock")
 
+	migrateSSHSocket(sshDir)
+
+	// If the user already has an SSH agent running externally, reuse it.
 	sshAuthSock := os.Getenv("SSH_AUTH_SOCK")
 	if sshAuthSock != "" {
 		if info, err := os.Stat(sshAuthSock); err == nil {

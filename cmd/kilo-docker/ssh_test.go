@@ -105,7 +105,7 @@ func TestSetupSSHRemovesStaleDirectory(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	sshDir := filepath.Join(tmpDir, ".ssh")
-	socketDir := filepath.Join(sshDir, "kilo")
+	socketDir := filepath.Join(sshDir, "kilo-docker")
 	socketPath := filepath.Join(socketDir, "agent.sock")
 
 	// Create the directory structure with agent.sock as a directory
@@ -154,7 +154,7 @@ func TestSetupSSHCreatesSocketWhenPathMissing(t *testing.T) {
 	tmpDir := t.TempDir()
 	sshDir := filepath.Join(tmpDir, ".ssh")
 
-	// Only create the .ssh directory, not the kilo subdirectory.
+	// Only create the .ssh directory, not the kilo-docker subdirectory.
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		t.Fatalf("failed to create ssh dir: %v", err)
 	}
@@ -217,8 +217,8 @@ func TestSetupSSHReusesActiveSocket(t *testing.T) {
 	if startedByUs {
 		t.Error("expected startedByUs=false when reusing existing agent")
 	}
-	if sock != socketPath {
-		t.Errorf("expected sock=%s, got %s", socketPath, sock)
+	if sock != filepath.Join(tmpDir, ".ssh", "kilo-docker", "agent.sock") {
+		t.Errorf("expected sock=%s, got %s", filepath.Join(tmpDir, ".ssh", "kilo-docker", "agent.sock"), sock)
 	}
 }
 
