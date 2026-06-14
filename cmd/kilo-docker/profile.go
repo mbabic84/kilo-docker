@@ -127,8 +127,7 @@ func unsetDefaultProfile() error {
 
 // mergeProfile applies a profile's flags to a config. CLI flags already set
 // on the config take precedence: services never get removed, SSH only gets
-// enabled if not already set, networks only apply when CLI specified none,
-// and ports/volumes are always additive.
+// enabled if not already set, and ports/volumes/networks are always additive.
 func mergeProfile(cfg *config, p Profile) {
 	if p.Flags.Go {
 		addServiceIfMissing(cfg, "go")
@@ -161,9 +160,7 @@ func mergeProfile(cfg *config, p Profile) {
 		cfg.ssh = true
 	}
 
-	if len(cfg.networks) == 0 && len(p.Networks) > 0 {
-		cfg.networks = append(cfg.networks, p.Networks...)
-	}
+	cfg.networks = append(cfg.networks, p.Networks...)
 
 	cfg.ports = append(cfg.ports, p.Ports...)
 	cfg.volumes = append(cfg.volumes, p.Volumes...)

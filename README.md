@@ -150,7 +150,7 @@ kilo-docker --ssh                  # CLI flags override profile flags
 kilo-docker profile unset-default  # stop auto-loading
 ```
 
-**Merge precedence:** CLI flags always win. Services from the profile are additive — a service already enabled by CLI won't be disabled. Networks only apply when CLI specified none. Ports and volumes are always additive.
+**Merge precedence:** CLI flags always win. Services from the profile are additive — a service already enabled by CLI won't be disabled. SSH only enables from the profile if not already set on the CLI. Ports, volumes, and networks are always additive. When `--network host` is used, all other networks are discarded (Docker does not allow combining host with other network modes).
 
 #### Import/Export
 
