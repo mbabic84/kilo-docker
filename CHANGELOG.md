@@ -1,3 +1,9 @@
+## [3.34.0](https://github.com/mbabic84/kilo-docker/compare/v3.33.0...v3.34.0) (2026-06-14)
+
+### Features
+
+* add flag overrides for sessions recreate and make --network additive in profiles ([8711845](https://github.com/mbabic84/kilo-docker/commit/8711845d9921a592474d145692bbff51c8a04c8c))
+
 ## [3.33.0](https://github.com/mbabic84/kilo-docker/compare/v3.32.1...v3.33.0) (2026-06-14)
 
 ### Features
