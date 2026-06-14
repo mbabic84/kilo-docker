@@ -1,3 +1,13 @@
+## [3.33.0](https://github.com/mbabic84/kilo-docker/compare/v3.32.1...v3.33.0) (2026-06-14)
+
+### Features
+
+* add config profiles and migrate paths to kilo-docker namespace ([2f25b71](https://github.com/mbabic84/kilo-docker/commit/2f25b719b752d9d8bbf299294b6c9be7a3688b12))
+
+### Bug Fixes
+
+* reject unknown subcommands with error instead of starting session ([87e27cd](https://github.com/mbabic84/kilo-docker/commit/87e27cde2e624657bb5d15cca33098915676426b))
+
 ## [3.32.1](https://github.com/mbabic84/kilo-docker/compare/v3.32.0...v3.32.1) (2026-06-13)
 
 ### Bug Fixes
