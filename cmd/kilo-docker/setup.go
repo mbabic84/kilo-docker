@@ -64,6 +64,7 @@ func printHelp() {
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sessions", "Manage sessions (use sessions -h for subcommands)"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "networks", "List available Docker networks"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "playwright", "Recreate Playwright MCP container"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "profile", "Manage flag profiles (save/list/show/delete/import/export/set-default)"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "backup", "Create backup of volume"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "restore", "Restore volume from backup"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "init", "Reset configuration"))
@@ -104,7 +105,7 @@ func printHelp() {
 		"Use 'kilo-docker <command> -h' for more details about a command.",
 	}, "\n")
 
-	fmt.Fprintf(os.Stderr, "%s", help)
+	fmt.Fprintf(os.Stderr, "%s\n", help)
 }
 
 func printCommandHelp(command string) {
@@ -209,6 +210,61 @@ Examples:
   kilo-docker playwright                # recreate container
   kilo-docker playwright -v             # recreate container and volume
   kilo-docker playwright -h            # show this help
+`
+	case "profile":
+		help = `Usage: kilo-docker profile <command> [args...]
+
+Manage named flag profiles stored under ~/.config/kilo-docker/profiles/.
+
+Commands:
+  save <name> <flags>   Save current flags as a profile (e.g. save fullstack --go --ssh)
+  list                  List all profiles (default marked with *)
+  show <name>           Display full profile JSON
+  edit <name>           Open profile in $EDITOR (falls back to vi)
+  delete <name>         Remove a profile (prompts for confirmation)
+  import <file>         Load a profile from a JSON file
+  export <name>         Print profile JSON to stdout
+  set-default <name>    Set a profile as the default (auto-applied when no flags given)
+  unset-default         Remove the default profile
+  show-default          Print the current default profile name
+
+Options:
+  -h, --help            Show this help message
+
+Use 'kilo-docker profile <command> --help' for details on a specific command.
+
+Examples:
+  kilo-docker profile save fullstack --go --ssh --docker  # save a profile
+  kilo-docker profile list                                 # list all profiles
+  kilo-docker profile show fullstack                       # inspect one
+  kilo-docker profile set-default fullstack                # make it the default
+  kilo-docker                                              # auto-loads default profile
+  kilo-docker profile export fullstack > profile.json      # export to file
+  kilo-docker profile import ./profile.json                # import from file
+`
+	case "profile save":
+		help = `Usage: kilo-docker profile save <name> [flags...]
+
+Save the current set of CLI flags as a named profile. Pass the same flags
+you would use when running kilo-docker, and they will be recorded in the
+profile. The --workspace flag is never saved (it is always specific to
+the current invocation).
+
+The profile is stored at ~/.config/kilo-docker/profiles/<name>.json and
+can be reused later with --profile <name>.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  # Save a full-stack development setup
+  kilo-docker profile save fullstack --go --ssh --docker --uv
+
+  # Save a minimal profile
+  kilo-docker profile save minimal --gh
+
+  # Use it later
+  kilo-docker --profile fullstack
 `
 	case "backup":
 		help = `Usage: kilo-docker backup [options]
@@ -344,5 +400,5 @@ Examples:
 	default:
 		help = fmt.Sprintf("Unknown command: %s\nRun 'kilo-docker help' for usage.\n", command)
 	}
-	fmt.Fprintf(os.Stderr, "%s", help)
+	fmt.Fprintf(os.Stderr, "%s\n", help)
 }

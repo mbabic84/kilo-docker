@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mbabic84/kilo-docker/pkg/services"
+	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
 const (
@@ -23,6 +24,7 @@ type config struct {
 	ssh                     bool
 	yes                     bool
 	help                    bool
+	profile                 string
 	networks                []string
 	networkFlag             bool
 	ports                   []string
@@ -117,6 +119,13 @@ var valueFlags = []valueFlag{
 		Description:     "Specify a custom workspace path (defaults to current directory)",
 		setField:        func(c *config, v string) { c.workspace = v },
 		serializeArgs:   func(c config) []string { return optional("--workspace", c.workspace) },
+		buildDockerArgs: func(c config) []string { return nil },
+	},
+	{
+		Names:            []string{"--profile"},
+		Description:     "Load a named profile from ~/.config/kilo-docker/profiles/",
+		setField:        func(c *config, v string) { c.profile = v },
+		serializeArgs:   func(c config) []string { return optional("--profile", c.profile) },
 		buildDockerArgs: func(c config) []string { return nil },
 	},
 	{
@@ -278,7 +287,26 @@ func parseArgs(args []string) config {
 }
 
 func parseFlags() config {
-	return parseArgs(os.Args[1:])
+	cfg := parseArgs(os.Args[1:])
+
+	profileName := cfg.profile
+	if profileName == "" && !cfg.help && cfg.command == "" && !hasAnyFlags(cfg) {
+		if defaultName, err := getDefaultProfile(); err == nil && defaultName != "" {
+			profileName = defaultName
+			utils.Log("[kilo-docker] Using default profile: %s\n", profileName, utils.WithOutput())
+		}
+	}
+
+	if profileName != "" {
+		p, err := loadProfile(profileName)
+		if err != nil {
+			utils.LogError("[kilo-docker] Profile '%s' not found: %v\n", profileName, err, utils.WithOutput())
+			os.Exit(1)
+		}
+		mergeProfile(&cfg, p)
+	}
+
+	return cfg
 }
 
 func formatFlagHelp() string {

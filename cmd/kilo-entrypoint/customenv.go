@@ -11,7 +11,7 @@ import (
 )
 
 func loadCustomEnvs(home, userID string) (map[string]string, error) {
-	customPath := filepath.Join(home, ".local/share/kilo/.custom-envs.env.enc")
+	customPath := filepath.Join(home, ".local/share/kilo-docker/.custom-envs.env.enc")
 	encData, err := os.ReadFile(customPath)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func saveCustomEnvs(home, userID string, envs map[string]string) error {
 	if err != nil {
 		return err
 	}
-	customPath := filepath.Join(home, ".local/share/kilo/.custom-envs.env.enc")
+	customPath := filepath.Join(home, ".local/share/kilo-docker/.custom-envs.env.enc")
 	_ = os.MkdirAll(filepath.Dir(customPath), 0o700)
 	return os.WriteFile(customPath, encData, 0600)
 }

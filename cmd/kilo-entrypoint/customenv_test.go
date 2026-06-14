@@ -145,7 +145,7 @@ func TestLoadCustomEnvsFileNotExist(t *testing.T) {
 
 func TestLoadCustomEnvsCorruptData(t *testing.T) {
 	homeDir := t.TempDir()
-	storeDir := filepath.Join(homeDir, ".local/share/kilo")
+	storeDir := filepath.Join(homeDir, ".local/share/kilo-docker")
 	_ = os.MkdirAll(storeDir, 0o700)
 	customPath := filepath.Join(storeDir, ".custom-envs.env.enc")
 	_ = os.WriteFile(customPath, []byte("not-encrypted-data"), 0o600)
@@ -220,7 +220,7 @@ func TestSaveCustomEnvsFilePermission(t *testing.T) {
 		t.Fatalf("saveCustomEnvs failed: %v", err)
 	}
 
-	customPath := filepath.Join(homeDir, ".local/share/kilo/.custom-envs.env.enc")
+	customPath := filepath.Join(homeDir, ".local/share/kilo-docker/.custom-envs.env.enc")
 	info, err := os.Stat(customPath)
 	if err != nil {
 		t.Fatalf("stat failed: %v", err)

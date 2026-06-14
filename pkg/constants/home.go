@@ -26,3 +26,11 @@ func GetHomeDir() string {
 func GetKiloConfigDir() string {
 	return filepath.Join(GetHomeDir(), ".config", "kilo")
 }
+
+func GetKiloDockerConfigDir() string {
+	return filepath.Join(GetHomeDir(), ".config", "kilo-docker")
+}
+
+func GetKiloDockerDataDir() string {
+	return filepath.Join(GetHomeDir(), ".local", "share", "kilo-docker")
+}

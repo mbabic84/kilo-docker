@@ -70,28 +70,30 @@ var defaultSyncPaths = []string{
 // Ainstruct REST API. It tracks content hashes to avoid redundant uploads,
 // handles JWT token refresh, and manages the collection lifecycle.
 type Syncer struct {
-	apiURL         string
-	accessToken    string
-	refreshToken   string
-	tokenExpiry    int64
-	homeDir        string
-	kiloConfigDir  string
-	hashFile       string
-	hashMu         sync.Mutex
-	collectionID   string
-	authExpired    bool
-	client         *http.Client
-	syncPaths      []string // whitelist of paths (relative to kilo config dir) to sync
-	saveTokensFn   func()  // override for testing; nil uses default saveTokensToEncrypted
-	refreshMu      sync.Mutex // serializes token refresh to prevent race with server-side token rotation
+	apiURL            string
+	accessToken       string
+	refreshToken      string
+	tokenExpiry       int64
+	homeDir           string
+	kiloConfigDir     string
+	kiloDockerDataDir string
+	hashFile          string
+	hashMu            sync.Mutex
+	collectionID      string
+	authExpired       bool
+	client            *http.Client
+	syncPaths         []string
+	saveTokensFn      func()
+	refreshMu         sync.Mutex
 }
 
 // NewSyncer creates a Syncer configured from encrypted token storage.
-// Reads tokens from <home>/.local/share/kilo/.tokens.env.enc and falls back
+// Reads tokens from <home>/.local/share/kilo-docker/.tokens.env.enc and falls back
 // to environment variables for backward compatibility.
 func NewSyncer() *Syncer {
 	home := constants.GetHomeDir()
 	kiloConfigDir := constants.GetKiloConfigDir()
+	kiloDockerDataDir := constants.GetKiloDockerConfigDir()
 	baseURL := os.Getenv("KD_AINSTRUCT_BASE_URL")
 	if baseURL == "" {
 		baseURL = constants.AinstructBaseURL
@@ -101,10 +103,9 @@ func NewSyncer() *Syncer {
 	var accessToken, refreshToken string
 	var expiry int64
 
-	// Try to load from encrypted storage first
 	homeDir, _, _, userID := loadUserConfig()
 	if homeDir != "" && userID != "" {
-		encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
+		encPath := filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")
 		if encData, err := os.ReadFile(encPath); err == nil {
 			if decrypted, err := decryptAES(encData, userID); err == nil {
 				var expiryStr string
@@ -122,15 +123,16 @@ func NewSyncer() *Syncer {
 	}
 
 	return &Syncer{
-		apiURL:        apiURL,
-		accessToken:   accessToken,
-		refreshToken:  refreshToken,
-		tokenExpiry:   expiry,
-		homeDir:       home,
-		kiloConfigDir: kiloConfigDir,
-		hashFile:      filepath.Join(kiloConfigDir, ".ainstruct-hashes"),
-		client:        &http.Client{Timeout: 30 * time.Second},
-		syncPaths:     defaultSyncPaths,
+		apiURL:            apiURL,
+		accessToken:       accessToken,
+		refreshToken:      refreshToken,
+		tokenExpiry:       expiry,
+		homeDir:           home,
+		kiloConfigDir:     kiloConfigDir,
+		kiloDockerDataDir: kiloDockerDataDir,
+		hashFile:          filepath.Join(kiloDockerDataDir, ".ainstruct-hashes"),
+		client:            &http.Client{Timeout: 30 * time.Second},
+		syncPaths:         defaultSyncPaths,
 	}
 }
 

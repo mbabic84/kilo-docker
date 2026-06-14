@@ -308,7 +308,7 @@ func runLoginInteractive() (loginResult, error) {
 	_ = os.MkdirAll(homeDir, 0o700)
 
 	var storedAinstruct, storedPatExpiry string
-	encPath := filepath.Join(homeDir, ".local/share/kilo/.tokens.env.enc")
+	encPath := filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")
 	if encData, err := os.ReadFile(encPath); err == nil {
 		if decrypted, decErr := decryptAES(encData, result.UserID); decErr == nil {
 			_, storedAinstruct, _, _, _, storedPatExpiry, _ = parseTokenEnv(string(decrypted))

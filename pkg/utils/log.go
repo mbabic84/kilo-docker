@@ -25,10 +25,94 @@ func WithOutput() LogOpt {
 	return func(b *bool) { *b = true }
 }
 
+// migrateLogFile moves log files from the old ~/.config/kilo/logs/ directory
+// to ~/.config/kilo-docker/logs/. Called once via sync.Once before the first
+// log write. Uses direct stderr and file I/O (not utils.Log) to avoid a
+// deadlock with getLogFile's sync.Once guard.
+func migrateLogFile() {
+	oldDir := filepath.Join(constants.GetHomeDir(), ".config", "kilo", "logs")
+	newDir := filepath.Join(constants.GetKiloDockerConfigDir(), "logs")
+	oldLog := filepath.Join(oldDir, "kilo-docker.log")
+	newLog := filepath.Join(newDir, "kilo-docker.log")
+
+	oldDirExists := false
+	if info, err := os.Stat(oldDir); err == nil && info.IsDir() {
+		oldDirExists = true
+	}
+
+	oldLogExists := false
+	if info, err := os.Stat(oldLog); err == nil && !info.IsDir() {
+		oldLogExists = true
+	}
+
+	newLogExists := false
+	if _, err := os.Stat(newLog); err == nil {
+		newLogExists = true
+	}
+
+	if !oldDirExists && !newLogExists {
+		_ = os.MkdirAll(newDir, 0o700)
+		return
+	}
+
+	if !oldLogExists {
+		_ = os.MkdirAll(newDir, 0o700)
+		return
+	}
+
+	if newLogExists {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Log file already exists at new location, renaming old file\n")
+		fmt.Fprintf(os.Stderr, "[kilo-docker]   Old: %s → %s.migrated\n", oldLog, oldLog)
+		_ = os.MkdirAll(newDir, 0o700)
+
+		w, err := os.OpenFile(oldLog, os.O_APPEND|os.O_WRONLY, 0o600)
+		if err == nil {
+			timestamp := time.Now().Format("2006-01-02 15:04:05")
+			_, _ = fmt.Fprintf(w, "[%s] [host] [LOG] [kilo-docker] Log file migrated, future logs go to ~/.config/kilo-docker/logs/\n", timestamp)
+			_ = w.Close()
+		}
+
+		if err := os.Rename(oldLog, oldLog+".migrated"); err != nil {
+			fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to rename old log file: %v\n", err)
+		}
+
+		oldRotated, _ := filepath.Glob(filepath.Join(oldDir, "kilo-docker-*.log.gz"))
+		for _, f := range oldRotated {
+			dest := filepath.Join(newDir, filepath.Base(f))
+			if _, err := os.Stat(dest); os.IsNotExist(err) {
+				_ = os.Rename(f, dest)
+			}
+		}
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "[kilo-docker] Migrated log files from %s to %s\n", oldDir, newDir)
+
+	_ = os.MkdirAll(newDir, 0o700)
+
+	if err := os.Rename(oldLog, newLog); err != nil {
+		fmt.Fprintf(os.Stderr, "[kilo-docker] Warning: failed to migrate log file: %v\n", err)
+	}
+
+	oldRotated, _ := filepath.Glob(filepath.Join(oldDir, "kilo-docker-*.log.gz"))
+	for _, f := range oldRotated {
+		dest := filepath.Join(newDir, filepath.Base(f))
+		if _, err := os.Stat(dest); os.IsNotExist(err) {
+			_ = os.Rename(f, dest)
+		}
+	}
+
+	remaining, _ := filepath.Glob(filepath.Join(oldDir, "*"))
+	if len(remaining) == 0 {
+		_ = os.Remove(oldDir)
+	}
+}
+
 func getLogFile() *lumberjack.Logger {
 	logFileOnce.Do(func() {
-		logDir := constants.GetKiloConfigDir()
-		logSubDir := filepath.Join(logDir, "logs")
+		migrateLogFile()
+
+		logSubDir := filepath.Join(constants.GetKiloDockerConfigDir(), "logs")
 		if err := os.MkdirAll(logSubDir, 0o700); err != nil {
 			return
 		}

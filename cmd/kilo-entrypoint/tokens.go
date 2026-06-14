@@ -8,7 +8,7 @@ import (
 )
 
 // saveEncryptedTokens encrypts MCP and sync tokens with userID as the key
-// and writes them to <home>/.local/share/kilo/.tokens.env.enc.
+// and writes them to <home>/.local/share/kilo-docker/.tokens.env.enc.
 func saveEncryptedTokens(home, userID, context7Token, ainstructToken, syncToken, syncRefreshToken, syncTokenExpiry, patExpiry string) error {
 	tokenData := fmt.Sprintf("KD_MCP_CONTEXT7_TOKEN=%s\nKD_MCP_AINSTRUCT_TOKEN=%s\nKD_AINSTRUCT_SYNC_TOKEN=%s\nKD_AINSTRUCT_SYNC_REFRESH_TOKEN=%s\nKD_AINSTRUCT_SYNC_TOKEN_EXPIRY=%s\nKD_AINSTRUCT_PAT_EXPIRY=%s\n",
 		context7Token, ainstructToken, syncToken, syncRefreshToken, syncTokenExpiry, patExpiry)
@@ -16,14 +16,14 @@ func saveEncryptedTokens(home, userID, context7Token, ainstructToken, syncToken,
 	if err != nil {
 		return err
 	}
-	tokenPath := filepath.Join(home, ".local/share/kilo/.tokens.env.enc")
+	tokenPath := filepath.Join(home, ".local/share/kilo-docker/.tokens.env.enc")
 	return os.WriteFile(tokenPath, encData, 0600)
 }
 
 // loadEncryptedTokens reads and decrypts MCP and sync tokens from the volume.
 // Returns empty strings for any missing fields rather than an error.
 func loadEncryptedTokens(home, userID string) (context7, ainstruct, syncToken, syncRefresh, syncExpiry, patExpiry string, err error) {
-	tokenPath := filepath.Join(home, ".local/share/kilo/.tokens.env.enc")
+	tokenPath := filepath.Join(home, ".local/share/kilo-docker/.tokens.env.enc")
 	encData, err := os.ReadFile(tokenPath)
 	if err != nil {
 		return "", "", "", "", "", "", err

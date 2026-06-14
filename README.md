@@ -49,6 +49,16 @@ kilo-docker
 | `sessions recreate <name\|index>` | Recreate a session with the same flags (preserves volume) |
 | `networks` | List available Docker networks |
 | `playwright` | Recreate the Playwright MCP sidecar container |
+| `profile save <name> <flags>` | Save current flags as a profile (flags passed after name) |
+| `profile list` | List all saved profiles (default marked with `*`) |
+| `profile show <name>` | Display full profile JSON |
+| `profile edit <name>` | Open profile in $EDITOR |
+| `profile delete <name>` | Remove a profile |
+| `profile import <file>` | Load a profile from a JSON file |
+| `profile export <name>` | Print profile JSON to stdout |
+| `profile set-default <name>` | Set a profile as the default |
+| `profile unset-default` | Remove the default profile |
+| `profile show-default` | Print the current default profile name |
 | `backup [-f] [--legacy-volume]` | Create backup of volume to tar.gz |
 | `restore <file> [-f] [-v\|--volume <name>] [--legacy-volume]` | Restore volume from backup |
 | `init` | Reset configuration (remove volume, re-enter tokens) |
@@ -69,6 +79,7 @@ kilo-docker
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--ssh` | Enable SSH agent forwarding into the container |
 | `--network <name>` | Attach to a Docker network (repeatable, `kilo-shared` included by default). Use `host` to share the host network stack |
+| `--profile <name>` | Load a named flag profile from `~/.config/kilo-docker/profiles/` |
 | `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
 
 ### Volume Mounts
@@ -105,6 +116,51 @@ The current working directory is always mounted at the same path automatically.
 | `--nvm` | Install NVM (Node Version Manager) for managing Node.js versions |
 | `--rclone` | Install rclone, a universal CLI for S3 and 40+ cloud storage backends |
 | `--gitnexus` | Install GitNexus for codebase knowledge graph indexing and MCP-based code intelligence |
+
+### Config Profiles
+
+Named profiles let you save reusable flag combinations and apply them with a single `--profile` flag. Profiles are stored as JSON files under `~/.config/kilo-docker/profiles/`.
+
+```bash
+# Save current flags as a profile
+kilo-docker --go --ssh --docker --workspace /path profile save fullstack
+
+# List all profiles (default marked with *)
+kilo-docker profile list
+
+# Show full profile JSON
+kilo-docker profile show fullstack
+
+# Edit a profile in your editor
+kilo-docker profile edit fullstack
+
+# Use a profile
+kilo-docker --profile fullstack
+```
+
+#### Default Profile
+
+Set a default profile and it auto-loads whenever you run `kilo-docker` with no flags:
+
+```bash
+kilo-docker profile set-default fullstack
+kilo-docker                        # auto-loads --go --ssh --docker
+kilo-docker --profile other       # explicit profile overrides default
+kilo-docker --ssh                  # CLI flags override profile flags
+kilo-docker profile unset-default  # stop auto-loading
+```
+
+**Merge precedence:** CLI flags always win. Services from the profile are additive — a service already enabled by CLI won't be disabled. Networks only apply when CLI specified none. Ports and volumes are always additive.
+
+#### Import/Export
+
+Share profiles between machines:
+
+```bash
+kilo-docker profile export fullstack > fullstack.json
+scp fullstack.json remote-host:
+ssh remote-host kilo-docker profile import fullstack.json
+```
 
 ## One-Time Sessions
 
