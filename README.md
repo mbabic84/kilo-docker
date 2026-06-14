@@ -46,7 +46,7 @@ kilo-docker
 | `sessions stop <name\|index>` | Stop a running session, freeing its ports |
 | `sessions cleanup [-y] [name\|index]` | Remove a session (interactive if no name given) |
 | `sessions cleanup -y -a` | Remove all exited sessions |
-| `sessions recreate <name\|index>` | Recreate a session with the same flags (preserves volume) |
+| `sessions recreate <name\|index> [flags]` | Recreate a session, optionally overriding its configuration (preserves volume) |
 | `networks` | List available Docker networks |
 | `playwright` | Recreate the Playwright MCP sidecar container |
 | `profile save <name> <flags>` | Save current flags as a profile (flags passed after name) |
@@ -332,9 +332,20 @@ kilo-docker sessions stop <name-or-index>
 
 # Recreate a session with the same flags (preserves volume)
 kilo-docker sessions recreate <name-or-index>
+
+# Recreate a session with flag overrides
+kilo-docker sessions recreate <name-or-index> --ssh
+kilo-docker sessions recreate <name-or-index> --port 9090:80 --profile dev
+
+# Show recreate help
+kilo-docker sessions recreate -h
 ```
 
 When attaching to a session, `kilo-docker` detects the container state: if running it attaches directly, if stopped it starts the container then attaches.
+
+### Recreating Sessions
+
+`sessions recreate` removes the old container but keeps the volume, then starts a fresh container with the merged configuration. If no flags are given, the session uses its original flags. Any flags passed after the session name override the stored values.
 
 ## MCP Servers
 

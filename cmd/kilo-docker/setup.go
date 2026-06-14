@@ -119,7 +119,7 @@ List sessions, attach to one, or stop a running session.
 Commands:
   (no command)          List all sessions and attach interactively
   cleanup               Remove sessions
-  recreate              Recreate a session with the same flags
+  recreate              Recreate a session, optionally overriding its configuration
   stop                  Stop a running session (frees ports, preserves container)
 
 Options:
