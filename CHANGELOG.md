@@ -1,3 +1,9 @@
+## [3.34.1](https://github.com/mbabic84/kilo-docker/compare/v3.34.0...v3.34.1) (2026-06-14)
+
+### Bug Fixes
+
+* handle flags-only invocation by routing to runContainer ([a8513af](https://github.com/mbabic84/kilo-docker/commit/a8513af8936b0673e15358df52c8406d31cd32a6))
+
 ## [3.34.0](https://github.com/mbabic84/kilo-docker/compare/v3.33.0...v3.34.0) (2026-06-14)
 
 ### Features
