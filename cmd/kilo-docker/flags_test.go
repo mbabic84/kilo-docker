@@ -269,6 +269,56 @@ func TestParseFlagsPortNotSet(t *testing.T) {
 	}
 }
 
+// TestParseFlagsAllFlagsNoCommand tests that flags-only invocation (no subcommand)
+// correctly parses and leaves command empty so runContainer is called instead of
+// the unknown-command error.
+func TestParseFlagsAllFlagsNoCommand(t *testing.T) {
+	origArgs := os.Args
+	defer func() { os.Args = origArgs }()
+
+	os.Args = []string{"kilo-docker", "--gh", "--uv", "--nvm", "--docker", "--network", "host", "--build"}
+	cfg := parseFlags()
+
+	if cfg.command != "" {
+		t.Errorf("expected empty command (flags-only invocation), got %q", cfg.command)
+	}
+
+	expectedServices := []string{"gh", "uv", "nvm", "docker", "build"}
+	for _, svc := range expectedServices {
+		if !isServiceEnabled(cfg, svc) {
+			t.Errorf("expected %s service to be enabled", svc)
+		}
+	}
+
+	if len(cfg.networks) != 1 || cfg.networks[0] != "host" {
+		t.Errorf("expected networks = [host], got %v", cfg.networks)
+	}
+	if !cfg.networkFlag {
+		t.Error("expected networkFlag = true")
+	}
+}
+
+// TestParseFlagsAllFlagsWithCommand tests that flags before a subcommand work
+// correctly (subcommand is recognized, not eaten by a value flag).
+func TestParseFlagsAllFlagsWithCommand(t *testing.T) {
+	origArgs := os.Args
+	defer func() { os.Args = origArgs }()
+
+	os.Args = []string{"kilo-docker", "--gh", "--uv", "--docker", "--network", "host", "sessions"}
+	cfg := parseFlags()
+
+	if cfg.command != "sessions" {
+		t.Errorf("expected command = 'sessions', got %q", cfg.command)
+	}
+
+	expectedServices := []string{"gh", "uv", "docker"}
+	for _, svc := range expectedServices {
+		if !isServiceEnabled(cfg, svc) {
+			t.Errorf("expected %s service to be enabled", svc)
+		}
+	}
+}
+
 // TestParseFlagsPortWithOtherFlags tests that --port combines with other flags.
 func TestParseFlagsPortWithOtherFlags(t *testing.T) {
 	origArgs := os.Args

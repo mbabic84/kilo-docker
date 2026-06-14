@@ -109,8 +109,12 @@ func main() {
 	case "profile":
 		handleProfile(cfg)
 	default:
-		utils.LogError("[kilo-docker] unknown subcommand or command: %s\nRun 'kilo-docker help' for usage.\n", cfg.command, utils.WithOutput())
-		os.Exit(1)
+		if cfg.command == "" {
+			runContainer(cfg)
+		} else {
+			utils.LogError("[kilo-docker] unknown subcommand or command: %s\nRun 'kilo-docker help' for usage.\n", cfg.command, utils.WithOutput())
+			os.Exit(1)
+		}
 	}
 }
 
