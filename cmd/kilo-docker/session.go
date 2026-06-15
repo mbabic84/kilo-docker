@@ -109,3 +109,24 @@ func resolveTarget(target string) (string, error) {
 	}
 	return sessions[idx-1].Name, nil
 }
+
+// filterSessions returns sessions matching the given criteria.
+// If legacy is true, only sessions using legacy volumes are included.
+// If needsUpdate is true, only sessions needing an image update are included.
+// If both are true, sessions matching either criterion are included.
+func filterSessions(sessions []session, legacy, needsUpdate bool) []session {
+	if !legacy && !needsUpdate {
+		return sessions
+	}
+	var filtered []session
+	for _, s := range sessions {
+		if legacy && s.UsesLegacyVolume {
+			filtered = append(filtered, s)
+			continue
+		}
+		if needsUpdate && s.NeedsUpdate {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}

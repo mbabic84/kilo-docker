@@ -44,8 +44,12 @@ kilo-docker
 |---------|-------------|
 | `sessions [name\|index]` | List sessions or attach to one by name or index |
 | `sessions stop <name\|index>` | Stop a running session, freeing its ports |
+| `sessions stop --legacy` | Stop all sessions using legacy volumes |
+| `sessions stop --needs-update` | Stop all sessions needing an image update |
 | `sessions cleanup [-y] [name\|index]` | Remove a session (interactive if no name given) |
 | `sessions cleanup -y -a` | Remove all exited sessions |
+| `sessions cleanup --legacy [-y]` | Remove all sessions using legacy volumes |
+| `sessions cleanup --needs-update [-y]` | Remove all sessions needing an image update |
 | `sessions recreate <name\|index> [flags]` | Recreate a session, optionally overriding its configuration (preserves volume) |
 | `networks` | List available Docker networks |
 | `playwright` | Recreate the Playwright MCP sidecar container |
@@ -327,8 +331,23 @@ kilo-docker sessions cleanup <name-or-index>
 # Remove all exited sessions
 kilo-docker sessions cleanup -a
 
+# Remove all sessions using legacy volumes
+kilo-docker sessions cleanup --legacy
+
+# Remove all sessions needing an image update
+kilo-docker sessions cleanup --needs-update
+
 # Stop a running session (frees ports, preserves container)
 kilo-docker sessions stop <name-or-index>
+
+# Stop all sessions using legacy volumes
+kilo-docker sessions stop --legacy
+
+# Stop all sessions needing an image update
+kilo-docker sessions stop --needs-update
+
+# Stop all running sessions
+kilo-docker sessions stop --all
 
 # Recreate a session with the same flags (preserves volume)
 kilo-docker sessions recreate <name-or-index>

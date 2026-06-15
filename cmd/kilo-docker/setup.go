@@ -114,13 +114,13 @@ func printCommandHelp(command string) {
 	case "sessions":
 		help = `Usage: kilo-docker sessions [command] [options]
 
-List sessions, attach to one, or stop a running session.
+List sessions, attach to one, stop, or clean up sessions.
 
 Commands:
   (no command)          List all sessions and attach interactively
-  cleanup               Remove sessions
+  cleanup               Remove sessions (supports --legacy, --needs-update)
   recreate              Recreate a session, optionally overriding its configuration
-  stop                  Stop a running session (frees ports, preserves container)
+  stop                  Stop running sessions (supports --all, --legacy, --needs-update)
 
 Options:
   -h, --help            Show this help message
@@ -136,17 +136,23 @@ Remove one or more sessions.
 
 Options:
   -a, --all             Remove all exited sessions
+  --legacy              Remove all sessions using legacy volumes
+  --needs-update        Remove all sessions needing an image update
   -y, --yes             Skip confirmation prompts
   -h, --help            Show this help message
 
 Without flags, shows interactive selection.
 With -a, prompts for each session (or skips if -y is set).
+--legacy and --needs-update can be combined with -a and -y.
 
 Examples:
   kilo-docker sessions cleanup                  # interactive selection
   kilo-docker sessions cleanup 1                # remove session 1
   kilo-docker sessions cleanup -a              # remove all exited (with prompt)
   kilo-docker sessions cleanup -a -y            # remove all exited (no prompt)
+  kilo-docker sessions cleanup --legacy         # remove legacy sessions
+  kilo-docker sessions cleanup --needs-update   # remove outdated sessions
+  kilo-docker sessions cleanup --legacy -y      # remove legacy sessions (no prompt)
   kilo-docker sessions cleanup -h              # show this help
 `
 	case "sessions recreate":
@@ -167,16 +173,27 @@ Examples:
   kilo-docker sessions recreate -h                   # show this help
 `
 	case "sessions stop":
-		help = `Usage: kilo-docker sessions stop <name|index>
+		help = `Usage: kilo-docker sessions stop [options] [name|index]
 
 Stop a running session, freeing its ports while preserving the
 container and volume for later restart.
 
-Use 'kilo-docker sessions <name>' to restart the session.
+Options:
+  -a, --all             Stop all running sessions
+  --legacy              Stop all sessions using legacy volumes
+  --needs-update        Stop all sessions needing an image update
+  -y, --yes             Skip confirmation prompts (for batch operations)
+  -h, --help            Show this help message
+
+Use 'kilo-docker sessions <name>' to restart a stopped session.
 
 Examples:
   kilo-docker sessions stop 1                   # stop session 1
   kilo-docker sessions stop my-session          # stop by name
+  kilo-docker sessions stop --all               # stop all running sessions
+  kilo-docker sessions stop --legacy            # stop legacy sessions
+  kilo-docker sessions stop --needs-update      # stop outdated sessions
+  kilo-docker sessions stop --legacy -y         # stop legacy sessions (no prompt)
   kilo-docker sessions stop -h                  # show this help
 `
 	case "networks":
