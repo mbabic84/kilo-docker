@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	SharedNetworkName           = "kilo-shared"
-	PlaywrightVolumeName       = "kilo-playwright-output"
-	PlaywrightMountPath        = "/home/node"
+	SharedNetworkName             = "kilo-shared"
+	PlaywrightVolumeName          = "kilo-playwright-output"
+	PlaywrightMountPath           = "/home/node"
 	SharedPlaywrightContainerName = "kilo-playwright-mcp"
 )
 

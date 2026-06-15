@@ -8,12 +8,12 @@ import (
 
 // session represents a running or stopped kilo-docker container with its metadata.
 type session struct {
-	Name              string
-	Status            string
-	Workspace         string
-	Args              string
-	User              string
-	UsesLegacyVolume  bool
+	Name             string
+	Status           string
+	Workspace        string
+	Args             string
+	User             string
+	UsesLegacyVolume bool
 }
 
 // getSessions queries Docker for all containers labeled with kilo.workspace.

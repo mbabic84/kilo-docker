@@ -185,7 +185,7 @@ func handleCleanup(cfg config) {
 	}
 
 	output, _ := dockerRun("ps", "-a", "--filter", "ancestor="+repoURL, "-q")
-		if output != "" {
+	if output != "" {
 		for _, id := range strings.Split(output, "\n") {
 			if id != "" {
 				_, _ = dockerRun("rm", "-f", id)
@@ -222,7 +222,7 @@ func handleInit(cfg config) {
 	}
 
 	if volumeExists(dataVolume) {
-		if promptConfirm("Remove volume '" + dataVolume + "' and reset all configuration? [y/N]: ", cfg.yes) {
+		if promptConfirm("Remove volume '"+dataVolume+"' and reset all configuration? [y/N]: ", cfg.yes) {
 			_ = removeVolume(dataVolume)
 			utils.Log("[kilo-docker] Volume removed. You will be prompted for tokens on next run.\n", utils.WithOutput())
 		}
