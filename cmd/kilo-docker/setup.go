@@ -40,6 +40,13 @@ func promptConfirm(message string, yes bool) bool {
 	return strings.ToLower(strings.TrimSpace(response)) == "y"
 }
 
+func promptConfirmStrict(message string) bool {
+	fmt.Print(message)
+	var response string
+	_, _ = fmt.Scanln(&response)
+	return strings.ToLower(strings.TrimSpace(response)) == "y"
+}
+
 func fileDescriptor(fd uintptr) (int, bool) {
 	if fd > uintptr(math.MaxInt) {
 		return 0, false
@@ -344,23 +351,22 @@ Examples:
   kilo-docker init -h
 `
 	case "cleanup":
-		help = `Usage: kilo-docker cleanup [options]
+		help = `Usage: kilo-docker cleanup
 
-Remove all kilo-docker artifacts from the system.
+PERMANENTLY remove all kilo-docker artifacts from the system.
+Each step requires explicit confirmation — there is NO auto-confirm flag.
 
-WARNING: This removes:
-  - The per-user data volume
-  - All kilo-docker containers
-  - The kilo-docker image
+WARNING: This will destroy:
+  - All kilo-docker containers (force-removed)
+  - The per-user data volume (sessions, config, cached data)
+  - The kilo-docker Docker image
   - The kilo-docker binary
 
 Options:
-  -y, --yes             Skip confirmation
   -h, --help            Show this help message
 
 Examples:
   kilo-docker cleanup
-  kilo-docker cleanup -y
   kilo-docker cleanup -h
 `
 	case "update":

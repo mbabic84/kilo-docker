@@ -173,39 +173,183 @@ func handleUpdate(cfg config) {
 }
 
 // handleCleanup removes all kilo-docker artifacts: containers, volumes,
-// Docker images, and the installed script.
+// Docker images, and the installed script. Each destructive step requires
+// explicit user confirmation. The -y/--yes flag is intentionally ignored.
 func handleCleanup(cfg config) {
 	if cfg.help {
 		printCommandHelp("cleanup")
 		return
 	}
-	if !promptConfirm("Remove volume, containers, and images for kilo-docker? [y/N]: ", cfg.yes) {
-		utils.Log("[kilo-docker] Aborted.\n", utils.WithOutput())
-		return
-	}
-
-	output, _ := dockerRun("ps", "-a", "--filter", "ancestor="+repoURL, "-q")
-	if output != "" {
-		for _, id := range strings.Split(output, "\n") {
-			if id != "" {
-				_, _ = dockerRun("rm", "-f", id)
-			}
-		}
-	}
 
 	home, _ := os.UserHomeDir()
 	_, username := resolveWorkspaceAndUsername()
 	dataVolume := resolveVolume(cfg, username)
-	if dataVolume != "" && volumeExists(dataVolume) {
-		_ = removeVolume(dataVolume)
+	binaryPath := filepath.Join(home, ".local", "bin", "kilo-docker")
+	sessions, _ := getSessions()
+	volExists := dataVolume != "" && volumeExists(dataVolume)
+	imgExists := imageExists(repoURL + ":latest")
+	binExists := fileExists(binaryPath)
+
+	showCleanupSummary(sessions, dataVolume, volExists, imgExists, binExists, binaryPath)
+
+	if !promptConfirmStrict("Do you understand and want to proceed? [y/N]: ") {
+		utils.Log("[kilo-docker] Aborted.\n", utils.WithOutput())
+		return
+	}
+	utils.Log("[kilo-docker] \n", utils.WithOutput())
+
+	containersSkipped := cleanupStepContainers()
+
+	utils.Log("[kilo-docker] \n", utils.WithOutput())
+	cleanupStepVolume(dataVolume, volExists, containersSkipped)
+
+	utils.Log("[kilo-docker] \n", utils.WithOutput())
+	cleanupStepImage(imgExists)
+
+	utils.Log("[kilo-docker] \n", utils.WithOutput())
+	cleanupStepBinary(binaryPath, binExists)
+
+	utils.Log("[kilo-docker] \nCleanup finished.\n", utils.WithOutput())
+}
+
+func showCleanupSummary(sessions []session, dataVolume string, volExists, imgExists, binExists bool, binaryPath string) {
+	var running, exited []session
+	for _, s := range sessions {
+		if isContainerRunning(s.Name) {
+			running = append(running, s)
+		} else {
+			exited = append(exited, s)
+		}
 	}
 
+	utils.LogWarn("[kilo-docker] WARNING: This command will permanently destroy kilo-docker data.\n", utils.WithOutput())
+	utils.LogWarn("[kilo-docker] You will be asked to confirm EACH step before anything is removed.\n\n", utils.WithOutput())
+
+	utils.Log("[kilo-docker] Current state:\n", utils.WithOutput())
+	if len(running) > 0 {
+		utils.Log("[kilo-docker]   Running sessions:  %d\n", len(running), utils.WithOutput())
+		for _, s := range running {
+			utils.Log("[kilo-docker]     - %s  (%s)\n", s.Name, s.Workspace, utils.WithOutput())
+		}
+	}
+	if len(exited) > 0 {
+		utils.Log("[kilo-docker]   Exited sessions:   %d\n", len(exited), utils.WithOutput())
+		for _, s := range exited {
+			utils.Log("[kilo-docker]     - %s  (%s)\n", s.Name, s.Workspace, utils.WithOutput())
+		}
+	}
+	if len(sessions) == 0 {
+		utils.Log("[kilo-docker]   Sessions:          none\n", utils.WithOutput())
+	}
+	if volExists {
+		utils.Log("[kilo-docker]   Data volume:       %s\n", dataVolume, utils.WithOutput())
+	} else {
+		utils.Log("[kilo-docker]   Data volume:       none\n", utils.WithOutput())
+	}
+	if imgExists {
+		utils.Log("[kilo-docker]   Docker image:      %s:latest\n", repoURL, utils.WithOutput())
+	} else {
+		utils.Log("[kilo-docker]   Docker image:      not found\n", utils.WithOutput())
+	}
+	if binExists {
+		utils.Log("[kilo-docker]   Binary:            %s\n", binaryPath, utils.WithOutput())
+	} else {
+		utils.Log("[kilo-docker]   Binary:            not found\n", utils.WithOutput())
+	}
+	utils.Log("[kilo-docker] \n", utils.WithOutput())
+}
+
+func cleanupStepContainers() bool {
+	output, _ := dockerRun("ps", "-a", "--filter", "ancestor="+repoURL, "-q")
+	ids := filterNonEmpty(strings.Split(output, "\n"))
+	if len(ids) == 0 {
+		utils.Log("[kilo-docker] No kilo-docker containers found.\n", utils.WithOutput())
+		return false
+	}
+
+	utils.LogWarn("[kilo-docker] Found %d kilo-docker container(s) that will be FORCE-REMOVED:\n", len(ids), utils.WithOutput())
+	for _, id := range ids {
+		utils.LogWarn("[kilo-docker]   - %s\n", id, utils.WithOutput())
+	}
+	if !promptConfirmStrict("Remove these containers? [y/N]: ") {
+		utils.Log("[kilo-docker] Skipping container removal.\n", utils.WithOutput())
+		return true
+	}
+	for _, id := range ids {
+		_, _ = dockerRun("rm", "-f", id)
+	}
+	utils.Log("[kilo-docker] Containers removed.\n", utils.WithOutput())
+	return false
+}
+
+func cleanupStepVolume(dataVolume string, exists, containersSkipped bool) {
+	if !exists {
+		utils.Log("[kilo-docker] No data volume found.\n", utils.WithOutput())
+		return
+	}
+
+	utils.LogWarn("[kilo-docker] DATA VOLUME '%s' will be PERMANENTLY DELETED.\n", dataVolume, utils.WithOutput())
+	utils.LogWarn("[kilo-docker] This includes ALL sessions, configuration, and cached data.\n", utils.WithOutput())
+	if containersSkipped {
+		utils.LogWarn("[kilo-docker] NOTE: Container removal was skipped. The volume may still be in use.\n", utils.WithOutput())
+		utils.LogWarn("[kilo-docker] Docker will refuse to delete a volume mounted by a running container.\n", utils.WithOutput())
+	}
+	if !promptConfirmStrict("Delete this volume? [y/N]: ") {
+		utils.Log("[kilo-docker] Skipping volume deletion.\n", utils.WithOutput())
+		return
+	}
+	if err := removeVolume(dataVolume); err != nil {
+		utils.LogError("[kilo-docker] Failed to delete volume '%s': %v\n", dataVolume, err, utils.WithOutput())
+		if containersSkipped {
+			utils.LogError("[kilo-docker] The volume is likely still mounted by a running container.\n", utils.WithOutput())
+			utils.LogError("[kilo-docker] Remove the containers first, then retry cleanup.\n", utils.WithOutput())
+		}
+		return
+	}
+	utils.Log("[kilo-docker] Volume deleted.\n", utils.WithOutput())
+}
+
+func cleanupStepImage(exists bool) {
+	if !exists {
+		utils.Log("[kilo-docker] Docker image not found, skipping.\n", utils.WithOutput())
+		return
+	}
+	utils.LogWarn("[kilo-docker] Docker image '%s:latest' will be REMOVED.\n", repoURL, utils.WithOutput())
+	if !promptConfirmStrict("Remove Docker image? [y/N]: ") {
+		utils.Log("[kilo-docker] Skipping image removal.\n", utils.WithOutput())
+		return
+	}
 	_, _ = dockerRun("rmi", repoURL+":latest")
+	utils.Log("[kilo-docker] Image removed.\n", utils.WithOutput())
+}
 
-	target := filepath.Join(home, ".local", "bin", "kilo-docker")
-	_ = os.Remove(target)
+func cleanupStepBinary(path string, exists bool) {
+	if !exists {
+		utils.Log("[kilo-docker] No binary found at %s.\n", path, utils.WithOutput())
+		return
+	}
+	utils.LogWarn("[kilo-docker] Binary '%s' will be DELETED.\n", path, utils.WithOutput())
+	if !promptConfirmStrict("Delete binary? [y/N]: ") {
+		utils.Log("[kilo-docker] Skipping binary deletion.\n", utils.WithOutput())
+		return
+	}
+	_ = os.Remove(path)
+	utils.Log("[kilo-docker] Binary deleted.\n", utils.WithOutput())
+}
 
-	utils.Log("[kilo-docker] Cleanup complete.\n", utils.WithOutput())
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func filterNonEmpty(items []string) []string {
+	var result []string
+	for _, item := range items {
+		if strings.TrimSpace(item) != "" {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 // handleInit resets the data volume, prompting for confirmation.

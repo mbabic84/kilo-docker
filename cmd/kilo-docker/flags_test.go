@@ -206,7 +206,7 @@ func TestYesFlagDirectlyPassed(t *testing.T) {
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 
-	os.Args = []string{"kilo-docker", "-y", "cleanup"}
+	os.Args = []string{"kilo-docker", "-y", "install"}
 	cfg := parseFlags()
 
 	if !cfg.yes {
