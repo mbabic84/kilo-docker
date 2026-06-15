@@ -81,6 +81,7 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 
 	sessionArgs := serializeArgs(cfg, sshAuthSock != "")
 	args = append(args, "--label", "kilo.args="+sessionArgs)
+	args = append(args, "--label", "kilo.version="+version)
 
 	if cfg.playwright {
 		args = append(args, "-e", "PLAYWRIGHT_ENABLED=1")

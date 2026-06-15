@@ -13,7 +13,9 @@ type session struct {
 	Workspace        string
 	Args             string
 	User             string
+	ImageVersion     string
 	UsesLegacyVolume bool
+	NeedsUpdate      bool
 }
 
 // getSessions queries Docker for all containers labeled with kilo.workspace.
@@ -49,6 +51,9 @@ func getSessions() ([]session, error) {
 			if strings.HasPrefix(label, "kilo.owner=") {
 				s.User = strings.TrimPrefix(label, "kilo.owner=")
 			}
+			if strings.HasPrefix(label, "kilo.version=") {
+				s.ImageVersion = strings.TrimPrefix(label, "kilo.version=")
+			}
 		}
 		sessions = append(sessions, s)
 	}
@@ -57,6 +62,7 @@ func getSessions() ([]session, error) {
 	expectedVolume := deriveVolumeName(currentUsername)
 	for i := range sessions {
 		sessions[i].UsesLegacyVolume = containerUsesLegacyVolume(sessions[i].Name, expectedVolume)
+		sessions[i].NeedsUpdate = sessions[i].ImageVersion == "" || sessions[i].ImageVersion != version
 	}
 
 	return sessions, nil
@@ -70,6 +76,9 @@ func showSessions(sessions []session) {
 		status := s.Status
 		if s.UsesLegacyVolume {
 			status += " (legacy)"
+		}
+		if s.NeedsUpdate {
+			status += " (update)"
 		}
 		fmt.Fprintf(os.Stderr, "%-4d %-22s %-32s %-52s %s\n", i+1, s.Name, status, s.Workspace, s.Args)
 	}
