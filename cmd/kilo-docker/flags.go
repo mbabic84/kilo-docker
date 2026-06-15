@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/mbabic84/kilo-docker/pkg/services"
@@ -18,21 +20,21 @@ var version = "dev"
 var kiloVersion = "unknown"
 
 type config struct {
-	once                    bool
-	playwright              bool
+	once                     bool
+	playwright               bool
 	playwrightRecreateVolume bool
-	ssh                     bool
-	yes                     bool
-	help                    bool
-	profile                 string
-	networks                []string
-	networkFlag             bool
-	ports                   []string
-	volumes                 []string
-	workspace               string
-	command                 string
-	args                    []string
-	enabledServices         []string
+	ssh                      bool
+	yes                      bool
+	help                     bool
+	profile                  string
+	networks                 []string
+	networkFlag              bool
+	ports                    []string
+	volumes                  []string
+	workspace                string
+	command                  string
+	args                     []string
+	enabledServices          []string
 }
 
 type boolFlag struct {
@@ -43,20 +45,20 @@ type boolFlag struct {
 }
 
 type valueFlag struct {
-	Names       []string
-	Description string
-	setField    func(*config, string)
-	serializeArgs func(config) []string
+	Names           []string
+	Description     string
+	setField        func(*config, string)
+	serializeArgs   func(config) []string
 	buildDockerArgs func(config) []string
 }
 
 func newRepeatableValueFlag(longName, shortName, description string, getValues func(config) []string, setValue func(*config, string)) valueFlag {
 	return valueFlag{
-		Names:            []string{longName, shortName},
-		Description:      description,
-		setField:         setValue,
-		serializeArgs:    func(c config) []string { return flatten(longName, getValues(c)) },
-		buildDockerArgs:  func(c config) []string { return flatten(shortName, getValues(c)) },
+		Names:           []string{longName, shortName},
+		Description:     description,
+		setField:        setValue,
+		serializeArgs:   func(c config) []string { return flatten(longName, getValues(c)) },
+		buildDockerArgs: func(c config) []string { return flatten(shortName, getValues(c)) },
 	}
 }
 
@@ -115,21 +117,21 @@ var valueFlags = []valueFlag{
 		func(c *config, v string) { c.volumes = append(c.volumes, v) },
 	),
 	{
-		Names:            []string{"--workspace", "-w"},
+		Names:           []string{"--workspace", "-w"},
 		Description:     "Specify a custom workspace path (defaults to current directory)",
 		setField:        func(c *config, v string) { c.workspace = v },
 		serializeArgs:   func(c config) []string { return optional("--workspace", c.workspace) },
 		buildDockerArgs: func(c config) []string { return nil },
 	},
 	{
-		Names:            []string{"--profile"},
+		Names:           []string{"--profile"},
 		Description:     "Load a named profile from ~/.config/kilo-docker/profiles/",
 		setField:        func(c *config, v string) { c.profile = v },
 		serializeArgs:   func(c config) []string { return optional("--profile", c.profile) },
 		buildDockerArgs: func(c config) []string { return nil },
 	},
 	{
-		Names:            []string{"--network"},
+		Names:           []string{"--network"},
 		Description:     "Connect to a Docker network (repeatable). 'kilo-shared' is always included.",
 		setField:        func(c *config, v string) { c.networks = append(c.networks, v); c.networkFlag = true },
 		serializeArgs:   func(c config) []string { return flatten("--network", normalizeNetworks(c.networks, true)) },
@@ -153,25 +155,48 @@ func optional(flag, value string) []string {
 }
 
 func normalizeForCompare(args string) string {
-	parts := strings.Split(args, " ")
-	var filtered []string
-	skipNext := false
-	for i, p := range parts {
-		if skipNext {
-			skipNext = false
-			continue
-		}
-		if p == "--network" && i+1 < len(parts) && parts[i+1] == SharedNetworkName {
-			skipNext = true
-			continue
-		}
-		filtered = append(filtered, p)
-	}
-	return strings.Join(filtered, " ")
+	return comparisonSignature(parseArgs(strings.Fields(args)))
 }
 
 func argsMatch(current, stored string) bool {
 	return normalizeForCompare(current) == normalizeForCompare(stored)
+}
+
+func comparisonSignature(cfg config) string {
+	var parts []string
+	parts = append(parts,
+		strconv.FormatBool(cfg.once),
+		strconv.FormatBool(cfg.playwright),
+		strconv.FormatBool(cfg.playwrightRecreateVolume),
+		strconv.FormatBool(cfg.ssh),
+		strconv.FormatBool(cfg.yes),
+		strconv.FormatBool(cfg.help),
+		cfg.profile,
+		cfg.workspace,
+		cfg.command,
+		joinSorted(cfg.args),
+		joinSorted(normalizedNetworks(cfg.networks)),
+		joinSorted(cfg.ports),
+		joinSorted(cfg.volumes),
+		joinSorted(cfg.enabledServices),
+	)
+	return strings.Join(parts, "\x00")
+}
+
+func normalizedNetworks(networks []string) []string {
+	var normalized []string
+	for _, network := range networks {
+		if network != SharedNetworkName {
+			normalized = append(normalized, network)
+		}
+	}
+	return normalized
+}
+
+func joinSorted(values []string) string {
+	sorted := append([]string(nil), values...)
+	sort.Strings(sorted)
+	return strings.Join(sorted, "\x00")
 }
 
 // serializeForDisplay serializes args for display in session list, excluding implicit kilo-shared network.
@@ -226,6 +251,13 @@ func serializeForDisplay(cfg config, sshEnabled bool) string {
 	return strings.Join(parts, " ")
 }
 
+func isAmbiguousVolumeValue(name string, index int, args []string) bool {
+	if name != "--volume" && name != "-v" {
+		return false
+	}
+	return index+1 < len(args) && !strings.HasPrefix(args[index+1], "--")
+}
+
 func parseArgs(args []string) config {
 	var cfg config
 
@@ -235,7 +267,7 @@ func parseArgs(args []string) config {
 
 		for _, f := range boolFlags {
 			for _, name := range f.Names {
-				if arg == name {
+				if arg == name && !isAmbiguousVolumeValue(name, i, args) {
 					f.setField(&cfg)
 					consumed = true
 					break
