@@ -1,3 +1,16 @@
+## [3.36.0](https://github.com/mbabic84/kilo-docker/compare/v3.35.0...v3.36.0) (2026-06-16)
+
+### Features
+
+* add --legacy and --needs-update flags to sessions stop and cleanup ([7b3c8ff](https://github.com/mbabic84/kilo-docker/commit/7b3c8ff71be6bad3c9d51198d29f022d4a2aaede))
+* add install-dev subcommand ([96311a4](https://github.com/mbabic84/kilo-docker/commit/96311a44a87d6d314ef04789781ba029ac306418))
+* indicate sessions needing update in session list ([64d696d](https://github.com/mbabic84/kilo-docker/commit/64d696d434550600045e4400e5e5e85220132383))
+* remove auto-confirm from cleanup, add per-step confirmation and audit summary ([48b4a66](https://github.com/mbabic84/kilo-docker/commit/48b4a66e036386983442c596c4e9836856c77aff))
+
+### Bug Fixes
+
+* normalize argument comparison to handle flag reordering ([f58ff8a](https://github.com/mbabic84/kilo-docker/commit/f58ff8a16802031403a5b587cb27ef67d89f60fa))
+
 ## [3.35.0](https://github.com/mbabic84/kilo-docker/compare/v3.34.1...v3.35.0) (2026-06-15)
 
 ### Features
