@@ -40,6 +40,13 @@ func promptConfirm(message string, yes bool) bool {
 	return strings.ToLower(strings.TrimSpace(response)) == "y"
 }
 
+func promptConfirmStrict(message string) bool {
+	fmt.Print(message)
+	var response string
+	_, _ = fmt.Scanln(&response)
+	return strings.ToLower(strings.TrimSpace(response)) == "y"
+}
+
 func fileDescriptor(fd uintptr) (int, bool) {
 	if fd > uintptr(math.MaxInt) {
 		return 0, false
@@ -70,6 +77,7 @@ func printHelp() {
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "init", "Reset configuration"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "cleanup", "Remove all artifacts"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "update", "Update binary and/or config (use update -h for subcommands)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "install-dev", "Install current development binary to ~/.local/bin"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "version", "Show versions"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "help", "Show this help message"))
 
@@ -114,13 +122,13 @@ func printCommandHelp(command string) {
 	case "sessions":
 		help = `Usage: kilo-docker sessions [command] [options]
 
-List sessions, attach to one, or stop a running session.
+List sessions, attach to one, stop, or clean up sessions.
 
 Commands:
   (no command)          List all sessions and attach interactively
-  cleanup               Remove sessions
+  cleanup               Remove sessions (supports --legacy, --needs-update)
   recreate              Recreate a session, optionally overriding its configuration
-  stop                  Stop a running session (frees ports, preserves container)
+  stop                  Stop running sessions (supports --all, --legacy, --needs-update)
 
 Options:
   -h, --help            Show this help message
@@ -136,17 +144,23 @@ Remove one or more sessions.
 
 Options:
   -a, --all             Remove all exited sessions
+  --legacy              Remove all sessions using legacy volumes
+  --needs-update        Remove all sessions needing an image update
   -y, --yes             Skip confirmation prompts
   -h, --help            Show this help message
 
 Without flags, shows interactive selection.
 With -a, prompts for each session (or skips if -y is set).
+--legacy and --needs-update can be combined with -a and -y.
 
 Examples:
   kilo-docker sessions cleanup                  # interactive selection
   kilo-docker sessions cleanup 1                # remove session 1
   kilo-docker sessions cleanup -a              # remove all exited (with prompt)
   kilo-docker sessions cleanup -a -y            # remove all exited (no prompt)
+  kilo-docker sessions cleanup --legacy         # remove legacy sessions
+  kilo-docker sessions cleanup --needs-update   # remove outdated sessions
+  kilo-docker sessions cleanup --legacy -y      # remove legacy sessions (no prompt)
   kilo-docker sessions cleanup -h              # show this help
 `
 	case "sessions recreate":
@@ -167,16 +181,27 @@ Examples:
   kilo-docker sessions recreate -h                   # show this help
 `
 	case "sessions stop":
-		help = `Usage: kilo-docker sessions stop <name|index>
+		help = `Usage: kilo-docker sessions stop [options] [name|index]
 
 Stop a running session, freeing its ports while preserving the
 container and volume for later restart.
 
-Use 'kilo-docker sessions <name>' to restart the session.
+Options:
+  -a, --all             Stop all running sessions
+  --legacy              Stop all sessions using legacy volumes
+  --needs-update        Stop all sessions needing an image update
+  -y, --yes             Skip confirmation prompts (for batch operations)
+  -h, --help            Show this help message
+
+Use 'kilo-docker sessions <name>' to restart a stopped session.
 
 Examples:
   kilo-docker sessions stop 1                   # stop session 1
   kilo-docker sessions stop my-session          # stop by name
+  kilo-docker sessions stop --all               # stop all running sessions
+  kilo-docker sessions stop --legacy            # stop legacy sessions
+  kilo-docker sessions stop --needs-update      # stop outdated sessions
+  kilo-docker sessions stop --legacy -y         # stop legacy sessions (no prompt)
   kilo-docker sessions stop -h                  # show this help
 `
 	case "networks":
@@ -327,23 +352,22 @@ Examples:
   kilo-docker init -h
 `
 	case "cleanup":
-		help = `Usage: kilo-docker cleanup [options]
+		help = `Usage: kilo-docker cleanup
 
-Remove all kilo-docker artifacts from the system.
+PERMANENTLY remove all kilo-docker artifacts from the system.
+Each step requires explicit confirmation — there is NO auto-confirm flag.
 
-WARNING: This removes:
-  - The per-user data volume
-  - All kilo-docker containers
-  - The kilo-docker image
+WARNING: This will destroy:
+  - All kilo-docker containers (force-removed)
+  - The per-user data volume (sessions, config, cached data)
+  - The kilo-docker Docker image
   - The kilo-docker binary
 
 Options:
-  -y, --yes             Skip confirmation
   -h, --help            Show this help message
 
 Examples:
   kilo-docker cleanup
-  kilo-docker cleanup -y
   kilo-docker cleanup -h
 `
 	case "update":
@@ -378,6 +402,23 @@ Options:
 Examples:
   kilo-docker update config
   kilo-docker update config -h
+`
+	case "install-dev":
+		help = `Usage: kilo-docker install-dev [options]
+
+Install the currently running development binary as the global kilo-docker command in ~/.local/bin/kilo-docker.
+
+Options:
+  -y, --yes             Replace existing binary without prompting
+  -h, --help            Show this help message
+
+This command copies the binary returned by os.Executable(), creates ~/.local/bin,
+sets executable permissions, and prints the same ~/.local/bin PATH warning as scripts/install.sh.
+
+Examples:
+  kilo-docker install-dev
+  kilo-docker install-dev -y
+  kilo-docker install-dev -h
 `
 	case "version":
 		help = `Usage: kilo-docker version

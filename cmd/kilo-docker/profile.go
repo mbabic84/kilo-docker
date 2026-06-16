@@ -15,16 +15,16 @@ import (
 // profileFlags holds the boolean service/feature flags stored in a profile.
 // Services use omitempty so absent fields default to false.
 type profileFlags struct {
-	Go        bool     `json:"go,omitempty"`
-	Docker    bool     `json:"docker,omitempty"`
-	UV        bool     `json:"uv,omitempty"`
-	GH        bool     `json:"gh,omitempty"`
-	SSH       bool     `json:"ssh,omitempty"`
-	NVM       bool     `json:"nvm,omitempty"`
-	Build     bool     `json:"build,omitempty"`
-	Rclone    bool     `json:"rclone,omitempty"`
-	Gitnexus  bool     `json:"gitnexus,omitempty"`
-	Picomamba bool     `json:"picomamba,omitempty"`
+	Go        bool `json:"go,omitempty"`
+	Docker    bool `json:"docker,omitempty"`
+	UV        bool `json:"uv,omitempty"`
+	GH        bool `json:"gh,omitempty"`
+	SSH       bool `json:"ssh,omitempty"`
+	NVM       bool `json:"nvm,omitempty"`
+	Build     bool `json:"build,omitempty"`
+	Rclone    bool `json:"rclone,omitempty"`
+	Gitnexus  bool `json:"gitnexus,omitempty"`
+	Picomamba bool `json:"picomamba,omitempty"`
 }
 
 // Profile represents a named set of reusable CLI flags stored as JSON under

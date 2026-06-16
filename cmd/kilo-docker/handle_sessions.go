@@ -8,14 +8,40 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
+type batchFlags struct {
+	all         bool
+	legacy      bool
+	needsUpdate bool
+}
+
+// parseBatchFlags parses common batch operation flags and returns the parsed
+// flags along with the remaining unparsed arguments.
+func parseBatchFlags(args []string) (batchFlags, []string) {
+	var bf batchFlags
+	for len(args) > 0 {
+		switch args[0] {
+		case "-a", "--all":
+			bf.all = true
+		case "--legacy":
+			bf.legacy = true
+		case "--needs-update":
+			bf.needsUpdate = true
+		default:
+			return bf, args
+		}
+		args = args[1:]
+	}
+	return bf, args
+}
+
 // handleSessions lists, attaches to, recreates, stops, or cleans up kilo-docker sessions.
 func handleSessions(cfg config) {
 	args := cfg.args
 	cleanupMode := false
-	cleanupYes := false
-	cleanupAll := false
+	var cleanupFlags batchFlags
 	recreateMode := false
 	stopMode := false
+	var stopFlags batchFlags
 	attachTarget := ""
 
 	if cfg.help {
@@ -37,19 +63,7 @@ func handleSessions(cfg config) {
 
 	if len(args) > 0 && args[0] == "cleanup" {
 		cleanupMode = true
-		args = args[1:]
-	parseCleanupFlags:
-		for len(args) > 0 {
-			switch args[0] {
-			case "-y", "--yes":
-				cleanupYes = true
-			case "-a", "--all":
-				cleanupAll = true
-			default:
-				break parseCleanupFlags
-			}
-			args = args[1:]
-		}
+		cleanupFlags, args = parseBatchFlags(args[1:])
 	}
 
 	if len(args) > 0 && args[0] == "recreate" {
@@ -59,7 +73,7 @@ func handleSessions(cfg config) {
 
 	if len(args) > 0 && args[0] == "stop" {
 		stopMode = true
-		args = args[1:]
+		stopFlags, args = parseBatchFlags(args[1:])
 	}
 
 	if len(args) > 0 {
@@ -80,8 +94,34 @@ func handleSessions(cfg config) {
 	}
 
 	if stopMode {
+		if stopFlags.all || stopFlags.legacy || stopFlags.needsUpdate {
+			filtered := filterSessions(sessions, stopFlags.legacy, stopFlags.needsUpdate)
+			if len(filtered) == 0 {
+				fmt.Fprintf(os.Stderr, "No matching sessions to stop.\n")
+				os.Exit(0)
+			}
+			for _, s := range filtered {
+				state := dockerState(s.Name)
+				if state != "running" {
+					continue
+				}
+				if cfg.yes || promptConfirm("Stop session '"+s.Name+"'? [y/N]: ", cfg.yes) {
+					utils.Log("[kilo-docker] Stopping session '%s'...\n", s.Name, utils.WithOutput())
+					_, err = dockerRun("stop", s.Name)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Error stopping session '%s': %v\n", s.Name, err)
+						continue
+					}
+					fmt.Fprintf(os.Stderr, "Session '%s' stopped.\n", s.Name)
+				} else {
+					fmt.Fprintf(os.Stderr, "Skipped '%s'.\n", s.Name)
+				}
+			}
+			return
+		}
+
 		if attachTarget == "" {
-			fmt.Fprintf(os.Stderr, "Error: specify a session to stop (name or index)\n")
+			fmt.Fprintf(os.Stderr, "Error: specify a session to stop (name or index), or use --all/--legacy/--needs-update\n")
 			os.Exit(1)
 		}
 		containerName, err := resolveTarget(attachTarget)
@@ -172,12 +212,17 @@ func handleSessions(cfg config) {
 	}
 
 	if cleanupMode {
-		if cleanupAll {
-			for _, s := range sessions {
-				if dockerState(s.Name) != "exited" {
+		if cleanupFlags.all || cleanupFlags.legacy || cleanupFlags.needsUpdate {
+			filtered := filterSessions(sessions, cleanupFlags.legacy, cleanupFlags.needsUpdate)
+			if len(filtered) == 0 {
+				fmt.Fprintf(os.Stderr, "No matching sessions to clean up.\n")
+				os.Exit(0)
+			}
+			for _, s := range filtered {
+				if cleanupFlags.all && !cleanupFlags.legacy && !cleanupFlags.needsUpdate && dockerState(s.Name) != "exited" {
 					continue
 				}
-				if cleanupYes || promptConfirm("Remove session '"+s.Name+"'? [y/N]: ", cleanupYes) {
+				if cfg.yes || promptConfirm("Remove session '"+s.Name+"'? [y/N]: ", cfg.yes) {
 					_, _ = dockerRun("rm", "-f", s.Name)
 					fmt.Fprintf(os.Stderr, "Session '%s' removed.\n", s.Name)
 				} else {
@@ -214,7 +259,7 @@ func handleSessions(cfg config) {
 			}
 		}
 
-		if cleanupYes || promptConfirm("Remove session '"+containerToClean+"'? [y/N]: ", cleanupYes) {
+		if cfg.yes || promptConfirm("Remove session '"+containerToClean+"'? [y/N]: ", cfg.yes) {
 			_, _ = dockerRun("rm", "-f", containerToClean)
 			fmt.Fprintf(os.Stderr, "Session '%s' removed.\n", containerToClean)
 		} else {

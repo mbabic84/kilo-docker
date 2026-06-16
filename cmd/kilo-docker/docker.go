@@ -99,6 +99,17 @@ func containerExists(container string) bool {
 	return err == nil
 }
 
+// isContainerRunning reports whether a container is in "running" state.
+func isContainerRunning(container string) bool {
+	return dockerState(container) == "running"
+}
+
+// imageExists reports whether a Docker image with the given reference exists locally.
+func imageExists(ref string) bool {
+	out, _ := dockerRun("images", "-q", ref)
+	return strings.TrimSpace(out) != ""
+}
+
 // containerUsesLegacyVolume reports whether a container's /home mount uses a
 // volume different from the expected per-user volume. This catches both the
 // original shared volume (kilo-docker-data) and old workspace-scoped volumes.

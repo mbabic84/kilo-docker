@@ -44,8 +44,12 @@ kilo-docker
 |---------|-------------|
 | `sessions [name\|index]` | List sessions or attach to one by name or index |
 | `sessions stop <name\|index>` | Stop a running session, freeing its ports |
+| `sessions stop --legacy` | Stop all sessions using legacy volumes |
+| `sessions stop --needs-update` | Stop all sessions needing an image update |
 | `sessions cleanup [-y] [name\|index]` | Remove a session (interactive if no name given) |
 | `sessions cleanup -y -a` | Remove all exited sessions |
+| `sessions cleanup --legacy [-y]` | Remove all sessions using legacy volumes |
+| `sessions cleanup --needs-update [-y]` | Remove all sessions needing an image update |
 | `sessions recreate <name\|index> [flags]` | Recreate a session, optionally overriding its configuration (preserves volume) |
 | `networks` | List available Docker networks |
 | `playwright` | Recreate the Playwright MCP sidecar container |
@@ -64,6 +68,7 @@ kilo-docker
 | `init` | Reset configuration (remove volume, re-enter tokens) |
 | `cleanup` | Remove volume, containers, image, and installed binary |
 | `update [config]` | Pull latest Docker image and update binary, or merge config template |
+| `install-dev` | Install the currently running development binary to `~/.local/bin/kilo-docker` |
 | `version` | Show kilo-docker and kilo versions |
 | `help` | Show help message |
 
@@ -327,8 +332,23 @@ kilo-docker sessions cleanup <name-or-index>
 # Remove all exited sessions
 kilo-docker sessions cleanup -a
 
+# Remove all sessions using legacy volumes
+kilo-docker sessions cleanup --legacy
+
+# Remove all sessions needing an image update
+kilo-docker sessions cleanup --needs-update
+
 # Stop a running session (frees ports, preserves container)
 kilo-docker sessions stop <name-or-index>
+
+# Stop all sessions using legacy volumes
+kilo-docker sessions stop --legacy
+
+# Stop all sessions needing an image update
+kilo-docker sessions stop --needs-update
+
+# Stop all running sessions
+kilo-docker sessions stop --all
 
 # Recreate a session with the same flags (preserves volume)
 kilo-docker sessions recreate <name-or-index>
@@ -437,6 +457,14 @@ docker run --rm kilo-docker version
 # Interactive
 docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-docker
 ```
+
+After building the host binary, install it for local development with:
+
+```bash
+./bin/kilo-docker install-dev
+```
+
+This installs the currently running `./bin/kilo-docker` binary to `~/.local/bin/kilo-docker`, matching the bootstrap installer target.
 
 The build uses a multi-stage Dockerfile: a `golang:1.26-bookworm` builder compiles the `kilo-entrypoint` binary as a static binary, then the runtime stage copies it into the final Debian Bookworm image. No Go toolchain is needed on the host.
 

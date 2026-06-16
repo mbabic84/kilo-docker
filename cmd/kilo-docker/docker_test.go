@@ -256,18 +256,18 @@ func TestBuildRunArgs(t *testing.T) {
 		{
 			name:       "with multiple extra args",
 			dockerArgs: []string{"--rm"},
-image:      "debian:bookworm-slim",
-		extraArgs:  []string{"sh", "-c", "echo hello"},
-		terminal:   true,
-		expected:   []string{"run", "-it", "--rm", "debian:bookworm-slim", "sh", "-c", "echo hello"},
+			image:      "debian:bookworm-slim",
+			extraArgs:  []string{"sh", "-c", "echo hello"},
+			terminal:   true,
+			expected:   []string{"run", "-it", "--rm", "debian:bookworm-slim", "sh", "-c", "echo hello"},
 		},
 		{
 			name:       "empty dockerArgs",
 			dockerArgs: []string{},
-image:      "debian:bookworm-slim",
-		extraArgs:  nil,
-		terminal:   true,
-		expected:   []string{"run", "-it", "debian:bookworm-slim"},
+			image:      "debian:bookworm-slim",
+			extraArgs:  nil,
+			terminal:   true,
+			expected:   []string{"run", "-it", "debian:bookworm-slim"},
 		},
 	}
 

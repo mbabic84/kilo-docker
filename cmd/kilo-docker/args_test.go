@@ -224,9 +224,32 @@ func TestArgsMatchDifferent(t *testing.T) {
 }
 
 func TestArgsMatchPortReordering(t *testing.T) {
-	// Port reordering is NOT normalized — this is a known limitation
-	if argsMatch("--port 8080:80 --port 3000:3000", "--port 3000:3000 --port 8080:80") {
-		t.Error("port reordering should not match (known limitation)")
+	if !argsMatch("--port 8080:80 --port 3000:3000", "--port 3000:3000 --port 8080:80") {
+		t.Error("port reordering should match")
+	}
+}
+
+func TestArgsMatchVolumeReordering(t *testing.T) {
+	if !argsMatch("--volume /a:/a --volume /b:/b", "--volume /b:/b --volume /a:/a") {
+		t.Error("volume reordering should match")
+	}
+}
+
+func TestArgsMatchNetworkReordering(t *testing.T) {
+	if !argsMatch("--network kilo-shared --network b --network a", "--network a --network b") {
+		t.Error("network reordering should match after implicit network normalization")
+	}
+}
+
+func TestArgsMatchServiceReordering(t *testing.T) {
+	if !argsMatch("--docker --gh", "--gh --docker") {
+		t.Error("service flag reordering should match")
+	}
+}
+
+func TestArgsMatchDifferentRepeatableValues(t *testing.T) {
+	if argsMatch("--port 8080:80 --port 3000:3000", "--port 8080:80 --port 4000:4000") {
+		t.Error("different repeatable flag values should not match")
 	}
 }
 
