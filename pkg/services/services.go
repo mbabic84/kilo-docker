@@ -55,7 +55,7 @@ var BuiltInServices = []Service{
 		Flag:        "--gh",
 		Description: "Install GitHub CLI for interacting with GitHub",
 		Install: []string{
-			"command -v gh >/dev/null || apt-get update && apt-get install -y --no-install-recommends gh",
+			"command -v gh >/dev/null || (GH_VERSION=$(curl -fsSL https://api.github.com/repos/cli/cli/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && GH_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz\" -o /tmp/gh.tar.gz && tar xzf /tmp/gh.tar.gz -C /tmp && mv /tmp/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh && chmod +x /usr/local/bin/gh && rm -rf /tmp/gh*)",
 		},
 		Volumes:        []string{},
 		RequiresSocket: "",
@@ -78,10 +78,9 @@ var BuiltInServices = []Service{
 	{
 		Name:        "build",
 		Flag:        "--build",
-		Description: "Install build base dependencies (gcc, g++, make, python3) for compiling native extensions",
+		Description: "Install build base dependencies (gcc, g++, make) for compiling native extensions",
 		Install: []string{
-"command -v gcc >/dev/null || apt-get update && apt-get install -y --no-install-recommends build-essential",
-		"command -v python3 >/dev/null || apt-get update && apt-get install -y --no-install-recommends python3",
+		"command -v gcc >/dev/null || apt-get update && apt-get install -y --no-install-recommends build-essential",
 		},
 		EnvVars: map[string]string{
 			"BUILD_ENABLED": "1",

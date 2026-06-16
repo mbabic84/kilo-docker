@@ -148,8 +148,8 @@ func TestBuildServiceHasRequiredFields(t *testing.T) {
 	if svc.Flag != "--build" {
 		t.Errorf("expected Flag '--build', got %q", svc.Flag)
 	}
-	if len(svc.Install) != 2 {
-		t.Errorf("expected 2 Install commands for build, got %d", len(svc.Install))
+	if len(svc.Install) != 1 {
+		t.Errorf("expected 1 Install command for build, got %d", len(svc.Install))
 	}
 	if svc.RequiresSocket != "" {
 		t.Errorf("expected RequiresSocket to be empty for build, got %q", svc.RequiresSocket)
