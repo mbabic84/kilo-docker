@@ -68,6 +68,7 @@ kilo-docker
 | `init` | Reset configuration (remove volume, re-enter tokens) |
 | `cleanup` | Remove volume, containers, image, and installed binary |
 | `update [config]` | Pull latest Docker image and update binary, or merge config template |
+| `install-dev` | Install the currently running development binary to `~/.local/bin/kilo-docker` |
 | `version` | Show kilo-docker and kilo versions |
 | `help` | Show help message |
 
@@ -456,6 +457,14 @@ docker run --rm kilo-docker version
 # Interactive
 docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-docker
 ```
+
+After building the host binary, install it for local development with:
+
+```bash
+./bin/kilo-docker install-dev
+```
+
+This installs the currently running `./bin/kilo-docker` binary to `~/.local/bin/kilo-docker`, matching the bootstrap installer target.
 
 The build uses a multi-stage Dockerfile: a `golang:1.26-bookworm` builder compiles the `kilo-entrypoint` binary as a static binary, then the runtime stage copies it into the final Debian Bookworm image. No Go toolchain is needed on the host.
 

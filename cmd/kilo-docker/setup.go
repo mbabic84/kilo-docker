@@ -77,6 +77,7 @@ func printHelp() {
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "init", "Reset configuration"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "cleanup", "Remove all artifacts"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "update", "Update binary and/or config (use update -h for subcommands)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "install-dev", "Install current development binary to ~/.local/bin"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "version", "Show versions"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "help", "Show this help message"))
 
@@ -401,6 +402,23 @@ Options:
 Examples:
   kilo-docker update config
   kilo-docker update config -h
+`
+	case "install-dev":
+		help = `Usage: kilo-docker install-dev [options]
+
+Install the currently running development binary as the global kilo-docker command in ~/.local/bin/kilo-docker.
+
+Options:
+  -y, --yes             Replace existing binary without prompting
+  -h, --help            Show this help message
+
+This command copies the binary returned by os.Executable(), creates ~/.local/bin,
+sets executable permissions, and prints the same ~/.local/bin PATH warning as scripts/install.sh.
+
+Examples:
+  kilo-docker install-dev
+  kilo-docker install-dev -y
+  kilo-docker install-dev -h
 `
 	case "version":
 		help = `Usage: kilo-docker version

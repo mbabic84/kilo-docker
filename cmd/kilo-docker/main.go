@@ -32,6 +32,7 @@
 //	init              Reset configuration
 //	cleanup           Remove all artifacts
 //	update            Pull latest Docker image and update binary
+//	install-dev       Install the current development binary
 //	update-config     Merge config template
 //	version           Show versions
 //	help              Show help
@@ -96,6 +97,8 @@ func main() {
 		handleSessions(cfg)
 	case "update":
 		handleUpdate(cfg)
+	case "install-dev":
+		handleInstallDev(cfg)
 	case "cleanup":
 		handleCleanup(cfg)
 	case "backup":

@@ -172,6 +172,189 @@ func handleUpdate(cfg config) {
 	utils.Log("[kilo-docker] \nUpdated ✓\n", utils.WithOutput())
 }
 
+// handleInstallDev installs the currently running development binary as the
+// global kilo-docker command in ~/.local/bin/kilo-docker.
+func handleInstallDev(cfg config) {
+	if cfg.help {
+		printCommandHelp("install-dev")
+		return
+	}
+
+	if len(cfg.args) > 0 {
+		fmt.Fprintf(os.Stderr, "Unknown argument: %s\nRun 'kilo-docker install-dev -h' for usage.\n", cfg.args[0])
+		os.Exit(1)
+	}
+
+	source, err := os.Executable()
+	if err != nil {
+		utils.LogError("[kilo-docker] Failed to resolve current executable: %v\n", err)
+		os.Exit(1)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		utils.LogError("[kilo-docker] Failed to resolve home directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	installDir := installDevInstallDir(home)
+	target := installDevTargetPath(home)
+	sourceInfo, err := os.Stat(source)
+	if err != nil {
+		utils.LogError("[kilo-docker] Failed to stat current executable: %v\n", err)
+		os.Exit(1)
+	}
+
+	targetInfo, targetExists, err := statIfExists(target)
+	if err != nil {
+		utils.LogError("[kilo-docker] Failed to stat install target: %v\n", err)
+		os.Exit(1)
+	}
+	if targetExists && targetInfo.IsDir() {
+		utils.LogError("[kilo-docker] Install target is a directory: %s\n", target)
+		os.Exit(1)
+	}
+	if targetExists {
+		if sameFile(sourceInfo, targetInfo) {
+			utils.Log("[kilo-docker] Already installed at %s\n", target, utils.WithOutput())
+			printInstallPathWarning(installDir, home)
+			return
+		}
+		if !cfg.yes && !promptConfirm(fmt.Sprintf("Replace existing kilo-docker binary at %s? [y/N]: ", target), cfg.yes) {
+			utils.Log("[kilo-docker] Cancelled.\n", utils.WithOutput())
+			return
+		}
+	}
+
+	if err := installDevBinary(source, target); err != nil {
+		utils.LogError("[kilo-docker] Failed to install development binary: %v\n", err)
+		os.Exit(1)
+	}
+
+	printInstallPathWarning(installDir, home)
+	utils.Log("[kilo-docker] Installed development binary to %s\n", target, utils.WithOutput())
+}
+
+func installDevInstallDir(home string) string {
+	return filepath.Join(home, ".local", "bin")
+}
+
+func installDevTargetPath(home string) string {
+	return filepath.Join(installDevInstallDir(home), "kilo-docker")
+}
+
+func statIfExists(path string) (os.FileInfo, bool, error) {
+	info, err := os.Stat(path)
+	if err == nil {
+		return info, true, nil
+	}
+	if os.IsNotExist(err) {
+		return nil, false, nil
+	}
+	return nil, false, err
+}
+
+func sameFile(a, b os.FileInfo) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return os.SameFile(a, b)
+}
+
+func installDevBinary(source, target string) error {
+	if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+		return err
+	}
+
+	src, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = src.Close() }()
+
+	tmp, err := os.CreateTemp(filepath.Dir(target), ".kilo-docker-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	if _, err := io.Copy(tmp, src); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o755); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, target)
+}
+
+func printInstallPathWarning(installDir, home string) {
+	if pathContainsInstallDir(os.Getenv("PATH"), installDir) {
+		return
+	}
+
+	message := installPathWarningMessage(installDir, home, os.Getenv("SHELL"), profileContainsLocalBin(filepath.Join(home, ".profile")))
+	utils.Log("%s", message, utils.WithOutput())
+}
+
+func installPathWarningMessage(installDir, home, shell string, profileContainsLocalBin bool) string {
+	var b strings.Builder
+	b.WriteString("\nWARNING: ")
+	b.WriteString(installDir)
+	b.WriteString(" is not in your PATH.\n\n")
+
+	if profileContainsLocalBin {
+		b.WriteString("Found PATH configuration in ~/.profile.\n")
+		b.WriteString("Simply close and reopen your terminal to use kilo-docker.\n")
+		return b.String()
+	}
+
+	b.WriteString("To fix this, add the following line to your shell profile:\n\n")
+	switch shell {
+	case "":
+		b.WriteString("  export PATH=\"$HOME/.local/bin:$PATH\"\n\n")
+		b.WriteString("Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.) and reload your shell.\n")
+	case "/bin/zsh", "zsh":
+		b.WriteString("  echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc\n\n")
+		b.WriteString("Then reload your shell with: source ~/.zshrc\n")
+	default:
+		if strings.HasSuffix(shell, "/zsh") {
+			b.WriteString("  echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc\n\n")
+			b.WriteString("Then reload your shell with: source ~/.zshrc\n")
+		} else if strings.HasSuffix(shell, "/bash") {
+			b.WriteString("  echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc\n\n")
+			b.WriteString("Then reload your shell with: source ~/.bashrc\n")
+		} else {
+			b.WriteString("  export PATH=\"$HOME/.local/bin:$PATH\"\n\n")
+			b.WriteString("Add this to your shell profile (~/.bashrc, ~/.zshrc, etc.) and reload your shell.\n")
+		}
+	}
+	return b.String()
+}
+
+func pathContainsInstallDir(pathEnv, installDir string) bool {
+	cleanInstallDir := filepath.Clean(installDir)
+	for _, entry := range filepath.SplitList(pathEnv) {
+		if filepath.Clean(entry) == cleanInstallDir {
+			return true
+		}
+	}
+	return false
+}
+
+func profileContainsLocalBin(profilePath string) bool {
+	data, err := os.ReadFile(profilePath)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), ".local/bin")
+}
+
 // handleCleanup removes all kilo-docker artifacts: containers, volumes,
 // Docker images, and the installed script. Each destructive step requires
 // explicit user confirmation. The -y/--yes flag is intentionally ignored.
