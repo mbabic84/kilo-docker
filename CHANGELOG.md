@@ -1,3 +1,9 @@
+## [3.36.1](https://github.com/mbabic84/kilo-docker/compare/v3.36.0...v3.36.1) (2026-06-16)
+
+### Bug Fixes
+
+* **services:** install gh from GitHub releases and remove redundant python3 ([2118367](https://github.com/mbabic84/kilo-docker/commit/211836754e41521d62b63720fb8ca83e926a2314))
+
 ## [3.36.0](https://github.com/mbabic84/kilo-docker/compare/v3.35.0...v3.36.0) (2026-06-16)
 
 ### Features
