@@ -2,7 +2,7 @@ name: Check Kilo Version
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -19,9 +19,15 @@ jobs:
       - name: Get latest Kilo release
         id: latest
         run: |
-          LATEST=$(curl -sf https://api.github.com/repos/Kilo-Org/kilocode/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          MAX_ATTEMPTS=10
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            LATEST=$(curl -sSf https://api.github.com/repos/Kilo-Org/kilocode/releases/latest | jq -r '.tag_name' | sed 's/^v//') && break
+            BACKOFF=$((2 ** (i - 1)))
+            echo "::warning::Attempt $i/$MAX_ATTEMPTS failed, retrying in ${BACKOFF}s..."
+            sleep $BACKOFF
+          done
           if [ -z "$LATEST" ]; then
-            echo "::error::Failed to fetch latest Kilo version"
+            echo "::error::Failed to fetch latest Kilo version after $MAX_ATTEMPTS attempts"
             exit 1
           fi
           echo "version=$LATEST" >> "$GITHUB_OUTPUT"
