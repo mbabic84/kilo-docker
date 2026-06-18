@@ -16,7 +16,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,6 +43,38 @@ var subcommands = map[string]bool{
 	"help":            true,
 }
 
+// entrypointArgs captures the result of parsing kilo-entrypoint command-line
+// arguments, mirroring the custom parser used by kilo-docker.
+type entrypointArgs struct {
+	help    bool
+	command string
+	args    []string
+}
+
+// parseEntrypointArgs parses raw command-line arguments. It detects -h/--help,
+// treats the first non-flag argument as the command, and collects the rest as
+// command arguments. This mirrors kilo-docker's custom flag parsing.
+func parseEntrypointArgs(rawArgs []string) entrypointArgs {
+	var parsed entrypointArgs
+	for i := 0; i < len(rawArgs); i++ {
+		arg := rawArgs[i]
+		if arg == "-h" || arg == "--help" {
+			parsed.help = true
+			continue
+		}
+		if parsed.command == "" && strings.HasPrefix(arg, "-") {
+			// Skip unknown leading flags, matching Go's flag.Parse behavior.
+			continue
+		}
+		if parsed.command == "" {
+			parsed.command = arg
+		} else {
+			parsed.args = append(parsed.args, arg)
+		}
+	}
+	return parsed
+}
+
 // resolveCommand checks if name is a known internal subcommand.
 // If not, it resolves the name to an executable binary via LookPath.
 // Returns (binaryPath, true) for pass-through commands, ("", false) for
@@ -59,42 +90,342 @@ func resolveCommand(name string) (string, bool) {
 	return binary, true
 }
 
-func runHelp() {
+func printHelp() {
 	const w = 40
-	fmt.Println("kilo-entrypoint - Container entrypoint for kilo-docker")
-	fmt.Println("")
-	fmt.Println("Usage: kilo-entrypoint [subcommand]")
-	fmt.Println("")
-	fmt.Println("With no arguments, runs container initialization.")
-	fmt.Println("")
-	fmt.Println("Subcommands:")
-	fmt.Printf("  %-*s %s\n", w, "help", "Show this help message")
-	fmt.Printf("  %-*s %s\n", w, "update-config", "Download config template, merge with existing config")
-	fmt.Printf("  %-*s %s\n", w, "backup [path]", "Create tar.gz of KILO_HOME (default: /tmp/backup.tar.gz)")
-	fmt.Printf("  %-*s %s\n", w, "restore [path]", "Extract tar.gz into KILO_HOME with ownership fix")
-	fmt.Printf("  %-*s %s\n", w, "mcp-config", "Apply MCP enabled states from encrypted token storage")
-	fmt.Printf("  %-*s %s\n", w, "mcp-tokens", "Interactive token management")
-	fmt.Printf("  %-*s %s\n", w, "sync", "Start ainstruct file watcher + REST sync")
-	fmt.Printf("  %-*s %s\n", w, "sync ls", "List all ainstruct sync files")
-	fmt.Printf("  %-*s %s\n", w, "sync rm <file>", "Remove a specific sync file (local and remote)")
-	fmt.Printf("  %-*s %s\n", w, "resync", "Delete all remote documents and re-push local files")
-	fmt.Printf("  %-*s %s\n", w, "zellij-attach", "Attach to existing zellij session")
-	fmt.Printf("  %-*s %s\n", w, "print-env", "Print export statements for current tokens and custom envs")
-	fmt.Printf("  %-*s %s\n", w, "custom-envs", "Manage user-defined custom environment variables")
-	fmt.Println("")
-	fmt.Println("Custom Envs Subcommands:")
-	fmt.Printf("  %-*s %s\n", w, "custom-envs list", "List all custom envs (keys + masked values)")
-	fmt.Printf("  %-*s %s\n", w, "custom-envs get <key>", "Print raw value of a custom env to stdout")
-	fmt.Printf("  %-*s %s\n", w, "custom-envs add <key> <value>", "Add a new custom env")
-	fmt.Printf("  %-*s %s\n", w, "custom-envs edit <key> <value>", "Edit an existing custom env")
-	fmt.Printf("  %-*s %s\n", w, "custom-envs remove <key>", "Remove a custom env")
-	fmt.Println("")
-	fmt.Println("Examples:")
-	fmt.Println("  kilo-entrypoint zellij-attach")
-	fmt.Println("  kilo-entrypoint sync")
-	fmt.Println("")
-	fmt.Println("Any other argument is passed through to exec.LookPath for")
-	fmt.Println("direct binary execution (e.g. \"kilo\", \"sh\", \"bash\").")
+
+	var cmdLines []string
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "help", "Show this help message"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "update-config", "Download config template, merge with existing config"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "backup [path]", "Create tar.gz of KILO_HOME (default: /tmp/backup.tar.gz)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "restore [path]", "Extract tar.gz into KILO_HOME with ownership fix"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "mcp-config", "Apply MCP enabled states from encrypted token storage"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "mcp-tokens", "Interactive token management"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sync", "Start ainstruct file watcher + REST sync"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sync ls", "List all ainstruct sync files"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "sync rm <file>", "Remove a specific sync file (local and remote)"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "resync", "Delete all remote documents and re-push local files"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "zellij-attach", "Attach to existing zellij session"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "print-env", "Print export statements for current tokens and custom envs"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "custom-envs", "Manage user-defined custom environment variables"))
+
+	var exLines []string
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-entrypoint zellij-attach", "# attach to existing zellij session"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-entrypoint sync", "# start ainstruct file watcher"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-entrypoint backup", "# create backup in /tmp/backup.tar.gz"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-entrypoint help backup", "# see backup help"))
+	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-entrypoint sync -h", "# see sync help"))
+
+	help := strings.Join([]string{
+		"kilo-entrypoint - Container entrypoint for kilo-docker",
+		"",
+		"Usage: kilo-entrypoint [subcommand]",
+		"",
+		"With no arguments, runs container initialization.",
+		"",
+		"Subcommands:",
+		strings.Join(cmdLines, "\n"),
+		"",
+		"Custom Envs Subcommands:",
+		fmt.Sprintf("  %-*s %s", w-2, "custom-envs list", "List all custom envs (keys + masked values)"),
+		fmt.Sprintf("  %-*s %s", w-2, "custom-envs get <key>", "Print raw value of a custom env to stdout"),
+		fmt.Sprintf("  %-*s %s", w-2, "custom-envs add <key> <value>", "Add a new custom env"),
+		fmt.Sprintf("  %-*s %s", w-2, "custom-envs edit <key> <value>", "Edit an existing custom env"),
+		fmt.Sprintf("  %-*s %s", w-2, "custom-envs remove <key>", "Remove a custom env"),
+		"",
+		"Examples:",
+		strings.Join(exLines, "\n"),
+		"",
+		"Any other argument is passed through to exec.LookPath for",
+		"direct binary execution (e.g. \"kilo\", \"sh\", \"bash\").",
+		"",
+		"Use 'kilo-entrypoint <command> -h' for more details about a command.",
+	}, "\n")
+
+	fmt.Fprintf(os.Stderr, "%s\n", help)
+}
+
+func printCommandHelp(command string) {
+	var help string
+	switch command {
+	case "update-config":
+		help = `Usage: kilo-entrypoint update-config
+
+Download the latest config template and merge it with the existing
+config in KILO_HOME.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint update-config
+  kilo-entrypoint update-config -h
+`
+	case "backup":
+		help = `Usage: kilo-entrypoint backup [path]
+
+Create a tar.gz archive of KILO_HOME.
+
+Arguments:
+  [path]                Destination archive path (default: /tmp/backup.tar.gz)
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint backup                    # create /tmp/backup.tar.gz
+  kilo-entrypoint backup /tmp/my-backup.tar.gz
+  kilo-entrypoint backup -h                 # show this help
+`
+	case "restore":
+		help = `Usage: kilo-entrypoint restore [path]
+
+Extract a tar.gz archive into KILO_HOME with ownership fix.
+
+Arguments:
+  [path]                Source archive path (default: /tmp/backup.tar.gz)
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint restore                   # restore /tmp/backup.tar.gz
+  kilo-entrypoint restore /tmp/my-backup.tar.gz
+  kilo-entrypoint restore -h                # show this help
+`
+	case "mcp-config":
+		help = `Usage: kilo-entrypoint mcp-config
+
+Apply MCP enabled states from encrypted token storage.
+
+This reads the encrypted tokens and KD_MCP_* environment variables,
+then updates the local MCP configuration accordingly.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint mcp-config
+  kilo-entrypoint mcp-config -h
+`
+	case "mcp-tokens":
+		help = `Usage: kilo-entrypoint mcp-tokens
+
+Interactive token management for MCP services.
+
+Prompts for and stores Context7, Ainstruct, and other MCP tokens
+in an encrypted file under KILO_HOME.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint mcp-tokens
+  kilo-entrypoint mcp-tokens -h
+`
+	case "sync":
+		help = `Usage: kilo-entrypoint sync [command]
+
+Start ainstruct file watcher and REST sync, or manage sync files.
+
+Commands:
+  (no command)          Start the file watcher and sync loop
+  ls                    List all ainstruct sync files
+  rm <file>             Remove a specific sync file (local and remote)
+
+Options:
+  -h, --help            Show this help message
+
+Use 'kilo-entrypoint sync ls -h' or 'kilo-entrypoint sync rm -h' for
+subcommand help.
+
+Examples:
+  kilo-entrypoint sync                      # start watcher
+  kilo-entrypoint sync ls                   # list sync files
+  kilo-entrypoint sync -h                   # show this help
+`
+	case "sync ls":
+		help = `Usage: kilo-entrypoint sync ls
+
+List all ainstruct sync files.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint sync ls
+  kilo-entrypoint sync ls -h
+`
+	case "sync rm":
+		help = `Usage: kilo-entrypoint sync rm <file>
+
+Remove a specific sync file, both locally and remotely.
+
+Arguments:
+  <file>                Path of the sync file to remove
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint sync rm ./docs/readme.md
+  kilo-entrypoint sync rm -h                # show this help
+`
+	case "resync":
+		help = `Usage: kilo-entrypoint resync
+
+Delete all remote documents and re-push every local sync file.
+
+Use this when the remote state is out of sync with the local files.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint resync
+  kilo-entrypoint resync -h
+`
+	case "zellij-attach":
+		help = `Usage: kilo-entrypoint zellij-attach
+
+Attach to the existing zellij session inside the container.
+
+This is the normal entrypoint used by kilo-docker when reconnecting
+to a running container.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint zellij-attach
+  kilo-entrypoint zellij-attach -h
+`
+	case "print-env":
+		help = `Usage: kilo-entrypoint print-env
+
+Print export statements for the currently stored tokens and custom envs.
+
+Output is suitable for eval-ing in a shell.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint print-env
+  kilo-entrypoint print-env -h
+`
+	case "custom-envs":
+		help = `Usage: kilo-entrypoint custom-envs <command>
+
+Manage user-defined custom environment variables.
+
+Custom envs are stored encrypted and can be printed via print-env.
+
+Commands:
+  list                  List all custom envs (keys + masked values)
+  get <key>             Print raw value of a custom env to stdout
+  add <key> <value>     Add a new custom env
+  edit <key> <value>    Edit an existing custom env
+  remove <key>          Remove a custom env
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint custom-envs list
+  kilo-entrypoint custom-envs get MY_VAR
+  kilo-entrypoint custom-envs -h
+`
+	case "custom-envs list":
+		help = `Usage: kilo-entrypoint custom-envs list
+
+List all custom envs with masked values.
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint custom-envs list
+  kilo-entrypoint custom-envs list -h
+`
+	case "custom-envs get":
+		help = `Usage: kilo-entrypoint custom-envs get <key>
+
+Print the raw value of a custom env to stdout.
+
+Arguments:
+  <key>                 Name of the custom env
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint custom-envs get MY_VAR
+  kilo-entrypoint custom-envs get -h
+`
+	case "custom-envs add":
+		help = `Usage: kilo-entrypoint custom-envs add <key> <value>
+
+Add a new custom env.
+
+Arguments:
+  <key>                 Name of the custom env
+  <value>               Value of the custom env
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint custom-envs add MY_VAR my-value
+  kilo-entrypoint custom-envs add -h
+`
+	case "custom-envs edit":
+		help = `Usage: kilo-entrypoint custom-envs edit <key> <value>
+
+Edit an existing custom env.
+
+Arguments:
+  <key>                 Name of the custom env
+  <value>               New value of the custom env
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint custom-envs edit MY_VAR new-value
+  kilo-entrypoint custom-envs edit -h
+`
+	case "custom-envs remove":
+		help = `Usage: kilo-entrypoint custom-envs remove <key>
+
+Remove a custom env.
+
+Arguments:
+  <key>                 Name of the custom env
+
+Options:
+  -h, --help            Show this help message
+
+Examples:
+  kilo-entrypoint custom-envs remove MY_VAR
+  kilo-entrypoint custom-envs remove -h
+`
+	case "help":
+		help = `Usage: kilo-entrypoint help [command]
+
+Show help for kilo-entrypoint commands.
+
+Arguments:
+  [command]             Optional command to get help for
+
+Examples:
+  kilo-entrypoint help
+  kilo-entrypoint help backup
+  kilo-entrypoint help sync ls
+`
+	default:
+		help = fmt.Sprintf("Unknown command: %s\nRun 'kilo-entrypoint help' for usage.\n", command)
+	}
+	fmt.Fprintf(os.Stderr, "%s\n", help)
 }
 
 func runPrintEnv() {
@@ -141,18 +472,36 @@ func runPrintEnv() {
 }
 
 func main() {
-	flag.Parse()
+	parsed := parseEntrypointArgs(os.Args[1:])
 	utils.Log("[main] Entrypoint started, os.Args=%v\n", os.Args)
 
-	remaining := flag.Args()
-	hasSubcommand := len(remaining) > 0 && !strings.HasPrefix(remaining[0], "-")
-	onlyFlags := len(remaining) == 0 || (len(remaining) == 1 && strings.HasPrefix(remaining[0], "-"))
+	// Handle -h/--help flag, mirroring kilo-docker.
+	if parsed.help {
+		if parsed.command != "" {
+			printCommandHelp(commandWithSubcommand(parsed.command, parsed.args))
+		} else {
+			printHelp()
+		}
+		return
+	}
+
+	// Handle help [command] syntax, mirroring kilo-docker.
+	if parsed.command == "help" {
+		if len(parsed.args) > 0 {
+			printCommandHelp(commandWithSubcommand(parsed.args[0], parsed.args[1:]))
+		} else {
+			printHelp()
+		}
+		return
+	}
+
+	hasSubcommand := parsed.command != ""
 	alreadyInitialized := func() bool {
 		_, err := os.Stat("/tmp/.kilo-initialized")
 		return err == nil
 	}
 
-	if onlyFlags && !hasSubcommand {
+	if !hasSubcommand {
 		if alreadyInitialized() {
 			utils.Log("[main] Container already initialized, sleeping for exec\n")
 			if err := syscall.Exec("/bin/sleep", []string{"sleep", "infinity"}, os.Environ()); err != nil {
@@ -168,13 +517,14 @@ func main() {
 		return
 	}
 
-	name := remaining[0]
+	name := parsed.command
 	binary, passthrough := resolveCommand(name)
 	if passthrough {
 		if binary == "" {
 			utils.LogError("[main] unknown subcommand or command: %s\n", name, utils.WithOutput())
 			os.Exit(1)
 		}
+		remaining := append([]string{name}, parsed.args...)
 		if err := syscall.Exec(binary, remaining, os.Environ()); err != nil {
 			utils.LogError("[main] exec %s: %v\n", name, err, utils.WithOutput())
 			os.Exit(1)
@@ -190,8 +540,8 @@ func main() {
 		}
 	case "backup":
 		outputPath := "/tmp/backup.tar.gz"
-		if len(remaining) > 1 {
-			outputPath = remaining[1]
+		if len(parsed.args) > 0 {
+			outputPath = parsed.args[0]
 		}
 		if err := runBackup(outputPath); err != nil {
 			utils.LogError("[main] backup error: %v\n", err, utils.WithOutput())
@@ -199,8 +549,8 @@ func main() {
 		}
 	case "restore":
 		archivePath := "/tmp/backup.tar.gz"
-		if len(remaining) > 1 {
-			archivePath = remaining[1]
+		if len(parsed.args) > 0 {
+			archivePath = parsed.args[0]
 		}
 		if err := runRestore(archivePath); err != nil {
 			utils.LogError("[main] restore error: %v\n", err, utils.WithOutput())
@@ -217,30 +567,30 @@ func main() {
 			os.Exit(1)
 		}
 	case "sync":
-		if len(remaining) < 2 {
+		if len(parsed.args) < 1 {
 			runSyncMode()
 			return
 		}
-		switch remaining[1] {
+		switch parsed.args[0] {
 		case "ls":
 			s := NewSyncer()
-			humanReadable := len(remaining) > 2 && remaining[2] == "-h"
+			humanReadable := len(parsed.args) > 1 && parsed.args[1] == "-h"
 			if err := s.listSyncFiles(humanReadable); err != nil {
 				utils.LogError("[main] sync ls error: %v\n", err, utils.WithOutput())
 				os.Exit(1)
 			}
 		case "rm":
-			if len(remaining) < 3 {
+			if len(parsed.args) < 2 {
 				utils.LogError("[main] sync rm requires a file argument\n", utils.WithOutput())
 				os.Exit(1)
 			}
 			s := NewSyncer()
-			if err := s.removeSyncFile(remaining[2]); err != nil {
+			if err := s.removeSyncFile(parsed.args[1]); err != nil {
 				utils.LogError("[main] sync rm error: %v\n", err, utils.WithOutput())
 				os.Exit(1)
 			}
 		default:
-			utils.LogError("[main] unknown sync subcommand: %s\n", remaining[1], utils.WithOutput())
+			utils.LogError("[main] unknown sync subcommand: %s\n", parsed.args[0], utils.WithOutput())
 			os.Exit(1)
 		}
 	case "resync":
@@ -264,42 +614,61 @@ func main() {
 			utils.LogError("[kilo-docker] No user config found\n", utils.WithOutput())
 			os.Exit(1)
 		}
-		if len(remaining) < 2 {
+		if len(parsed.args) < 1 {
 			utils.LogError("[kilo-docker] custom-envs requires a subcommand: list, get, add, edit, remove\n", utils.WithOutput())
 			os.Exit(1)
 		}
-		switch remaining[1] {
+		switch parsed.args[0] {
 		case "list":
 			runCustomEnvsList(homeDir, userID)
 		case "get":
-			if len(remaining) < 3 {
+			if len(parsed.args) < 2 {
 				utils.LogError("[kilo-docker] custom-envs get requires a key\n", utils.WithOutput())
 				os.Exit(1)
 			}
-			runCustomEnvsGet(homeDir, userID, remaining[2])
+			runCustomEnvsGet(homeDir, userID, parsed.args[1])
 		case "add":
-			if len(remaining) < 4 {
+			if len(parsed.args) < 3 {
 				utils.LogError("[kilo-docker] custom-envs add requires a key and value\n", utils.WithOutput())
 				os.Exit(1)
 			}
-			runCustomEnvsAdd(homeDir, userID, remaining[2], remaining[3])
+			runCustomEnvsAdd(homeDir, userID, parsed.args[1], parsed.args[2])
 		case "edit":
-			if len(remaining) < 4 {
+			if len(parsed.args) < 3 {
 				utils.LogError("[kilo-docker] custom-envs edit requires a key and value\n", utils.WithOutput())
 				os.Exit(1)
 			}
-			runCustomEnvsEdit(homeDir, userID, remaining[2], remaining[3])
+			runCustomEnvsEdit(homeDir, userID, parsed.args[1], parsed.args[2])
 		case "remove":
-			if len(remaining) < 3 {
+			if len(parsed.args) < 2 {
 				utils.LogError("[kilo-docker] custom-envs remove requires a key\n", utils.WithOutput())
 				os.Exit(1)
 			}
-			runCustomEnvsRemove(homeDir, userID, remaining[2])
+			runCustomEnvsRemove(homeDir, userID, parsed.args[1])
 		default:
-			utils.LogError("[kilo-docker] unknown custom-envs subcommand: %s\n", remaining[1], utils.WithOutput())
+			utils.LogError("[kilo-docker] unknown custom-envs subcommand: %s\n", parsed.args[0], utils.WithOutput())
 			os.Exit(1)
 		}
-	case "help":
-		runHelp()
 	}
+}
+
+// commandWithSubcommand builds a help command key from a command and its args.
+// It mirrors the nested-command handling in kilo-docker: commands that accept
+// nested subcommands (sync, custom-envs) return "<command> <subcommand>" when
+// the first argument is a valid nested subcommand.
+func commandWithSubcommand(command string, args []string) string {
+	if len(args) == 0 {
+		return command
+	}
+	switch command {
+	case "sync":
+		if args[0] == "ls" || args[0] == "rm" {
+			return command + " " + args[0]
+		}
+	case "custom-envs":
+		if args[0] == "list" || args[0] == "get" || args[0] == "add" || args[0] == "edit" || args[0] == "remove" {
+			return command + " " + args[0]
+		}
+	}
+	return command
 }

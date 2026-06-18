@@ -151,6 +151,131 @@ func TestResolveCommandUnknownBinary(t *testing.T) {
 	}
 }
 
+// --- Unit tests for argument parsing ---
+
+// TestParseEntrypointArgsNoArgs verifies that an empty argument list produces
+// an empty command and no help flag.
+func TestParseEntrypointArgsNoArgs(t *testing.T) {
+	parsed := parseEntrypointArgs([]string{})
+	if parsed.help {
+		t.Error("expected help=false for empty args")
+	}
+	if parsed.command != "" {
+		t.Errorf("expected empty command, got %q", parsed.command)
+	}
+	if len(parsed.args) != 0 {
+		t.Errorf("expected no args, got %v", parsed.args)
+	}
+}
+
+// TestParseEntrypointArgsCommandOnly verifies that a bare command is parsed.
+func TestParseEntrypointArgsCommandOnly(t *testing.T) {
+	parsed := parseEntrypointArgs([]string{"backup"})
+	if parsed.help {
+		t.Error("expected help=false for backup")
+	}
+	if parsed.command != "backup" {
+		t.Errorf("expected command=backup, got %q", parsed.command)
+	}
+	if len(parsed.args) != 0 {
+		t.Errorf("expected no args, got %v", parsed.args)
+	}
+}
+
+// TestParseEntrypointArgsHelpFlag verifies that -h and --help set the help flag.
+func TestParseEntrypointArgsHelpFlag(t *testing.T) {
+	for _, flag := range []string{"-h", "--help"} {
+		parsed := parseEntrypointArgs([]string{flag})
+		if !parsed.help {
+			t.Errorf("expected help=true for %s", flag)
+		}
+		if parsed.command != "" {
+			t.Errorf("expected empty command, got %q", parsed.command)
+		}
+	}
+}
+
+// TestParseEntrypointArgsCommandHelpFlag verifies that -h after a command is
+// detected and the command is preserved for context-sensitive help.
+func TestParseEntrypointArgsCommandHelpFlag(t *testing.T) {
+	parsed := parseEntrypointArgs([]string{"backup", "-h"})
+	if !parsed.help {
+		t.Error("expected help=true for backup -h")
+	}
+	if parsed.command != "backup" {
+		t.Errorf("expected command=backup, got %q", parsed.command)
+	}
+	if len(parsed.args) != 0 {
+		t.Errorf("expected args stripped of -h, got %v", parsed.args)
+	}
+}
+
+// TestParseEntrypointArgsHelpCommand verifies that 'help <command>' is parsed
+// as a help command with arguments.
+func TestParseEntrypointArgsHelpCommand(t *testing.T) {
+	parsed := parseEntrypointArgs([]string{"help", "sync", "ls"})
+	if parsed.help {
+		t.Error("expected help=false for help command syntax")
+	}
+	if parsed.command != "help" {
+		t.Errorf("expected command=help, got %q", parsed.command)
+	}
+	if len(parsed.args) != 2 || parsed.args[0] != "sync" || parsed.args[1] != "ls" {
+		t.Errorf("expected args [sync ls], got %v", parsed.args)
+	}
+}
+
+// TestParseEntrypointArgsLeadingFlagsSkipped verifies that unknown flags
+// before the command are skipped, matching Go's flag.Parse behavior.
+func TestParseEntrypointArgsLeadingFlagsSkipped(t *testing.T) {
+	parsed := parseEntrypointArgs([]string{"-foo", "backup", "/tmp/out.tar.gz"})
+	if parsed.help {
+		t.Error("expected help=false for unknown flags")
+	}
+	if parsed.command != "backup" {
+		t.Errorf("expected command=backup, got %q", parsed.command)
+	}
+	if len(parsed.args) != 1 || parsed.args[0] != "/tmp/out.tar.gz" {
+		t.Errorf("expected args [/tmp/out.tar.gz], got %v", parsed.args)
+	}
+}
+
+// TestParseEntrypointArgsKeepsFlagsAfterCommand verifies that flags after the
+// command are preserved so pass-through commands like 'sh -c ...' work.
+func TestParseEntrypointArgsKeepsFlagsAfterCommand(t *testing.T) {
+	parsed := parseEntrypointArgs([]string{"sh", "-c", "echo hello"})
+	if parsed.help {
+		t.Error("expected help=false for sh -c")
+	}
+	if parsed.command != "sh" {
+		t.Errorf("expected command=sh, got %q", parsed.command)
+	}
+	if len(parsed.args) != 2 || parsed.args[0] != "-c" || parsed.args[1] != "echo hello" {
+		t.Errorf("expected args [-c 'echo hello'], got %v", parsed.args)
+	}
+}
+
+// TestCommandWithSubcommand verifies nested command detection for help routing.
+func TestCommandWithSubcommand(t *testing.T) {
+	cases := []struct {
+		cmd  string
+		args []string
+		want string
+	}{
+		{"backup", nil, "backup"},
+		{"sync", []string{"ls"}, "sync ls"},
+		{"sync", []string{"rm"}, "sync rm"},
+		{"custom-envs", []string{"add"}, "custom-envs add"},
+		{"custom-envs", []string{"unknown"}, "custom-envs"},
+	}
+	for _, tc := range cases {
+		got := commandWithSubcommand(tc.cmd, tc.args)
+		if got != tc.want {
+			t.Errorf("commandWithSubcommand(%q, %v) = %q, want %q", tc.cmd, tc.args, got, tc.want)
+		}
+	}
+}
+
 // --- Integration tests (run compiled entrypoint as subprocess) ---
 
 // TestPassThroughExecSh verifies that invoking the entrypoint with
@@ -231,6 +356,76 @@ func TestEntrypointNoArgsRunsInit(t *testing.T) {
 
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
+}
+
+// TestHelpFlagGeneral verifies that 'kilo-entrypoint -h' prints the general help.
+func TestHelpFlagGeneral(t *testing.T) {
+	bin := findEntrypointBinary(t)
+
+	cmd := exec.Command(bin, "-h")
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+
+	if err != nil {
+		t.Fatalf("expected help to exit cleanly, got err=%v\noutput: %s", err, output)
+	}
+	if !strings.Contains(output, "kilo-entrypoint - Container entrypoint") {
+		t.Errorf("general help missing header, got:\n%s", output)
+	}
+	if !strings.Contains(output, "Subcommands:") {
+		t.Errorf("general help missing subcommands section, got:\n%s", output)
+	}
+}
+
+// TestHelpCommandSubcommand verifies that 'kilo-entrypoint help backup' prints
+// command-specific help.
+func TestHelpCommandSubcommand(t *testing.T) {
+	bin := findEntrypointBinary(t)
+
+	cmd := exec.Command(bin, "help", "backup")
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+
+	if err != nil {
+		t.Fatalf("expected help backup to exit cleanly, got err=%v\noutput: %s", err, output)
+	}
+	if !strings.Contains(output, "Usage: kilo-entrypoint backup") {
+		t.Errorf("backup help missing usage, got:\n%s", output)
+	}
+}
+
+// TestHelpFlagNestedCommand verifies that 'kilo-entrypoint sync ls -h' prints
+// nested command help.
+func TestHelpFlagNestedCommand(t *testing.T) {
+	bin := findEntrypointBinary(t)
+
+	cmd := exec.Command(bin, "sync", "ls", "-h")
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+
+	if err != nil {
+		t.Fatalf("expected sync ls -h to exit cleanly, got err=%v\noutput: %s", err, output)
+	}
+	if !strings.Contains(output, "Usage: kilo-entrypoint sync ls") {
+		t.Errorf("sync ls help missing usage, got:\n%s", output)
+	}
+}
+
+// TestUnknownCommandHelp verifies that asking for help on an unknown command
+// prints the unknown-command message.
+func TestUnknownCommandHelp(t *testing.T) {
+	bin := findEntrypointBinary(t)
+
+	cmd := exec.Command(bin, "help", "nonexistent-command")
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+
+	if err != nil {
+		t.Fatalf("expected unknown command help to exit cleanly, got err=%v\noutput: %s", err, output)
+	}
+	if !strings.Contains(output, "Unknown command") {
+		t.Errorf("expected Unknown command message, got:\n%s", output)
+	}
 }
 
 // findEntrypointBinary locates the pre-built kilo-entrypoint binary.
