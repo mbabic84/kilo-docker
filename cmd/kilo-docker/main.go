@@ -77,12 +77,8 @@ func main() {
 	switch cfg.command {
 	case "help":
 		if len(cfg.args) > 0 {
-			if cfg.args[0] == "sessions" && len(cfg.args) > 1 {
+			if (cfg.args[0] == "sessions" || cfg.args[0] == "update" || cfg.args[0] == "profile") && len(cfg.args) > 1 {
 				printCommandHelp(cfg.args[0] + " " + cfg.args[1])
-			} else if cfg.args[0] == "update" && len(cfg.args) > 1 {
-				printCommandHelp(cfg.args[0] + " " + cfg.args[1])
-			} else if cfg.args[0] == "profile" {
-				printHelp()
 			} else {
 				printCommandHelp(cfg.args[0])
 			}
