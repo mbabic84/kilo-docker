@@ -1,3 +1,9 @@
+## [3.37.0](https://github.com/mbabic84/kilo-docker/compare/v3.36.1...v3.37.0) (2026-06-18)
+
+### Features
+
+* **help:** update help logic for kilo-entrypoint and fix kilo-docker profile routing ([9a5a6ff](https://github.com/mbabic84/kilo-docker/commit/9a5a6ff60e2b3ba3a9053024b4f61f1d42c7d8ed))
+
 ## [3.36.1](https://github.com/mbabic84/kilo-docker/compare/v3.36.0...v3.36.1) (2026-06-16)
 
 ### Bug Fixes
