@@ -60,6 +60,8 @@ var BuiltInServices = []Service{
 		UserInstall: []string{
 			"gh extension install shuymn/gh-mcp",
 		},
+		VersionCheck:  "gh extension list 2>/dev/null | grep 'shuymn/gh-mcp' | awk '{print $NF}' | sed 's/^v//'",
+		LatestVersion: "curl -s https://api.github.com/repos/shuymn/gh-mcp/releases/latest | grep '\"tag_name\":' | sed 's/.*\"v*\\([0-9.]*\\)\".*/\\1/'",
 		Volumes:        []string{},
 		RequiresSocket: "",
 	},
