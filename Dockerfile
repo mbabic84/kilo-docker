@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/kilo-entrypoint ./cmd/kilo-e
 # ── Builder: download Kilo binary ──
 FROM debian:bookworm-slim AS builder
 
-ARG KILO_VERSION=7.3.46
+ARG KILO_VERSION=7.3.50
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl tar ca-certificates \
      && rm -rf /var/lib/apt/lists/* \
@@ -39,7 +39,6 @@ COPY configs/kilo.jsonc /etc/kilo/template-kilo.jsonc
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo-real
 COPY --from=builder /tmp/tree-sitter /usr/local/bin/tree-sitter
 COPY --from=builder /tmp/console /usr/local/bin/console
-COPY --from=builder /tmp/models-snapshot.json /usr/local/bin/models-snapshot.json
 COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
 COPY scripts/kilo-wrapper.sh /usr/local/bin/kilo
 
