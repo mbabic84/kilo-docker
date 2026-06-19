@@ -1,3 +1,9 @@
+## [3.38.1](https://github.com/mbabic84/kilo-docker/compare/v3.38.0...v3.38.1) (2026-06-19)
+
+### Bug Fixes
+
+* **services:** skip gh-mcp reinstall when already at latest version ([ba74ba4](https://github.com/mbabic84/kilo-docker/commit/ba74ba4d50907913a53dcc8d0b1c8220217042b4))
+
 ## [3.38.0](https://github.com/mbabic84/kilo-docker/compare/v3.37.0...v3.38.0) (2026-06-19)
 
 ### Features
