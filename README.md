@@ -116,7 +116,7 @@ The current working directory is always mounted at the same path automatically.
 | `--docker` | Mount Docker socket for container management from within Kilo |
 | `--go` | Install Go (latest stable) for development |
 | `--build` | Install build essentials (gcc, g++, make) for compiling native extensions |
-| `--gh` | Install GitHub CLI for interacting with GitHub |
+| `--gh` | Install GitHub CLI and GitHub MCP server (via gh-mcp extension) for GitHub interactions from within Kilo |
 | `--uv` | Install uv for fast Python package management |
 | `--nvm` | Install NVM (Node Version Manager) for managing Node.js versions |
 | `--rclone` | Install rclone, a universal CLI for S3 and 40+ cloud storage backends |
@@ -377,10 +377,13 @@ When attaching to a session, `kilo-docker` detects the container state: if runni
 | `ainstruct` | Document storage and semantic search | Bearer token (auto-created) |
 | `playwright` | Browser automation (screenshots, navigation) | None (local sidecar) |
 | `gitnexus` | Codebase knowledge graph indexing and MCP-based code intelligence | None (local) |
+| `github` | GitHub repository, issue, and PR management | None (uses gh auth) |
 
 `context7` requires a Bearer token. Use `kilo-entrypoint mcp-tokens` to manage MCP tokens interactively. Use `kilo-entrypoint custom-envs` to manage your own environment variables (see [Custom Environment Variables](#custom-environment-variables)).
 
 `playwright` is only available when using the `--playwright` flag. It runs as a separate container on a shared Docker network with no authentication required.
+
+`github` is only available when using the `--gh` flag. It runs as a local MCP server inside the Kilo container, reusing your existing `gh auth` session — no separate PAT or token needed.
 
 ## Custom Environment Variables
 
