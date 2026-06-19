@@ -1,3 +1,13 @@
+## [3.39.0](https://github.com/mbabic84/kilo-docker/compare/v3.38.2...v3.39.0) (2026-06-19)
+
+### Features
+
+* bump Kilo CLI to v7.3.50 ([4cf7347](https://github.com/mbabic84/kilo-docker/commit/4cf734712484795ea8ecaf6d7a65cc5f4cf0a81f))
+
+### Bug Fixes
+
+* remove models-snapshot.json COPY (dropped from Kilo v7.3.50 tarball) ([42205b6](https://github.com/mbabic84/kilo-docker/commit/42205b6bb91c1c1918fff18d79424a87906e164f))
+
 ## [3.38.2](https://github.com/mbabic84/kilo-docker/compare/v3.38.1...v3.38.2) (2026-06-19)
 
 ### Bug Fixes
