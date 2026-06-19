@@ -1,3 +1,9 @@
+## [3.38.2](https://github.com/mbabic84/kilo-docker/compare/v3.38.1...v3.38.2) (2026-06-19)
+
+### Bug Fixes
+
+* **docker:** copy all Kilo tarball assets into container image ([ad26d15](https://github.com/mbabic84/kilo-docker/commit/ad26d1561cc5453e645881012a7d315866da313d))
+
 ## [3.38.1](https://github.com/mbabic84/kilo-docker/compare/v3.38.0...v3.38.1) (2026-06-19)
 
 ### Bug Fixes
