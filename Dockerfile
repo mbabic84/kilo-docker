@@ -39,7 +39,6 @@ COPY configs/kilo.jsonc /etc/kilo/template-kilo.jsonc
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo-real
 COPY --from=builder /tmp/tree-sitter /usr/local/bin/tree-sitter
 COPY --from=builder /tmp/console /usr/local/bin/console
-COPY --from=builder /tmp/models-snapshot.json /usr/local/bin/models-snapshot.json
 COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
 COPY scripts/kilo-wrapper.sh /usr/local/bin/kilo
 
