@@ -27,6 +27,11 @@
       "type": "local",
       "command": ["gitnexus", "mcp"],
       "enabled": false
+    },
+    "github": {
+      "type": "local",
+      "command": ["gh", "mcp"],
+      "enabled": false
     }
   },
   "instructions": [
