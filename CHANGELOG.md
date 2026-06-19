@@ -1,3 +1,9 @@
+## [3.38.0](https://github.com/mbabic84/kilo-docker/compare/v3.37.0...v3.38.0) (2026-06-19)
+
+### Features
+
+* add GitHub MCP server support and auto-insert missing MCP entries ([3cf8067](https://github.com/mbabic84/kilo-docker/commit/3cf80671badd77ada7d4dbbdaa4ea782653ace4d))
+
 ## [3.37.0](https://github.com/mbabic84/kilo-docker/compare/v3.36.1...v3.37.0) (2026-06-18)
 
 ### Features
