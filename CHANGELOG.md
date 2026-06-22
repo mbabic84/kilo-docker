@@ -1,3 +1,10 @@
+## [3.39.1](https://github.com/mbabic84/kilo-docker/compare/v3.39.0...v3.39.1) (2026-06-22)
+
+### Bug Fixes
+
+* **services:** add version checking for gh CLI and fix gh-mcp upgrade ([9106b61](https://github.com/mbabic84/kilo-docker/commit/9106b6189f562055420e7a16f17b6c47c26e5577))
+* **services:** always write services marker after installServices run ([14c2424](https://github.com/mbabic84/kilo-docker/commit/14c24244e0de406c05c5df977abd712f8f18fcc5))
+
 ## [3.39.0](https://github.com/mbabic84/kilo-docker/compare/v3.38.2...v3.39.0) (2026-06-19)
 
 ### Features
