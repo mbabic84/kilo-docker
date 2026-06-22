@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/mbabic84/kilo-docker/pkg/services"
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
@@ -89,24 +90,42 @@ var runInstallCmd = func(cmd string) error {
 }
 
 // installServices reads KD_SERVICES env var and runs install commands for each enabled service.
+//
+// For services that define InstallVersionCheck and InstallLatestVersion, the installed binary
+// version is compared against the latest release and the user is prompted to update when a
+// newer version is available. For services without those fields, the marker file is used as
+// a coarse-grained skip: the install runs only when KD_SERVICES differs from the stored value.
 func installServices() error {
 	servicesEnv := os.Getenv("KD_SERVICES")
 	if servicesEnv == "" {
 		return nil
 	}
 
+	markerMatches := false
 	if existing, err := os.ReadFile(servicesMarkerPath); err == nil && strings.TrimSpace(string(existing)) == servicesEnv {
-		utils.Log("[init] KD_SERVICES=%s (already installed)\n", servicesEnv)
-		return nil
+		markerMatches = true
 	}
 
-	utils.Log("[init] Installing system-scoped services: %s\n", servicesEnv)
+	var installedSomething bool
+
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil {
 			utils.LogError("[init] Service %q not found in builtInServices\n", svcName)
 			continue
 		}
+
+		if svc.InstallVersionCheck != "" && svc.InstallLatestVersion != "" {
+			if !shouldRunSystemInstall(svc) {
+				continue
+			}
+		} else if markerMatches {
+			utils.Log("[init] Skipping %s: already installed\n", svc.Name)
+			continue
+		} else {
+			utils.Log("[init] Installing system-scoped services: %s\n", svc.Name)
+		}
+
 		for _, installCmd := range svc.Install {
 			if installCmd == "" {
 				continue
@@ -117,13 +136,43 @@ func installServices() error {
 				utils.Log("[init] Installing %s: ok\n", svc.Name)
 			}
 		}
+		installedSomething = true
 	}
 
-	if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0o600); err != nil {
-		utils.LogWarn("[init] failed to write services marker: %v\n", err)
+	if installedSomething {
+		if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0o600); err != nil {
+			utils.LogWarn("[init] failed to write services marker: %v\n", err)
+		}
 	}
 
 	return nil
+}
+
+// shouldRunSystemInstall returns true if the service's install command should run based on
+// version comparison. It logs the outcome and prompts the user when an update is available.
+func shouldRunSystemInstall(svc *services.Service) bool {
+	currentVer := runVersionCheck(svc.InstallVersionCheck, "/root")
+	latestVer := runVersionCheck(svc.InstallLatestVersion, "/root")
+
+	if currentVer != "" && latestVer != "" {
+		if compareVersions(currentVer, latestVer) >= 0 {
+			utils.Log("[init] Skipping %s: already at latest version (%s)\n", svc.Name, currentVer)
+			return false
+		}
+		utils.Log("[init] Updating %s: %s -> %s\n", svc.Name, currentVer, latestVer)
+		if !promptYesNo(fmt.Sprintf("Update %s?", svc.Name)) {
+			utils.Log("[init] Skipping %s update\n", svc.Name)
+			return false
+		}
+		return true
+	}
+
+	if currentVer == "" && latestVer != "" {
+		utils.Log("[init] Installing %s (latest: %s)\n", svc.Name, latestVer)
+	} else {
+		utils.Log("[init] Installing %s\n", svc.Name)
+	}
+	return true
 }
 
 // runVersionCheck executes a command and returns its trimmed output.
@@ -215,22 +264,24 @@ func installUserServices(homeDir string) error {
 			currentVer := runVersionCheck(svc.VersionCheck, homeDir)
 			latestVer := runVersionCheck(svc.LatestVersion, homeDir)
 
+			displayName := svc.DisplayNameOrName()
+
 			if currentVer != "" && latestVer != "" {
 				if compareVersions(currentVer, latestVer) < 0 {
-					utils.Log("[init] Updating %s: %s -> %s\n", svc.Name, currentVer, latestVer)
-					if !promptYesNo(fmt.Sprintf("Update %s?", svc.Name)) {
-						utils.Log("[init] Skipping %s update\n", svc.Name)
+					utils.Log("[init] Updating %s: %s -> %s\n", displayName, currentVer, latestVer)
+					if !promptYesNo(fmt.Sprintf("Update %s?", displayName)) {
+						utils.Log("[init] Skipping %s update\n", displayName)
 						continue
 					}
 				} else {
-					utils.Log("[init] Skipping %s: already at latest version (%s)\n", svc.Name, currentVer)
+					utils.Log("[init] Skipping %s: already at latest version (%s)\n", displayName, currentVer)
 					continue
 				}
 			} else {
 				if currentVer == "" && latestVer != "" {
-					utils.Log("[init] Installing %s (current: none, latest: %s)\n", svc.Name, latestVer)
+					utils.Log("[init] Installing %s (current: none, latest: %s)\n", displayName, latestVer)
 				} else {
-					utils.Log("[init] Installing %s\n", svc.Name)
+					utils.Log("[init] Installing %s\n", displayName)
 				}
 			}
 
@@ -239,9 +290,9 @@ func installUserServices(homeDir string) error {
 			c.Stdout = os.Stderr
 			c.Stderr = os.Stderr
 			if err := c.Run(); err != nil {
-				utils.LogWarn("[init] Installing %s: error: %v\n", svc.Name, err)
+				utils.LogWarn("[init] Installing %s: error: %v\n", displayName, err)
 			} else {
-				utils.Log("[init] Installing %s: ok\n", svc.Name)
+				utils.Log("[init] Installing %s: ok\n", displayName)
 			}
 		}
 	}

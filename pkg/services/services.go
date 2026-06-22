@@ -7,17 +7,28 @@ type CopyConfig struct {
 }
 
 type Service struct {
-	Name           string
-	Flag           string
-	Description    string
-	Install        []string
-	UserInstall    []string
-	VersionCheck   string
-	LatestVersion  string
-	EnvVars        map[string]string
-	Volumes        []string
-	RequiresSocket string
-	CopyConfigs    []CopyConfig
+	Name                 string
+	DisplayName          string
+	Flag                 string
+	Description          string
+	Install              []string
+	UserInstall          []string
+	VersionCheck         string
+	LatestVersion        string
+	InstallVersionCheck  string
+	InstallLatestVersion string
+	EnvVars              map[string]string
+	Volumes              []string
+	RequiresSocket       string
+	CopyConfigs          []CopyConfig
+}
+
+// DisplayNameOrName returns DisplayName if set, otherwise Name.
+func (s *Service) DisplayNameOrName() string {
+	if s.DisplayName != "" {
+		return s.DisplayName
+	}
+	return s.Name
 }
 
 var BuiltInServices = []Service{
@@ -52,18 +63,21 @@ var BuiltInServices = []Service{
 	},
 	{
 		Name:        "gh",
+		DisplayName: "gh-mcp extension",
 		Flag:        "--gh",
 		Description: "Install GitHub CLI for interacting with GitHub",
 		Install: []string{
-			"command -v gh >/dev/null || (GH_VERSION=$(curl -fsSL https://api.github.com/repos/cli/cli/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && GH_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz\" -o /tmp/gh.tar.gz && tar xzf /tmp/gh.tar.gz -C /tmp && mv /tmp/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh && chmod +x /usr/local/bin/gh && rm -rf /tmp/gh*)",
+			"(GH_VERSION=$(curl -fsSL https://api.github.com/repos/cli/cli/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && GH_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz\" -o /tmp/gh.tar.gz && tar xzf /tmp/gh.tar.gz -C /tmp && mv /tmp/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh && chmod +x /usr/local/bin/gh && rm -rf /tmp/gh*)",
 		},
 		UserInstall: []string{
-			"gh extension install shuymn/gh-mcp",
+			"if gh extension list 2>/dev/null | grep -q 'shuymn/gh-mcp'; then gh extension upgrade shuymn/gh-mcp; else gh extension install shuymn/gh-mcp; fi",
 		},
-		VersionCheck:  "gh extension list 2>/dev/null | grep 'shuymn/gh-mcp' | awk '{print $NF}' | sed 's/^v//'",
-		LatestVersion: "curl -s https://api.github.com/repos/shuymn/gh-mcp/releases/latest | grep '\"tag_name\":' | sed 's/.*\"v*\\([0-9.]*\\)\".*/\\1/'",
-		Volumes:        []string{},
-		RequiresSocket: "",
+		VersionCheck:         "gh extension list 2>/dev/null | grep 'shuymn/gh-mcp' | awk '{print $NF}' | sed 's/^v//'",
+		LatestVersion:        "curl -s https://api.github.com/repos/shuymn/gh-mcp/releases/latest | grep '\"tag_name\":' | sed 's/.*\"v*\\([0-9.]*\\)\".*/\\1/'",
+		InstallVersionCheck:  "command -v gh >/dev/null && gh --version 2>/dev/null | head -1 | awk '{print $3}'",
+		InstallLatestVersion: "curl -s https://api.github.com/repos/cli/cli/releases/latest | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\).*/\\1/'",
+		Volumes:              []string{},
+		RequiresSocket:       "",
 	},
 	{
 		Name:        "uv",

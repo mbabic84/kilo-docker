@@ -43,6 +43,36 @@ func TestGhServiceHasInstallCommands(t *testing.T) {
 	}
 }
 
+func TestGhServiceHasSystemVersionCheck(t *testing.T) {
+	svc := mustGetService(t, "gh")
+
+	if svc.InstallVersionCheck == "" {
+		t.Error("expected InstallVersionCheck to be set for gh")
+	}
+	if svc.InstallLatestVersion == "" {
+		t.Error("expected InstallLatestVersion to be set for gh")
+	}
+}
+
+func TestGhServiceDisplayName(t *testing.T) {
+	svc := mustGetService(t, "gh")
+
+	if svc.DisplayName != "gh-mcp extension" {
+		t.Errorf("expected DisplayName 'gh-mcp extension', got %q", svc.DisplayName)
+	}
+	if got := svc.DisplayNameOrName(); got != "gh-mcp extension" {
+		t.Errorf("expected DisplayNameOrName() 'gh-mcp extension', got %q", got)
+	}
+}
+
+func TestDisplayNameOrNameFallsBackToName(t *testing.T) {
+	svc := mustGetService(t, "docker")
+
+	if got := svc.DisplayNameOrName(); got != "docker" {
+		t.Errorf("expected DisplayNameOrName() to fall back to Name 'docker', got %q", got)
+	}
+}
+
 func TestDockerServiceHasInstallCommands(t *testing.T) {
 	svc := mustGetService(t, "docker")
 
