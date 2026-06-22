@@ -106,8 +106,6 @@ func installServices() error {
 		markerMatches = true
 	}
 
-	var installedSomething bool
-
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil {
@@ -136,13 +134,10 @@ func installServices() error {
 				utils.Log("[init] Installing %s: ok\n", svc.Name)
 			}
 		}
-		installedSomething = true
 	}
 
-	if installedSomething {
-		if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0o600); err != nil {
-			utils.LogWarn("[init] failed to write services marker: %v\n", err)
-		}
+	if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0o600); err != nil {
+		utils.LogWarn("[init] failed to write services marker: %v\n", err)
 	}
 
 	return nil
