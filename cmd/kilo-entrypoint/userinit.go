@@ -487,6 +487,11 @@ func startSyncWithTokens(homeDir, userID string) error {
 // section of .bashrc. The section is delimited by "# >>> kilo-managed >>>"
 // and "# <<< kilo-managed <<<". Content is determined by KD_SERVICES env var,
 // which is set when --nvm or --uv flags are used.
+//
+// When multiple sessions share the same home volume, a service installed by
+// one session (e.g. NVM) must not be removed from .bashrc by another session
+// that does not use that service. Existing service blocks are detected by
+// their sentinel comments and preserved across updates.
 func updateBashrcManaged(homeDir string) {
 	bashrc := filepath.Join(homeDir, ".bashrc")
 	servicesEnv := os.Getenv("KD_SERVICES")
@@ -494,36 +499,71 @@ func updateBashrcManaged(homeDir string) {
 	startMarker := "# >>> kilo-managed >>>"
 	endMarker := "# <<< kilo-managed <<<"
 
+	nvmBlock := "# NVM support\n" +
+		"if [ -f \"$HOME/.nvm/nvm.sh\" ]; then\n" +
+		"    export NVM_DIR=\"$HOME/.nvm\"\n" +
+		"    . \"$HOME/.nvm/nvm.sh\"\n" +
+		"fi\n"
+
+	uvBlock := "# Python wrappers using uv\n" +
+		"if command -v uv &>/dev/null; then\n" +
+		"    python() {\n" +
+		"        uv run python \"$@\"\n" +
+		"    }\n" +
+		"    python3() {\n" +
+		"        uv run python \"$@\"\n" +
+		"    }\n" +
+		"fi\n"
+
+	nvmSentinel := "# NVM support"
+	uvSentinel := "# Python wrappers using uv"
+
+	// Determine which services the current session wants.
+	currentServices := make(map[string]bool)
+	for _, svc := range strings.Split(servicesEnv, ",") {
+		currentServices[strings.TrimSpace(svc)] = true
+	}
+
+	// Read the existing managed section so that services installed by other
+	// sessions on the shared volume are not lost.
+	existing, err := os.ReadFile(bashrc)
+	existingHasNVM := false
+	existingHasUV := false
+	if err == nil {
+		existingStr := string(existing)
+		if start := strings.Index(existingStr, startMarker); start >= 0 {
+			section := existingStr[start+len(startMarker):]
+			if end := strings.Index(section, endMarker); end >= 0 {
+				section = section[:end]
+				existingHasNVM = strings.Contains(section, nvmSentinel)
+				existingHasUV = strings.Contains(section, uvSentinel)
+			}
+		}
+	}
+
+	nvmInstalledOnDisk := fileExists(filepath.Join(homeDir, ".nvm", "nvm.sh"))
+	uvInstalledOnDisk := fileExists(filepath.Join(homeDir, ".local", "bin", "uv"))
+
+	// Build the new managed section. A service block is included when:
+	//  1. The current session requests it (e.g. --nvm), OR
+	//  2. The service was already in .bashrc AND is still installed on disk.
+	// This preserves services across concurrent sessions while cleaning up
+	// blocks for services that have been removed from the volume.
 	var sb strings.Builder
 	sb.WriteString(startMarker + "\n")
 
-	for _, svc := range strings.Split(servicesEnv, ",") {
-		svc = strings.TrimSpace(svc)
-		switch svc {
-		case "nvm":
-			sb.WriteString("# NVM support\n")
-			sb.WriteString("if [ -f \"$HOME/.nvm/nvm.sh\" ]; then\n")
-			sb.WriteString("    export NVM_DIR=\"$HOME/.nvm\"\n")
-			sb.WriteString("    . \"$HOME/.nvm/nvm.sh\"\n")
-			sb.WriteString("fi\n")
-			utils.Log("[userinit] Added NVM to .bashrc managed section\n")
-		case "uv":
-			sb.WriteString("# Python wrappers using uv\n")
-			sb.WriteString("if command -v uv &>/dev/null; then\n")
-			sb.WriteString("    python() {\n")
-			sb.WriteString("        uv run python \"$@\"\n")
-			sb.WriteString("    }\n")
-			sb.WriteString("    python3() {\n")
-			sb.WriteString("        uv run python \"$@\"\n")
-			sb.WriteString("    }\n")
-			sb.WriteString("fi\n")
-			utils.Log("[userinit] Added Python uv wrappers to .bashrc managed section\n")
-		}
+	if currentServices["nvm"] || (existingHasNVM && nvmInstalledOnDisk) {
+		sb.WriteString(nvmBlock)
+		utils.Log("[userinit] Added NVM to .bashrc managed section\n")
 	}
+	if currentServices["uv"] || (existingHasUV && uvInstalledOnDisk) {
+		sb.WriteString(uvBlock)
+		utils.Log("[userinit] Added Python uv wrappers to .bashrc managed section\n")
+	}
+
 	sb.WriteString(endMarker + "\n")
 	managedContent := sb.String()
 
-	existing, err := os.ReadFile(bashrc)
 	if err != nil {
 		_ = os.WriteFile(bashrc, []byte("# ~/.bashrc\n\n"+managedContent), 0o600)
 		utils.Log("[userinit] Created .bashrc with managed section\n")
@@ -550,4 +590,10 @@ func updateBashrcManaged(homeDir string) {
 	newBashrc := existingStr + "\n\n" + managedContent
 	_ = os.WriteFile(bashrc, []byte(newBashrc), 0o600)
 	utils.Log("[userinit] Updated .bashrc managed section (KD_SERVICES=%s)\n", servicesEnv)
+}
+
+// fileExists reports whether the given path exists and is not a directory.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
