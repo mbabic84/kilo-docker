@@ -1,3 +1,9 @@
+## [3.41.1](https://github.com/mbabic84/kilo-docker/compare/v3.41.0...v3.41.1) (2026-06-23)
+
+### Bug Fixes
+
+* preserve NVM/UV bashrc blocks across concurrent sessions ([a6d4e78](https://github.com/mbabic84/kilo-docker/commit/a6d4e7829085bcdddad42f19c5e7b9deedfbd0e6))
+
 ## [3.41.0](https://github.com/mbabic84/kilo-docker/compare/v3.40.0...v3.41.0) (2026-06-23)
 
 ### Features
