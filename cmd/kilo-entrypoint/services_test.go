@@ -30,8 +30,8 @@ func TestGetServiceUnknown(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 8 {
-		t.Errorf("expected 8 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 9 {
+		t.Errorf("expected 9 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
@@ -120,5 +120,25 @@ func TestRcloneServiceHasRequiredFields(t *testing.T) {
 	}
 	if svc.RequiresSocket != "" {
 		t.Errorf("expected RequiresSocket to be empty for rclone, got %q", svc.RequiresSocket)
+	}
+}
+
+func TestDiagnosticsServiceHasRequiredFields(t *testing.T) {
+	svc := mustGetService(t, "diagnostics")
+
+	if svc.Name != "diagnostics" {
+		t.Errorf("expected Name 'diagnostics', got %q", svc.Name)
+	}
+	if svc.Flag != "--diagnostics" {
+		t.Errorf("expected Flag '--diagnostics', got %q", svc.Flag)
+	}
+	if len(svc.Install) != 1 {
+		t.Errorf("expected 1 Install command for diagnostics, got %d", len(svc.Install))
+	}
+	if len(svc.UserInstall) != 0 {
+		t.Errorf("expected 0 UserInstall commands for diagnostics, got %d", len(svc.UserInstall))
+	}
+	if svc.RequiresSocket != "" {
+		t.Errorf("expected RequiresSocket to be empty for diagnostics, got %q", svc.RequiresSocket)
 	}
 }

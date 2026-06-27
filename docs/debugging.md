@@ -12,6 +12,32 @@ Kilo Docker uses centralized logging in `pkg/utils/log.go`:
 
 Add `utils.WithOutput()` for user-visible messages (stderr).
 
+## Diagnostic Tools Inside a Session
+
+Pass `--diagnostics` when starting a session to install lightweight system
+diagnostic tools on demand (~9 MB, opt-in):
+
+```bash
+kilo-docker --diagnostics -y
+```
+
+| Tool | Package | Use case |
+|------|---------|----------|
+| `ps`, `top`, `pgrep`, `free`, `uptime`, `watch` | `procps` | Inspect running processes and resource usage |
+| `ss` | `iproute2` | Modern socket/port inspection |
+| `lsof` | `lsof` | List open files and port-bound processes |
+| `netstat`, `ifconfig` | `net-tools` | Classic network diagnostics |
+| `nc` | `netcat-openbsd` | TCP/UDP connectivity tests |
+| `ping` | `iputils-ping` | Reachability and latency checks |
+| `pstree`, `fuser`, `killall` | `psmisc` | Process tree and signal helpers |
+
+The install step is idempotent — running `init` again on a prepared volume is a
+no-op. Tools are only installed in sessions that opt in; the base image is
+unchanged.
+
+When `--diagnostics` is set, the environment variable `DIAGNOSTICS_ENABLED=1` is
+available inside the session.
+
 ## Common Scenarios
 
 ### Container fails to start
