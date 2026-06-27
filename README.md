@@ -121,6 +121,7 @@ The current working directory is always mounted at the same path automatically.
 | `--nvm` | Install NVM (Node Version Manager) for managing Node.js versions |
 | `--rclone` | Install rclone, a universal CLI for S3 and 40+ cloud storage backends |
 | `--gitnexus` | Install GitNexus for codebase knowledge graph indexing and MCP-based code intelligence |
+| `--diagnostics` | Install diagnostic tools (ps, top, ss, lsof, netstat, nc, ping, pstree) |
 
 ### Config Profiles
 

@@ -143,6 +143,19 @@ var BuiltInServices = []Service{
 		Volumes:        []string{},
 		RequiresSocket: "",
 	},
+	{
+		Name:        "diagnostics",
+		Flag:        "--diagnostics",
+		Description: "Install diagnostic tools (ps, top, ss, lsof, netstat, nc, ping, pstree)",
+		Install: []string{
+			"command -v ps >/dev/null || (apt-get update && apt-get install -y --no-install-recommends procps iproute2 lsof net-tools netcat-openbsd iputils-ping psmisc && rm -rf /var/lib/apt/lists/*)",
+		},
+		EnvVars: map[string]string{
+			"DIAGNOSTICS_ENABLED": "1",
+		},
+		Volumes:        []string{},
+		RequiresSocket: "",
+	},
 }
 
 func GetService(name string) *Service {
