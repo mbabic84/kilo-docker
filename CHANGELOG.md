@@ -1,3 +1,9 @@
+## [3.42.0](https://github.com/mbabic84/kilo-docker/compare/v3.41.1...v3.42.0) (2026-06-27)
+
+### Features
+
+* add --diagnostics service for on-demand system diagnostic tools ([ce1bbc3](https://github.com/mbabic84/kilo-docker/commit/ce1bbc38f3d7a4edb6454ae6b8d2ac4d3973dce2))
+
 ## [3.41.1](https://github.com/mbabic84/kilo-docker/compare/v3.41.0...v3.41.1) (2026-06-23)
 
 ### Bug Fixes
