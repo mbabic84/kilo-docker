@@ -1,3 +1,9 @@
+## [3.42.1](https://github.com/mbabic84/kilo-docker/compare/v3.42.0...v3.42.1) (2026-06-29)
+
+### Bug Fixes
+
+* update Context7 auth header from Bearer to CONTEXT7_API_KEY ([f78d6c3](https://github.com/mbabic84/kilo-docker/commit/f78d6c3854848a70a5b90f31a77c7c27061a8d9c))
+
 ## [3.42.0](https://github.com/mbabic84/kilo-docker/compare/v3.41.1...v3.42.0) (2026-06-27)
 
 ### Features
