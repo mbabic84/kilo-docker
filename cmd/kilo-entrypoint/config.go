@@ -42,7 +42,7 @@ var mcpServerDefaults = map[string]map[string]any{
 		"url":     "https://mcp.context7.com/mcp",
 		"enabled": false,
 		"headers": map[string]any{
-			"Authorization": "Bearer {env:KD_MCP_CONTEXT7_TOKEN}",
+			"CONTEXT7_API_KEY": "{env:KD_MCP_CONTEXT7_TOKEN}",
 		},
 	},
 }
@@ -129,6 +129,10 @@ func applyMCPEnabledFromEnv(homeDir string) error {
 				utils.LogWarn("[MCP Config] Failed to ensure %s MCP entry: %v\n", name, err)
 			}
 		}
+	}
+
+	if err := migrateContext7Header(configPath); err != nil {
+		utils.LogWarn("[MCP Config] Failed to migrate context7 header: %v\n", err)
 	}
 
 	if err := updateMCPEnabledStates(configPath, enabled); err != nil {
@@ -263,4 +267,89 @@ func ensureMCPEntry(configPath, name string, entryDef map[string]any) error {
 		return err
 	}
 	return os.Rename(tmpPath, configPath)
+}
+
+// migrateContext7Header migrates the old Context7 authorization header format
+// ("Authorization: Bearer <key>") to the new format ("CONTEXT7_API_KEY: <key>").
+// This is idempotent — no-ops if already correct.
+func migrateContext7Header(configPath string) error {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	var config map[string]any
+	if err := json.Unmarshal(data, &config); err != nil {
+		return err
+	}
+
+	mcpRaw, ok := config["mcp"]
+	if !ok {
+		return nil
+	}
+	mcp, ok := mcpRaw.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	ctx7Raw, ok := mcp["context7"]
+	if !ok {
+		return nil
+	}
+	ctx7, ok := ctx7Raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	headersRaw, ok := ctx7["headers"]
+	if !ok {
+		return nil
+	}
+	headers, ok := headersRaw.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	authVal, hasAuth := headers["Authorization"]
+	ctx7Val, hasCtx7Key := headers["CONTEXT7_API_KEY"]
+
+	migrated := false
+
+	// Migrate from old "Authorization: Bearer <key>" format
+	if hasAuth && !hasCtx7Key {
+		val, _ := authVal.(string)
+		headers["CONTEXT7_API_KEY"] = strings.TrimPrefix(val, "Bearer ")
+		delete(headers, "Authorization")
+		migrated = true
+	}
+
+	// Fix already-migrated header that still contains "Bearer " prefix
+	if hasCtx7Key {
+		if val, ok := ctx7Val.(string); ok && strings.HasPrefix(val, "Bearer ") {
+			headers["CONTEXT7_API_KEY"] = strings.TrimPrefix(val, "Bearer ")
+			migrated = true
+		}
+	}
+
+	if migrated {
+		utils.Log("[MCP Config] Migrating context7 header: Authorization -> CONTEXT7_API_KEY\n")
+
+		out, err := json.MarshalIndent(config, "", "  ")
+		if err != nil {
+			return err
+		}
+
+		tmpPath := configPath + ".tmp"
+		if err := os.WriteFile(tmpPath, out, 0o600); err != nil {
+			return err
+		}
+		if err := os.Rename(tmpPath, configPath); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

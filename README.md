@@ -374,13 +374,13 @@ When attaching to a session, `kilo-docker` detects the container state: if runni
 
 | Server | Description | Auth |
 |--------|-------------|------|
-| `context7` | Library documentation lookup | Bearer token |
+| `context7` | Library documentation lookup | API key header |
 | `ainstruct` | Document storage and semantic search | Bearer token (auto-created) |
 | `playwright` | Browser automation (screenshots, navigation) | None (local sidecar) |
 | `gitnexus` | Codebase knowledge graph indexing and MCP-based code intelligence | None (local) |
 | `github` | GitHub repository, issue, and PR management | None (uses gh auth) |
 
-`context7` requires a Bearer token. Use `kilo-entrypoint mcp-tokens` to manage MCP tokens interactively. Use `kilo-entrypoint custom-envs` to manage your own environment variables (see [Custom Environment Variables](#custom-environment-variables)).
+`context7` requires an API key passed via the `CONTEXT7_API_KEY` header. Use `kilo-entrypoint mcp-tokens` to manage MCP tokens interactively. Use `kilo-entrypoint custom-envs` to manage your own environment variables (see [Custom Environment Variables](#custom-environment-variables)).
 
 `playwright` is only available when using the `--playwright` flag. It runs as a separate container on a shared Docker network with no authentication required.
 
