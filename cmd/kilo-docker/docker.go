@@ -95,7 +95,7 @@ func dockerState(container string) string {
 
 // containerExists reports whether a container with the given name exists.
 func containerExists(container string) bool {
-	_, err := dockerRun("inspect", container)
+	_, err := dockerRun("inspect", "--type", "container", container)
 	return err == nil
 }
 

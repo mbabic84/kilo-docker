@@ -157,6 +157,10 @@ func handleUpdate(cfg config) {
 					utils.LogError("[kilo-docker] Error: failed to replace binary: %v\n", err)
 				} else {
 					utils.Log("[kilo-docker] Binary updated: %s\n", target, utils.WithOutput())
+					utils.Log("[kilo-docker] Updating shell completions...\n", utils.WithOutput())
+					if msg := installCompletions(); msg != "" {
+						utils.Log("[kilo-docker] %s\n", msg, utils.WithOutput())
+					}
 				}
 			}
 		}
@@ -233,6 +237,9 @@ func handleInstallDev(cfg config) {
 
 	printInstallPathWarning(installDir, home)
 	utils.Log("[kilo-docker] Installed development binary to %s\n", target, utils.WithOutput())
+	if msg := installCompletions(); msg != "" {
+		utils.Log("[kilo-docker] %s\n", msg, utils.WithOutput())
+	}
 }
 
 func installDevInstallDir(home string) string {

@@ -40,6 +40,11 @@ if command -v docker >/dev/null 2>&1; then
   docker pull ghcr.io/mbabic84/kilo-docker:latest 2>/dev/null || true
 fi
 
+# Install shell completions
+if [ -x "$TARGET" ]; then
+  "$TARGET" completions --install 2>/dev/null || true
+fi
+
 echo ""
 echo "kilo-docker installed successfully to: $TARGET"
 echo ""

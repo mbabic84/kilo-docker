@@ -37,6 +37,14 @@ func parseBatchFlags(args []string) (batchFlags, []string) {
 // handleSessions lists, attaches to, recreates, stops, or cleans up kilo-docker sessions.
 func handleSessions(cfg config) {
 	args := cfg.args
+
+	// Hidden flag for shell tab-completion — must be checked before any
+	// other arg parsing since it looks like a regular argument.
+	if len(args) > 0 && args[0] == "--complete" {
+		showSessionCompletions()
+		return
+	}
+
 	cleanupMode := false
 	var cleanupFlags batchFlags
 	recreateMode := false
@@ -124,7 +132,7 @@ func handleSessions(cfg config) {
 			fmt.Fprintf(os.Stderr, "Error: specify a session to stop (name or index), or use --all/--legacy/--needs-update\n")
 			os.Exit(1)
 		}
-		containerName, err := resolveTarget(attachTarget)
+		containerName, err := resolveTargetWithSessions(attachTarget, sessions)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -152,7 +160,7 @@ func handleSessions(cfg config) {
 			fmt.Fprintf(os.Stderr, "Error: specify a session to recreate (name or index)\n")
 			os.Exit(1)
 		}
-		containerName, err := resolveTarget(attachTarget)
+		containerName, err := resolveTargetWithSessions(attachTarget, sessions)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -234,7 +242,7 @@ func handleSessions(cfg config) {
 
 		containerToClean := ""
 		if attachTarget != "" {
-			containerToClean, err = resolveTarget(attachTarget)
+			containerToClean, err = resolveTargetWithSessions(attachTarget, sessions)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
@@ -252,7 +260,7 @@ func handleSessions(cfg config) {
 				fmt.Fprintf(os.Stderr, "Aborted.\n")
 				os.Exit(0)
 			}
-			containerToClean, err = resolveTarget(selection)
+			containerToClean, err = resolveTargetWithSessions(selection, sessions)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
@@ -277,7 +285,7 @@ func handleSessions(cfg config) {
 		return
 	}
 
-	containerToAttach, err := resolveTarget(attachTarget)
+	containerToAttach, err := resolveTargetWithSessions(attachTarget, sessions)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
