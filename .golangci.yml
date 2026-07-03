@@ -95,6 +95,10 @@ linters:
         text: 'G(107|302|304):'
         linters:
           - gosec
+      - path: cmd/kilo-docker/completions_install\.go
+        text: 'G(301|304|703):'
+        linters:
+          - gosec
       - path: cmd/kilo-entrypoint/(init|login|main|userinit|zellijattach|migration|mcptokens|osuser)\.go
         text: 'G(107|204|704|703|122|115|702):'
         linters:
