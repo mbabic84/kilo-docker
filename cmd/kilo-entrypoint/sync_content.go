@@ -549,7 +549,7 @@ func (s *Syncer) syncFileLocked(absPath, relPath string) error {
 		return fmt.Errorf("reading %s: %w", absPath, err)
 	}
 	localHash := computeLocalHash(content)
-	if s.localHashGet(relPath) == localHash {
+	if localHashGetUnlocked(s.localHashFile, relPath) == localHash {
 		utils.Log("[ainstruct-sync] Skipped (unchanged): %s\n", relPath)
 		return nil
 	}
@@ -570,7 +570,7 @@ func (s *Syncer) syncFileLocked(absPath, relPath string) error {
 			return err
 		}
 	}
-	if err := s.localHashSet(relPath, localHash); err != nil {
+	if err := localHashSetUnlocked(s.localHashFile, relPath, localHash); err != nil {
 		utils.LogWarn("[ainstruct-sync] Warning: local hash update failed for %s: %v\n", relPath, err)
 	}
 	return nil
@@ -592,7 +592,7 @@ func (s *Syncer) patchDocument(existing *document, relPath string, content []byt
 		return fmt.Errorf("parsing PATCH response: %w (body: %s)", err, string(data))
 	}
 	if result.ContentHash != "" {
-		if err := s.hashSet(relPath, result.ContentHash); err != nil {
+		if err := s.hashSetUnlocked(relPath, result.ContentHash); err != nil {
 			utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
 		}
 	}
@@ -622,7 +622,7 @@ func (s *Syncer) createDocument(absPath, relPath, title string, content []byte, 
 		return fmt.Errorf("parsing POST response: %w (body: %s)", err, string(data))
 	}
 	if result.ContentHash != "" {
-		if err := s.hashSet(relPath, result.ContentHash); err != nil {
+		if err := s.hashSetUnlocked(relPath, result.ContentHash); err != nil {
 			utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
 		}
 	}
