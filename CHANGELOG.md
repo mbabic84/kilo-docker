@@ -1,3 +1,9 @@
+## [3.43.0](https://github.com/mbabic84/kilo-docker/compare/v3.42.1...v3.43.0) (2026-07-03)
+
+### Features
+
+* add session auto-completion and shell completion scripts ([678749a](https://github.com/mbabic84/kilo-docker/commit/678749a136ffbaf51454938bfff0d664015eda59))
+
 ## [3.42.1](https://github.com/mbabic84/kilo-docker/compare/v3.42.0...v3.42.1) (2026-06-29)
 
 ### Bug Fixes
