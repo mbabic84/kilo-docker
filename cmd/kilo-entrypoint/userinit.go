@@ -470,14 +470,41 @@ func findExistingUser() string {
 	return ""
 }
 
+const syncPIDFile = "/tmp/.kilo-sync.pid"
+
 // startSyncWithTokens starts the sync process. Tokens are loaded by
-// sync_content.go directly from encrypted storage.
+// sync_content.go directly from encrypted storage. Uses a PID file guard
+// to prevent multiple concurrent sync processes.
 func startSyncWithTokens(homeDir, userID string) error {
+	if data, err := os.ReadFile(syncPIDFile); err == nil {
+		pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+		if err == nil {
+			process, err := os.FindProcess(pid)
+			if err == nil {
+				if err := process.Signal(syscall.Signal(0)); err == nil {
+					utils.Log("[userinit] Sync process already running (PID %d), skipping\n", pid)
+					return nil
+				}
+			}
+		}
+		_ = os.Remove(syncPIDFile)
+	}
+
 	go func() {
 		cmd := exec.Command("kilo-entrypoint", "sync")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		_ = cmd.Start()
+		if err := cmd.Start(); err != nil {
+			utils.LogWarn("[userinit] Failed to start sync: %v\n", err)
+			return
+		}
+		f, err := os.OpenFile(syncPIDFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err != nil {
+			utils.Log("[userinit] Sync PID file already claimed, skipping\n")
+			return
+		}
+		_, _ = f.WriteString(strconv.Itoa(cmd.Process.Pid))
+		_ = f.Close()
 	}()
 
 	return nil
