@@ -180,7 +180,25 @@ func updateMCPEnabledStates(configPath string, enabled map[string]bool) error {
 	}
 	utils.Log("[MCP Config] Found MCP section with %d server(s)\n", len(mcp))
 
-	updatedCount := 0
+	needsUpdate := false
+	for key, entryRaw := range mcp {
+		entry, ok := entryRaw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if val, known := enabled[key]; known {
+			if entry["enabled"] != val {
+				needsUpdate = true
+				utils.Log("[MCP Config] %s: needs update enabled=%v -> %v\n", key, entry["enabled"], val)
+			}
+		}
+	}
+
+	if !needsUpdate {
+		utils.Log("[MCP Config] All MCP enabled states already match, skipping config write\n")
+		return nil
+	}
+
 	for key, entryRaw := range mcp {
 		entry, ok := entryRaw.(map[string]any)
 		if !ok {
@@ -188,14 +206,8 @@ func updateMCPEnabledStates(configPath string, enabled map[string]bool) error {
 			continue
 		}
 
-		oldEnabled := entry["enabled"]
-
 		if val, known := enabled[key]; known {
 			entry["enabled"] = val
-			utils.Log("[MCP Config] %s: enabled=%v (was %v)\n", key, val, oldEnabled)
-			updatedCount++
-		} else {
-			utils.Log("[MCP Config] Skipping unknown MCP server '%s'\n", key)
 		}
 
 		mcp[key] = entry
@@ -220,7 +232,7 @@ func updateMCPEnabledStates(configPath string, enabled map[string]bool) error {
 		return err
 	}
 
-	utils.Log("[MCP Config] Successfully updated %d MCP server(s)\n", updatedCount)
+	utils.Log("[MCP Config] Successfully updated MCP enabled states\n")
 	return nil
 }
 
