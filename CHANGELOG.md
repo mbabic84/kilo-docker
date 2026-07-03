@@ -1,3 +1,14 @@
+## [3.45.0](https://github.com/mbabic84/kilo-docker/compare/v3.44.0...v3.45.0) (2026-07-03)
+
+### Features
+
+* add cross-container flock coordination and local hash skip ([4407619](https://github.com/mbabic84/kilo-docker/commit/4407619c2997b576176408f1bc5f7e7f809c0f9d))
+
+### Bug Fixes
+
+* handle errcheck in flock test defer ([3a583f1](https://github.com/mbabic84/kilo-docker/commit/3a583f11a5e84dbb28ef3f6305ffbcc17f5e25eb))
+* prevent duplicate sync documents from concurrent sessions ([da3e416](https://github.com/mbabic84/kilo-docker/commit/da3e416423d2e63bec422d76ca4abe2308537f43))
+
 ## [3.44.0](https://github.com/mbabic84/kilo-docker/compare/v3.43.0...v3.44.0) (2026-07-03)
 
 ### Features
