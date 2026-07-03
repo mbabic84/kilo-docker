@@ -36,6 +36,17 @@ func runZellijAttach() error {
 		utils.Log("[zellijattach] Init marker exists, checking PAT expiry\n")
 		if needsAinstructPATRefresh() {
 			utils.Log("[kilo-docker] Ainstruct PAT expiring soon, re-authentication required\n", utils.WithOutput())
+			claimed, err := claimUserInit()
+			if err != nil {
+				return err
+			}
+			if !claimed {
+				if err := waitForCompletedUserInit(initReadyTimeout()); err != nil {
+					return err
+				}
+				return execZellij()
+			}
+			defer func() { _ = os.Remove(userInitInProgressMarker) }()
 			return runUserInit()
 		}
 		return execZellij()

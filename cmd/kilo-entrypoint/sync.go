@@ -20,6 +20,7 @@ func runSyncMode() {
 	if err := s.pullCollection(); err != nil {
 		utils.LogError("[ainstruct-sync] Pull failed: %v\n", err)
 	} else {
+		_ = s.cleanupDuplicates()
 		s.pushUnsynced()
 	}
 

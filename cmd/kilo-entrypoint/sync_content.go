@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -78,7 +79,9 @@ type Syncer struct {
 	kiloConfigDir     string
 	kiloDockerDataDir string
 	hashFile          string
+	localHashFile     string
 	hashMu            sync.Mutex
+	lockFile          string
 	collectionID      string
 	authExpired       bool
 	client            *http.Client
@@ -131,6 +134,8 @@ func NewSyncer() *Syncer {
 		kiloConfigDir:     kiloConfigDir,
 		kiloDockerDataDir: kiloDockerDataDir,
 		hashFile:          filepath.Join(kiloDockerDataDir, ".ainstruct-hashes"),
+		localHashFile:     filepath.Join(kiloDockerDataDir, ".ainstruct-local-hashes"),
+		lockFile:          filepath.Join(kiloDockerDataDir, ".sync.lock"),
 		client:            &http.Client{Timeout: 30 * time.Second},
 		syncPaths:         defaultSyncPaths,
 	}
@@ -332,21 +337,43 @@ func (s *Syncer) ensureCollection() error {
 }
 
 type document struct {
-	DocumentID  string `json:"document_id"`
-	Content     string `json:"content"`
-	ContentHash string `json:"content_hash"`
-	Metadata    struct {
-		LocalPath string `json:"local_path"`
-	} `json:"metadata"`
+	DocumentID  string            `json:"document_id"`
+	Title       string            `json:"title"`
+	ContentHash string            `json:"content_hash"`
+	CreatedAt   flexTime          `json:"created_at"`
+	Metadata    map[string]string `json:"metadata"`
 }
 
 type documentsResponse struct {
 	Documents []document `json:"documents"`
+	Total     int        `json:"total"`
+	Limit     int        `json:"limit"`
+	Offset    int        `json:"offset"`
 }
 
 // getDocumentByPath looks up a document in the sync collection by its
 // local file path metadata. Returns nil if not found.
 func (s *Syncer) getDocumentByPath(relPath string) (*document, error) {
+	docs, err := s.listDocuments()
+	if err != nil {
+		return nil, err
+	}
+	return findDocumentByPath(docs, relPath), nil
+}
+
+// findDocumentByPath returns the first document in docs whose local_path
+// matches relPath, or nil if not found.
+func findDocumentByPath(docs []document, relPath string) *document {
+	for i := range docs {
+		if docs[i].Metadata["local_path"] == relPath {
+			return &docs[i]
+		}
+	}
+	return nil
+}
+
+// listDocuments returns all documents in the sync collection.
+func (s *Syncer) listDocuments() ([]document, error) {
 	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
 	if err != nil {
 		return nil, err
@@ -355,12 +382,135 @@ func (s *Syncer) getDocumentByPath(relPath string) (*document, error) {
 	if err := json.Unmarshal(data, &dr); err != nil {
 		return nil, fmt.Errorf("parsing documents response: %w (body: %s)", err, string(data))
 	}
-	for _, d := range dr.Documents {
-		if d.Metadata.LocalPath == relPath {
-			return &d, nil
+	return dr.Documents, nil
+}
+
+// deduplicateByPath removes extra documents that share the same local_path,
+// keeping only the most recently created one. This is a safety net for
+// race conditions where multiple sync processes create documents simultaneously.
+// If allDocs is provided, it is used instead of fetching from the API.
+// Safe: skips deletion when timestamps are equal or zero, preventing
+// accidental deletion of the wrong copy.
+func (s *Syncer) deduplicateByPath(relPath string, allDocs []document) error {
+	if allDocs == nil {
+		data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
+		if err != nil {
+			return err
+		}
+		var dr documentsResponse
+		if err := json.Unmarshal(data, &dr); err != nil {
+			return err
+		}
+		allDocs = dr.Documents
+	}
+	var matches []document
+	for _, d := range allDocs {
+		if d.Metadata["local_path"] == relPath {
+			matches = append(matches, d)
 		}
 	}
-	return nil, nil
+	if len(matches) <= 1 {
+		return nil
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		return matches[i].CreatedAt.Before(matches[j].CreatedAt.Time)
+	})
+	if matches[0].CreatedAt.Equal(matches[len(matches)-1].CreatedAt.Time) {
+		allSameHash := true
+		for i := 1; i < len(matches); i++ {
+			if matches[i].ContentHash != matches[0].ContentHash {
+				allSameHash = false
+				break
+			}
+		}
+		if !allSameHash {
+			utils.Log("[ainstruct-sync] %d documents for %s share same created_at but differ in content, skipping dedup\n", len(matches), relPath)
+			return nil
+		}
+		utils.Log("[ainstruct-sync] %d documents for %s share same created_at and content, cleaning up\n", len(matches), relPath)
+		for i := 1; i < len(matches); i++ {
+			if _, err := s.apiRequest("DELETE", "/documents/"+matches[i].DocumentID, nil); err != nil {
+				utils.LogWarn("[ainstruct-sync] Failed to delete duplicate %s: %v\n", matches[i].DocumentID, err)
+			}
+		}
+		return nil
+	}
+	utils.Log("[ainstruct-sync] Found %d duplicates for %s, cleaning up\n", len(matches), relPath)
+	for i := 0; i < len(matches)-1; i++ {
+		if _, err := s.apiRequest("DELETE", "/documents/"+matches[i].DocumentID, nil); err != nil {
+			utils.LogWarn("[ainstruct-sync] Failed to delete duplicate %s: %v\n", matches[i].DocumentID, err)
+		}
+	}
+	return nil
+}
+
+// cleanupDuplicates removes duplicate documents that share the same local_path,
+// keeping only the most recently created one per path.
+func (s *Syncer) cleanupDuplicates() error {
+	lock, err := utils.Acquire(s.lockFile, true)
+	if err != nil {
+		return fmt.Errorf("acquiring sync lock for cleanup: %w", err)
+	}
+	defer lock.Release() //nolint:errcheck // best-effort release
+
+	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
+	if err != nil {
+		return err
+	}
+	var dr documentsResponse
+	if err := json.Unmarshal(data, &dr); err != nil {
+		return err
+	}
+	byPath := make(map[string][]document)
+	for _, d := range dr.Documents {
+		if d.Metadata["local_path"] == "" {
+			continue
+		}
+		byPath[d.Metadata["local_path"]] = append(byPath[d.Metadata["local_path"]], d)
+	}
+	var deleted int
+	for path, docs := range byPath {
+		if len(docs) <= 1 {
+			continue
+		}
+		sort.Slice(docs, func(i, j int) bool {
+			return docs[i].CreatedAt.Before(docs[j].CreatedAt.Time)
+		})
+		if docs[0].CreatedAt.Equal(docs[len(docs)-1].CreatedAt.Time) {
+			allSameHash := true
+			for i := 1; i < len(docs); i++ {
+				if docs[i].ContentHash != docs[0].ContentHash {
+					allSameHash = false
+					break
+				}
+			}
+			if !allSameHash {
+				utils.Log("[ainstruct-sync] %d documents for %s share same created_at but differ in content, skipping\n", len(docs), path)
+				continue
+			}
+			utils.Log("[ainstruct-sync] %d documents for %s share same created_at and content, cleaning up\n", len(docs), path)
+			for i := 1; i < len(docs); i++ {
+				if _, err := s.apiRequest("DELETE", "/documents/"+docs[i].DocumentID, nil); err != nil {
+					utils.LogWarn("[ainstruct-sync] Failed to delete duplicate %s: %v\n", docs[i].DocumentID, err)
+				} else {
+					deleted++
+				}
+			}
+			continue
+		}
+		utils.Log("[ainstruct-sync] Cleaning %d duplicates for %s\n", len(docs), path)
+		for i := 0; i < len(docs)-1; i++ {
+			if _, err := s.apiRequest("DELETE", "/documents/"+docs[i].DocumentID, nil); err != nil {
+				utils.LogWarn("[ainstruct-sync] Failed to delete duplicate %s: %v\n", docs[i].DocumentID, err)
+			} else {
+				deleted++
+			}
+		}
+	}
+	if deleted > 0 {
+		utils.Log("[ainstruct-sync] Removed %d duplicate document(s)\n", deleted)
+	}
+	return nil
 }
 
 // syncFile uploads or updates a local file in the Ainstruct collection.
@@ -381,66 +531,104 @@ func (s *Syncer) syncFile(absPath string) error {
 		return err
 	}
 	relPath := strings.TrimPrefix(absPath, s.kiloConfigDir+"/")
+
+	lock, err := utils.Acquire(s.lockFile, true)
+	if err != nil {
+		return fmt.Errorf("acquiring sync lock: %w", err)
+	}
+	defer lock.Release() //nolint:errcheck // best-effort release
+
+	return s.syncFileLocked(absPath, relPath)
+}
+
+// syncFileLocked performs the actual sync after the flock is held.
+func (s *Syncer) syncFileLocked(absPath, relPath string) error {
 	title := filepath.Base(absPath)
 	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", absPath, err)
 	}
-	existing, err := s.getDocumentByPath(relPath)
+	localHash := computeLocalHash(content)
+	if s.localHashGet(relPath) == localHash {
+		utils.Log("[ainstruct-sync] Skipped (unchanged): %s\n", relPath)
+		return nil
+	}
+	allDocs, err := s.listDocuments()
+	if err != nil {
+		return err
+	}
+	existing := findDocumentByPath(allDocs, relPath)
+	if s.authExpired {
+		return fmt.Errorf("auth expired")
+	}
+	if existing != nil {
+		if err := s.patchDocument(existing, relPath, content); err != nil {
+			return err
+		}
+	} else {
+		if err := s.createDocument(absPath, relPath, title, content, allDocs); err != nil {
+			return err
+		}
+	}
+	if err := s.localHashSet(relPath, localHash); err != nil {
+		utils.LogWarn("[ainstruct-sync] Warning: local hash update failed for %s: %v\n", relPath, err)
+	}
+	return nil
+}
+
+func (s *Syncer) patchDocument(existing *document, relPath string, content []byte) error {
+	body := map[string]string{"content": string(content)}
+	data, err := s.apiRequest("PATCH", "/documents/"+existing.DocumentID, body)
 	if err != nil {
 		return err
 	}
 	if s.authExpired {
 		return fmt.Errorf("auth expired")
 	}
-	if existing != nil {
-		body := map[string]string{"content": string(content)}
-		data, err := s.apiRequest("PATCH", "/documents/"+existing.DocumentID, body)
-		if err != nil {
-			return err
+	var result struct {
+		ContentHash string `json:"content_hash"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return fmt.Errorf("parsing PATCH response: %w (body: %s)", err, string(data))
+	}
+	if result.ContentHash != "" {
+		if err := s.hashSet(relPath, result.ContentHash); err != nil {
+			utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
 		}
-		if s.authExpired {
-			return fmt.Errorf("auth expired")
+	}
+	utils.Log("[ainstruct-sync] Updated: %s\n", relPath)
+	return nil
+}
+
+func (s *Syncer) createDocument(absPath, relPath, title string, content []byte, allDocs []document) error {
+	body := map[string]any{
+		"title":         title,
+		"content":       string(content),
+		"document_type": documentType(absPath),
+		"collection_id": s.collectionID,
+		"metadata":      map[string]string{"local_path": relPath},
+	}
+	data, err := s.apiRequest("POST", "/documents", body)
+	if err != nil {
+		return err
+	}
+	if s.authExpired {
+		return fmt.Errorf("auth expired")
+	}
+	var result struct {
+		ContentHash string `json:"content_hash"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return fmt.Errorf("parsing POST response: %w (body: %s)", err, string(data))
+	}
+	if result.ContentHash != "" {
+		if err := s.hashSet(relPath, result.ContentHash); err != nil {
+			utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
 		}
-		var result struct {
-			ContentHash string `json:"content_hash"`
-		}
-		if err := json.Unmarshal(data, &result); err != nil {
-			return fmt.Errorf("parsing PATCH response: %w (body: %s)", err, string(data))
-		}
-		if result.ContentHash != "" {
-			if err := s.hashSet(relPath, result.ContentHash); err != nil {
-				utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
-			}
-		}
-		utils.Log("[ainstruct-sync] Updated: %s\n", relPath)
-	} else {
-		body := map[string]any{
-			"title":         title,
-			"content":       string(content),
-			"document_type": documentType(absPath),
-			"collection_id": s.collectionID,
-			"metadata":      map[string]string{"local_path": relPath},
-		}
-		data, err := s.apiRequest("POST", "/documents", body)
-		if err != nil {
-			return err
-		}
-		if s.authExpired {
-			return fmt.Errorf("auth expired")
-		}
-		var result struct {
-			ContentHash string `json:"content_hash"`
-		}
-		if err := json.Unmarshal(data, &result); err != nil {
-			return fmt.Errorf("parsing POST response: %w (body: %s)", err, string(data))
-		}
-		if result.ContentHash != "" {
-			if err := s.hashSet(relPath, result.ContentHash); err != nil {
-				utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
-			}
-		}
-		utils.Log("[ainstruct-sync] Created: %s\n", relPath)
+	}
+	utils.Log("[ainstruct-sync] Created: %s\n", relPath)
+	if err := s.deduplicateByPath(relPath, allDocs); err != nil {
+		utils.LogWarn("[ainstruct-sync] Dedup warning for %s: %v\n", relPath, err)
 	}
 	return nil
 }
@@ -468,6 +656,9 @@ func (s *Syncer) deleteByPath(relPath string) error {
 		}
 		if err := s.hashDelete(relPath); err != nil {
 			utils.LogWarn("[ainstruct-sync] Warning: hash delete failed for %s: %v\n", relPath, err)
+		}
+		if err := s.localHashDelete(relPath); err != nil {
+			utils.LogWarn("[ainstruct-sync] Warning: local hash delete failed for %s: %v\n", relPath, err)
 		}
 		utils.Log("[ainstruct-sync] Deleted: %s\n", relPath)
 	}
@@ -499,10 +690,10 @@ func (s *Syncer) listSyncFiles(humanReadable bool) error {
 	logSyncOutput("%-50s %-12s %-20s\n", "----", "----", "--------")
 
 	for _, doc := range dr.Documents {
-		if doc.Metadata.LocalPath == "" {
+		if doc.Metadata["local_path"] == "" {
 			continue
 		}
-		if !s.isSyncedPath(doc.Metadata.LocalPath) {
+		if !s.isSyncedPath(doc.Metadata["local_path"]) {
 			continue
 		}
 		
@@ -510,7 +701,7 @@ func (s *Syncer) listSyncFiles(humanReadable bool) error {
 		size := "-"
 		modTime := "-"
 		
-		absPath := filepath.Join(s.kiloConfigDir, doc.Metadata.LocalPath)
+		absPath := filepath.Join(s.kiloConfigDir, doc.Metadata["local_path"])
 		if info, err := os.Stat(absPath); err == nil {
 			if humanReadable {
 				size = formatFileSize(info.Size())
@@ -520,7 +711,7 @@ func (s *Syncer) listSyncFiles(humanReadable bool) error {
 			modTime = info.ModTime().Format("2006-01-02 15:04")
 		}
 		
-		logSyncOutput("%-50s %-12s %-20s\n", doc.Metadata.LocalPath, size, modTime)
+		logSyncOutput("%-50s %-12s %-20s\n", doc.Metadata["local_path"], size, modTime)
 	}
 
 	return nil
@@ -625,7 +816,7 @@ func (s *Syncer) pullCollection() error {
 	}
 	utils.Log("[ainstruct-sync] Pull: processing %d documents\n", len(dr.Documents))
 	for i, doc := range dr.Documents {
-		relPath := doc.Metadata.LocalPath
+		relPath := doc.Metadata["local_path"]
 		utils.Log("[ainstruct-sync] Pull: doc[%d] id=%s relPath=%q contentHash=%s\n", i, utils.RedactID(doc.DocumentID), relPath, doc.ContentHash)
 		if relPath == "" {
 			utils.Log("[ainstruct-sync] Pull: doc[%d] skipped — empty relPath\n", i)
@@ -698,10 +889,10 @@ func (s *Syncer) deleteAllDocuments() error {
 	utils.Log("[ainstruct-sync] Deleting %d documents from collection %s...\n", len(dr.Documents), utils.RedactID(s.collectionID))
 	for _, doc := range dr.Documents {
 		if _, err := s.apiRequest("DELETE", "/documents/"+doc.DocumentID, nil); err != nil {
-			utils.LogError("[ainstruct-sync] Failed to delete %s (%s): %v\n", doc.Metadata.LocalPath, utils.RedactID(doc.DocumentID), err)
+			utils.LogError("[ainstruct-sync] Failed to delete %s (%s): %v\n", doc.Metadata["local_path"], utils.RedactID(doc.DocumentID), err)
 			continue
 		}
-		utils.Log("[ainstruct-sync] Deleted: %s\n", doc.Metadata.LocalPath)
+		utils.Log("[ainstruct-sync] Deleted: %s\n", doc.Metadata["local_path"])
 	}
 	utils.Log("[ainstruct-sync] Done. Restart the container to re-sync with correct paths.\n")
 	return nil
