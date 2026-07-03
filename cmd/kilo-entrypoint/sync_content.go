@@ -79,7 +79,9 @@ type Syncer struct {
 	kiloConfigDir     string
 	kiloDockerDataDir string
 	hashFile          string
+	localHashFile     string
 	hashMu            sync.Mutex
+	lockFile          string
 	collectionID      string
 	authExpired       bool
 	client            *http.Client
@@ -132,6 +134,8 @@ func NewSyncer() *Syncer {
 		kiloConfigDir:     kiloConfigDir,
 		kiloDockerDataDir: kiloDockerDataDir,
 		hashFile:          filepath.Join(kiloDockerDataDir, ".ainstruct-hashes"),
+		localHashFile:     filepath.Join(kiloDockerDataDir, ".ainstruct-local-hashes"),
+		lockFile:          filepath.Join(kiloDockerDataDir, ".sync.lock"),
 		client:            &http.Client{Timeout: 30 * time.Second},
 		syncPaths:         defaultSyncPaths,
 	}
@@ -443,6 +447,12 @@ func (s *Syncer) deduplicateByPath(relPath string, allDocs []document) error {
 // cleanupDuplicates removes duplicate documents that share the same local_path,
 // keeping only the most recently created one per path.
 func (s *Syncer) cleanupDuplicates() error {
+	lock, err := utils.Acquire(s.lockFile, true)
+	if err != nil {
+		return fmt.Errorf("acquiring sync lock for cleanup: %w", err)
+	}
+	defer lock.Release() //nolint:errcheck // best-effort release
+
 	data, err := s.apiRequest("GET", "/documents?collection_id="+s.collectionID, nil)
 	if err != nil {
 		return err
@@ -521,10 +531,27 @@ func (s *Syncer) syncFile(absPath string) error {
 		return err
 	}
 	relPath := strings.TrimPrefix(absPath, s.kiloConfigDir+"/")
+
+	lock, err := utils.Acquire(s.lockFile, true)
+	if err != nil {
+		return fmt.Errorf("acquiring sync lock: %w", err)
+	}
+	defer lock.Release() //nolint:errcheck // best-effort release
+
+	return s.syncFileLocked(absPath, relPath)
+}
+
+// syncFileLocked performs the actual sync after the flock is held.
+func (s *Syncer) syncFileLocked(absPath, relPath string) error {
 	title := filepath.Base(absPath)
 	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", absPath, err)
+	}
+	localHash := computeLocalHash(content)
+	if s.localHashGet(relPath) == localHash {
+		utils.Log("[ainstruct-sync] Skipped (unchanged): %s\n", relPath)
+		return nil
 	}
 	allDocs, err := s.listDocuments()
 	if err != nil {
@@ -535,56 +562,73 @@ func (s *Syncer) syncFile(absPath string) error {
 		return fmt.Errorf("auth expired")
 	}
 	if existing != nil {
-		body := map[string]string{"content": string(content)}
-		data, err := s.apiRequest("PATCH", "/documents/"+existing.DocumentID, body)
-		if err != nil {
+		if err := s.patchDocument(existing, relPath, content); err != nil {
 			return err
 		}
-		if s.authExpired {
-			return fmt.Errorf("auth expired")
-		}
-		var result struct {
-			ContentHash string `json:"content_hash"`
-		}
-		if err := json.Unmarshal(data, &result); err != nil {
-			return fmt.Errorf("parsing PATCH response: %w (body: %s)", err, string(data))
-		}
-		if result.ContentHash != "" {
-			if err := s.hashSet(relPath, result.ContentHash); err != nil {
-				utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
-			}
-		}
-		utils.Log("[ainstruct-sync] Updated: %s\n", relPath)
 	} else {
-		body := map[string]any{
-			"title":         title,
-			"content":       string(content),
-			"document_type": documentType(absPath),
-			"collection_id": s.collectionID,
-			"metadata":      map[string]string{"local_path": relPath},
-		}
-		data, err := s.apiRequest("POST", "/documents", body)
-		if err != nil {
+		if err := s.createDocument(absPath, relPath, title, content, allDocs); err != nil {
 			return err
 		}
-		if s.authExpired {
-			return fmt.Errorf("auth expired")
+	}
+	if err := s.localHashSet(relPath, localHash); err != nil {
+		utils.LogWarn("[ainstruct-sync] Warning: local hash update failed for %s: %v\n", relPath, err)
+	}
+	return nil
+}
+
+func (s *Syncer) patchDocument(existing *document, relPath string, content []byte) error {
+	body := map[string]string{"content": string(content)}
+	data, err := s.apiRequest("PATCH", "/documents/"+existing.DocumentID, body)
+	if err != nil {
+		return err
+	}
+	if s.authExpired {
+		return fmt.Errorf("auth expired")
+	}
+	var result struct {
+		ContentHash string `json:"content_hash"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return fmt.Errorf("parsing PATCH response: %w (body: %s)", err, string(data))
+	}
+	if result.ContentHash != "" {
+		if err := s.hashSet(relPath, result.ContentHash); err != nil {
+			utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
 		}
-		var result struct {
-			ContentHash string `json:"content_hash"`
+	}
+	utils.Log("[ainstruct-sync] Updated: %s\n", relPath)
+	return nil
+}
+
+func (s *Syncer) createDocument(absPath, relPath, title string, content []byte, allDocs []document) error {
+	body := map[string]any{
+		"title":         title,
+		"content":       string(content),
+		"document_type": documentType(absPath),
+		"collection_id": s.collectionID,
+		"metadata":      map[string]string{"local_path": relPath},
+	}
+	data, err := s.apiRequest("POST", "/documents", body)
+	if err != nil {
+		return err
+	}
+	if s.authExpired {
+		return fmt.Errorf("auth expired")
+	}
+	var result struct {
+		ContentHash string `json:"content_hash"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return fmt.Errorf("parsing POST response: %w (body: %s)", err, string(data))
+	}
+	if result.ContentHash != "" {
+		if err := s.hashSet(relPath, result.ContentHash); err != nil {
+			utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
 		}
-		if err := json.Unmarshal(data, &result); err != nil {
-			return fmt.Errorf("parsing POST response: %w (body: %s)", err, string(data))
-		}
-		if result.ContentHash != "" {
-			if err := s.hashSet(relPath, result.ContentHash); err != nil {
-				utils.LogWarn("[ainstruct-sync] Warning: hash update failed for %s: %v\n", relPath, err)
-			}
-		}
-		utils.Log("[ainstruct-sync] Created: %s\n", relPath)
-		if err := s.deduplicateByPath(relPath, allDocs); err != nil {
-			utils.LogWarn("[ainstruct-sync] Dedup warning for %s: %v\n", relPath, err)
-		}
+	}
+	utils.Log("[ainstruct-sync] Created: %s\n", relPath)
+	if err := s.deduplicateByPath(relPath, allDocs); err != nil {
+		utils.LogWarn("[ainstruct-sync] Dedup warning for %s: %v\n", relPath, err)
 	}
 	return nil
 }
@@ -612,6 +656,9 @@ func (s *Syncer) deleteByPath(relPath string) error {
 		}
 		if err := s.hashDelete(relPath); err != nil {
 			utils.LogWarn("[ainstruct-sync] Warning: hash delete failed for %s: %v\n", relPath, err)
+		}
+		if err := s.localHashDelete(relPath); err != nil {
+			utils.LogWarn("[ainstruct-sync] Warning: local hash delete failed for %s: %v\n", relPath, err)
 		}
 		utils.Log("[ainstruct-sync] Deleted: %s\n", relPath)
 	}
