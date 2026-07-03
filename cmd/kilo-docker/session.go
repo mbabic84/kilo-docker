@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -84,22 +85,56 @@ func showSessions(sessions []session) {
 	}
 }
 
-// resolveTarget converts a target (numeric index or container name) to a
-// container name. Returns an error if the container doesn't exist or the
-// index is out of range.
+// resolveTarget converts a target (numeric index, container name, or workspace
+// name) to a container name. Resolution order:
+//  1. Numeric index (all digits) → index lookup
+//  2. Exact container name → return as-is
+//  3. Workspace basename (exact match) → return that session
+//  4. Workspace basename prefix match → return if unique, error if ambiguous
+//  5. No match → error
 func resolveTarget(target string) (string, error) {
-	for _, c := range target {
-		if c < '0' || c > '9' {
-			if containerExists(target) {
-				return target, nil
-			}
-			return "", fmt.Errorf("container '%s' not found", target)
-		}
-	}
-
 	sessions, err := getSessions()
 	if err != nil {
 		return "", err
+	}
+	return resolveTargetWithSessions(target, sessions)
+}
+
+// resolveTargetWithSessions is like resolveTarget but accepts a pre-fetched
+// sessions list to avoid redundant Docker calls.
+func resolveTargetWithSessions(target string, sessions []session) (string, error) {
+	for _, c := range target {
+		if c < '0' || c > '9' {
+			// Try workspace matching first — workspace basenames are the
+			// primary user-facing identifier (used by tab completion).
+			var matches []session
+			for _, s := range sessions {
+				base := filepath.Base(s.Workspace)
+				if base == target || strings.HasPrefix(base, target) {
+					matches = append(matches, s)
+				}
+			}
+
+			switch len(matches) {
+			case 1:
+				return matches[0].Name, nil
+			case 2, 3, 4, 5, 6, 7, 8, 9:
+				var candidates []string
+				for i, m := range matches {
+					candidates = append(candidates, fmt.Sprintf("  %d) %s (%s)", i+1, filepath.Base(m.Workspace), m.Name))
+				}
+				return "", fmt.Errorf("ambiguous target '%s', did you mean:\n%s", target, strings.Join(candidates, "\n"))
+			}
+
+			// No workspace match — fall back to exact container name.
+			if containerExists(target) {
+				return target, nil
+			}
+
+			if len(matches) == 0 {
+				return "", fmt.Errorf("no session matches '%s'", target)
+			}
+		}
 	}
 
 	idx := 0
@@ -129,4 +164,18 @@ func filterSessions(sessions []session, legacy, needsUpdate bool) []session {
 		}
 	}
 	return filtered
+}
+
+// showSessionCompletions prints tab-completion candidates to stdout, one per
+// line. Each session produces two candidates: workspace basename and full
+// workspace path.
+func showSessionCompletions() {
+	sessions, err := getSessions()
+	if err != nil {
+		return
+	}
+	for _, s := range sessions {
+		fmt.Printf("%s\n", filepath.Base(s.Workspace))
+		fmt.Printf("%s\n", s.Workspace)
+	}
 }

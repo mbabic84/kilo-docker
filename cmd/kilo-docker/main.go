@@ -105,6 +105,8 @@ func main() {
 		handleInit(cfg)
 	case "playwright":
 		handlePlaywright(cfg)
+	case "completions":
+		handleCompletions(cfg)
 	case "profile":
 		handleProfile(cfg)
 	default:

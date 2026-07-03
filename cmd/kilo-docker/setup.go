@@ -78,6 +78,7 @@ func printHelp() {
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "cleanup", "Remove all artifacts"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "update", "Update binary and/or config (use update -h for subcommands)"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "install-dev", "Install current development binary to ~/.local/bin"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "completions", "Generate shell completion scripts (bash/zsh/fish)"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "version", "Show versions"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "help", "Show this help message"))
 
@@ -132,6 +133,12 @@ Commands:
 
 Options:
   -h, --help            Show this help message
+
+Targets can be specified by index, container name, or workspace name:
+  kilo-docker sessions 1                       # attach by index
+  kilo-docker sessions kilo-a1b2c3d4           # attach by container name
+  kilo-docker sessions my-proj                 # attach by workspace name (tab-completion available)
+  kilo-docker sessions /home/user/proj         # attach by workspace path
 
 Examples:
   kilo-docker sessions                          # list sessions
@@ -441,6 +448,33 @@ Examples:
   kilo-docker help
   kilo-docker help sessions
   kilo-docker help sessions cleanup
+`
+	case "completions":
+		help = `Usage: kilo-docker completions <shell>
+
+Generate shell completion scripts for kilo-docker.
+
+Arguments:
+  <shell>             Target shell: bash, zsh, or fish
+
+Installation:
+  Bash (Linux):
+    kilo-docker completions bash > ~/.local/share/bash-completion/completions/kilo-docker
+
+  Bash (macOS with Homebrew):
+    kilo-docker completions bash > $(brew --prefix)/etc/bash_completion.d/kilo-docker
+
+  Zsh:
+    mkdir -p ~/.zsh/completions
+    kilo-docker completions zsh > ~/.zsh/completions/_kilo-docker
+    # Add to ~/.zshrc: fpath=(~/.zsh/completions $fpath)
+
+  Fish:
+    mkdir -p ~/.config/fish/completions
+    kilo-docker completions fish > ~/.config/fish/completions/kilo-docker.fish
+
+  Auto-install (detects shell automatically):
+    kilo-docker completions --install
 `
 	default:
 		help = fmt.Sprintf("Unknown command: %s\nRun 'kilo-docker help' for usage.\n", command)
