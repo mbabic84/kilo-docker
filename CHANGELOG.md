@@ -1,3 +1,10 @@
+## [3.45.1](https://github.com/mbabic84/kilo-docker/compare/v3.45.0...v3.45.1) (2026-07-03)
+
+### Bug Fixes
+
+* skip config file write in updateMCPEnabledStates when no changes needed ([99bdc38](https://github.com/mbabic84/kilo-docker/commit/99bdc388de05fbe70b6efd018b7a80fa3e71ef04))
+* use unlocked hash functions in sync_fileLocked and createDocument ([8b2eceb](https://github.com/mbabic84/kilo-docker/commit/8b2ecebb23736737721ab0bb352b54b37692f733))
+
 ## [3.45.0](https://github.com/mbabic84/kilo-docker/compare/v3.44.0...v3.45.0) (2026-07-03)
 
 ### Features
