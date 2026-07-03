@@ -66,7 +66,11 @@ func TestSharedLocksCoexist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Acquire shared lock1: %v", err)
 	}
-	defer lock1.Release()
+	defer func() {
+		if err := lock1.Release(); err != nil {
+			t.Errorf("Release lock1: %v", err)
+		}
+	}()
 
 	// Second shared lock should succeed immediately (no blocking).
 	lock2, err := Acquire(lockPath, false)
