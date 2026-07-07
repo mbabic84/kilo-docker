@@ -510,6 +510,53 @@ func startSyncWithTokens(homeDir, userID string) error {
 	return nil
 }
 
+// ensureSyncForCurrentUser drops privileges to the configured user and starts
+// the sync watcher if not already running. This is called on re-attach paths
+// where runUserInit() is skipped but the file watcher still needs to be active.
+func ensureSyncForCurrentUser() {
+	homeDir, _, _, userID := loadUserConfig()
+	if homeDir == "" || userID == "" {
+		utils.Log("[zellijattach] Cannot start sync: no user config\n")
+		return
+	}
+
+	configPath := filepath.Join(homeDir, ".local/share/kilo-docker/.user-config.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		utils.LogWarn("[zellijattach] Cannot read user config for sync: %v\n", err)
+		return
+	}
+
+	var config map[string]string
+	if err := json.Unmarshal(data, &config); err != nil {
+		utils.LogWarn("[zellijattach] Cannot parse user config for sync: %v\n", err)
+		return
+	}
+
+	uidStr, uidOK := config["uid"]
+	gidStr, gidOK := config["gid"]
+	username := config["username"]
+	if !uidOK || !gidOK || username == "" {
+		utils.Log("[zellijattach] Cannot start sync: incomplete user config\n")
+		return
+	}
+
+	uid, _ := strconv.Atoi(uidStr)
+	gid, _ := strconv.Atoi(gidStr)
+
+	suppGroups := getUserGroups(username)
+	if len(suppGroups) > 0 {
+		if err := syscall.Setgroups(suppGroups); err != nil {
+			utils.LogWarn("[zellijattach] Failed to set supplementary groups for sync: %v\n", err)
+		}
+	}
+	_ = syscall.Setgid(gid)
+	_ = syscall.Setuid(uid)
+
+	utils.Log("[zellijattach] Starting file sync for user %s (UID=%d)\n", username, uid)
+	_ = startSyncWithTokens(homeDir, userID)
+}
+
 // updateBashrcManaged writes NVM and Python wrapper functions to a managed
 // section of .bashrc. The section is delimited by "# >>> kilo-managed >>>"
 // and "# <<< kilo-managed <<<". Content is determined by KD_SERVICES env var,
