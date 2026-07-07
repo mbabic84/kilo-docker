@@ -1,3 +1,9 @@
+## [3.45.2](https://github.com/mbabic84/kilo-docker/compare/v3.45.1...v3.45.2) (2026-07-07)
+
+### Bug Fixes
+
+* start ainstruct sync watcher on container re-attach ([cebe1a7](https://github.com/mbabic84/kilo-docker/commit/cebe1a7ec7fcf250ae7c531e41614c92fc2c1b47)), closes [#231](https://github.com/mbabic84/kilo-docker/issues/231)
+
 ## [3.45.1](https://github.com/mbabic84/kilo-docker/compare/v3.45.0...v3.45.1) (2026-07-03)
 
 ### Bug Fixes
