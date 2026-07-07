@@ -44,11 +44,13 @@ func runZellijAttach() error {
 				if err := waitForCompletedUserInit(initReadyTimeout()); err != nil {
 					return err
 				}
+				ensureSyncForCurrentUser()
 				return execZellij()
 			}
 			defer func() { _ = os.Remove(userInitInProgressMarker) }()
 			return runUserInit()
 		}
+		ensureSyncForCurrentUser()
 		return execZellij()
 	}
 
@@ -60,6 +62,7 @@ func runZellijAttach() error {
 		if err := waitForCompletedUserInit(initReadyTimeout()); err != nil {
 			return err
 		}
+		ensureSyncForCurrentUser()
 		return execZellij()
 	}
 	defer func() { _ = os.Remove(userInitInProgressMarker) }()
