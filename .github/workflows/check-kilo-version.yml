@@ -21,7 +21,7 @@ jobs:
         run: |
           MAX_ATTEMPTS=10
           for i in $(seq 1 $MAX_ATTEMPTS); do
-            LATEST=$(curl -sSf https://api.github.com/repos/Kilo-Org/kilocode/releases/latest | jq -r '.tag_name' | sed 's/^v//') && break
+            LATEST=$(curl -sSf "https://api.github.com/repos/Kilo-Org/kilocode/releases?per_page=30" | jq -r '[.[] | select(.tag_name | test("^v[0-9]")) | .tag_name] | first' | sed 's/^v//') && break
             BACKOFF=$((2 ** (i - 1)))
             echo "::warning::Attempt $i/$MAX_ATTEMPTS failed, retrying in ${BACKOFF}s..."
             sleep $BACKOFF
