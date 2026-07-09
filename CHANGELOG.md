@@ -1,3 +1,9 @@
+## [3.49.0](https://github.com/mbabic84/kilo-docker/compare/v3.48.0...v3.49.0) (2026-07-09)
+
+### Features
+
+* copy bundled bwrap binary for sandbox support ([4e3aad1](https://github.com/mbabic84/kilo-docker/commit/4e3aad17e87f2e0ea5b0bc40b5d303da759f8d97))
+
 ## [3.48.0](https://github.com/mbabic84/kilo-docker/compare/v3.47.0...v3.48.0) (2026-07-09)
 
 ### Features
