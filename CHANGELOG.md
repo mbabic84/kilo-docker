@@ -1,3 +1,10 @@
+## [3.45.5](https://github.com/mbabic84/kilo-docker/compare/v3.45.4...v3.45.5) (2026-07-09)
+
+### Bug Fixes
+
+* **ci:** parenthesize jq expression to fix operator precedence in check-kilo-version ([3b8db17](https://github.com/mbabic84/kilo-docker/commit/3b8db1771cc465c792c0dd666ac6adc8de0e35ac))
+* **entrypoint:** strip JSONC comments before parsing kilo.jsonc ([06c0f0a](https://github.com/mbabic84/kilo-docker/commit/06c0f0aaaa0ff74aa6b7e75c6c065a091d7490a4))
+
 ## [3.45.4](https://github.com/mbabic84/kilo-docker/compare/v3.45.3...v3.45.4) (2026-07-09)
 
 ### Bug Fixes
