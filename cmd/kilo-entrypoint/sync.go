@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
@@ -27,9 +27,53 @@ func runSyncMode() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	if err := runWatcher(ctx, s); err != nil {
-		utils.LogError("[ainstruct-sync] Watcher error: %v\n", err)
-		os.Exit(1)
+	const (
+		minBackoff = 5 * time.Second
+		maxBackoff = 5 * time.Minute
+	)
+	backoff := minBackoff
+
+	for {
+		if s.authExpired {
+			utils.LogError("[ainstruct-sync] Auth expired permanently — stopping\n")
+			return
+		}
+
+		err := runWatcher(ctx, s)
+		if ctx.Err() != nil {
+			utils.Log("[ainstruct-sync] Shutting down\n")
+			return
+		}
+		if err != nil && err.Error() != "auth expired" {
+			utils.LogError("[ainstruct-sync] Watcher exited: %v — restarting in %s\n", err, backoff)
+		} else if err != nil {
+			utils.LogError("[ainstruct-sync] Watcher exited: auth expired — restarting in %s\n", backoff)
+		} else {
+			utils.Log("[ainstruct-sync] Watcher exited unexpectedly — restarting in %s\n", backoff)
+		}
+
+		select {
+		case <-ctx.Done():
+			utils.Log("[ainstruct-sync] Shutting down\n")
+			return
+		case <-time.After(backoff):
+		}
+
+		if s.authExpired {
+			utils.LogError("[ainstruct-sync] Auth expired permanently — stopping\n")
+			return
+		}
+
+		backoff = backoff * 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+
+		if err := s.pullCollection(); err != nil {
+			utils.LogError("[ainstruct-sync] Pull on restart failed: %v\n", err)
+		} else {
+			backoff = minBackoff
+		}
+		s.pushUnsynced()
 	}
-	utils.Log("[ainstruct-sync] Shutting down\n")
 }

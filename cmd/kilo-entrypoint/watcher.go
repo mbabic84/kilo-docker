@@ -197,6 +197,10 @@ func runWatcher(ctx context.Context, s *Syncer) error {
 		default:
 		}
 
+		if s.authExpired {
+			return fmt.Errorf("auth expired")
+		}
+
 		pollFD, ok := safeInt32(fd)
 		if !ok {
 			return fmt.Errorf("poll fd overflow: %d", fd)

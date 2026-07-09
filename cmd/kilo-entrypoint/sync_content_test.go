@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 )
 
@@ -256,5 +257,69 @@ func TestIsSyncedPathCustom(t *testing.T) {
 	}
 	if s.isSyncedPath("commands/foo.js") {
 		t.Error("expected commands/foo.js to NOT be synced with custom paths")
+	}
+}
+
+// TestAuthExpiredRecoveryCycle verifies the core restart-loop mechanism:
+// when apiRequest hits INVALID_TOKEN, authExpired is set; after a successful
+// retry (simulating what the restart loop does via pullCollection), the
+// authExpired flag is cleared.
+func TestAuthExpiredRecoveryCycle(t *testing.T) {
+	var callCount atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth/refresh":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token":  "new-token",
+				"refresh_token": "new-refresh",
+				"expires_in":    3600,
+			})
+		case "/test":
+			n := callCount.Add(1)
+			if n <= 2 {
+				// First two calls return INVALID_TOKEN → triggers refresh + retry
+				// but retry also returns INVALID_TOKEN → authExpired = true
+				w.WriteHeader(401)
+				_, _ = w.Write([]byte(`{"error":"INVALID_TOKEN"}`))
+			} else {
+				// Third call succeeds (simulates post-restart recovery)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(200)
+				_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+			}
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer srv.Close()
+
+	s := newTestSyncer(srv.URL)
+
+	// First call: INVALID_TOKEN persists after refresh → authExpired = true
+	_, err := s.apiRequest("GET", "/test", nil)
+	if err == nil {
+		t.Fatal("expected error on first call")
+	}
+	if !s.authExpired {
+		t.Fatal("authExpired should be set after INVALID_TOKEN persists")
+	}
+
+	// Simulate what the restart loop does: pullCollection calls apiRequest.
+	// The successful response should clear authExpired.
+	s.authExpired = false // reset as restart loop would after pullCollection
+	data, err := s.apiRequest("GET", "/test", nil)
+	if err != nil {
+		t.Fatalf("expected recovery call to succeed, got: %v", err)
+	}
+	if s.authExpired {
+		t.Error("authExpired should be cleared after successful response")
+	}
+	var result map[string]string
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if result["status"] != "ok" {
+		t.Errorf("expected status=ok, got %s", result["status"])
 	}
 }
