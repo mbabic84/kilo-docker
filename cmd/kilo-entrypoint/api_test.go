@@ -218,3 +218,134 @@ func TestRefreshTokenTriggeredNearExpiry(t *testing.T) {
 		t.Errorf("expected token to be refreshed, got %s", s.accessToken)
 	}
 }
+
+// TestApiRequestRetry500DoesNotExpireAuth verifies that a 500 on the retry
+// (after INVALID_TOKEN refresh) does NOT set authExpired — it's a transient error.
+func TestApiRequestRetry500DoesNotExpireAuth(t *testing.T) {
+	callCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth/refresh":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token":  "refreshed-token",
+				"refresh_token": "new-refresh",
+				"expires_in":    3600,
+			})
+		case "/test":
+			callCount++
+			if callCount == 1 {
+				w.WriteHeader(401)
+				_, _ = w.Write([]byte(`{"error":"INVALID_TOKEN"}`))
+			} else {
+				w.WriteHeader(500)
+				_, _ = w.Write([]byte(`{"detail":"internal error"}`))
+			}
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer srv.Close()
+
+	s := newTestSyncer(srv.URL)
+	_, err := s.apiRequest("GET", "/test", nil)
+	if err == nil {
+		t.Fatal("expected error for 500 retry response")
+	}
+	if s.authExpired {
+		t.Error("authExpired should NOT be set for transient 500 on retry")
+	}
+}
+
+// TestApiRequestRetryPlain401DoesNotExpireAuth verifies that a 500 on the
+// retry (after plain 401 refresh) does NOT set authExpired.
+func TestApiRequestRetryPlain401DoesNotExpireAuth(t *testing.T) {
+	callCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth/refresh":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token":  "refreshed-token",
+				"refresh_token": "new-refresh",
+				"expires_in":    3600,
+			})
+		case "/test":
+			callCount++
+			if callCount == 1 {
+				w.WriteHeader(401)
+			} else {
+				w.WriteHeader(500)
+				_, _ = w.Write([]byte(`{"detail":"internal error"}`))
+			}
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer srv.Close()
+
+	s := newTestSyncer(srv.URL)
+	_, err := s.apiRequest("GET", "/test", nil)
+	if err == nil {
+		t.Fatal("expected error for 500 retry response")
+	}
+	if s.authExpired {
+		t.Error("authExpired should NOT be set for transient 500 on retry")
+	}
+}
+
+// TestApiRequestRetryPlain401Still401DoesExpireAuth verifies that a 401 on
+// the retry (after plain 401 refresh) DOES set authExpired.
+func TestApiRequestRetryPlain401Still401DoesExpireAuth(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth/refresh":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access_token":  "refreshed-token",
+				"refresh_token": "new-refresh",
+				"expires_in":    3600,
+			})
+		case "/test":
+			w.WriteHeader(401)
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer srv.Close()
+
+	s := newTestSyncer(srv.URL)
+	_, err := s.apiRequest("GET", "/test", nil)
+	if err == nil {
+		t.Fatal("expected error for 401 after refresh")
+	}
+	if !s.authExpired {
+		t.Error("authExpired should be set when retry still returns 401")
+	}
+}
+
+// TestApiRequestSuccessResetsAuthExpired verifies that a successful response
+// clears authExpired if it was previously set.
+func TestApiRequestSuccessResetsAuthExpired(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}))
+	defer srv.Close()
+
+	s := newTestSyncer(srv.URL)
+	s.authExpired = true
+
+	data, err := s.apiRequest("GET", "/test", nil)
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+	if s.authExpired {
+		t.Error("authExpired should be cleared after successful response")
+	}
+	var result map[string]string
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+}

@@ -163,10 +163,17 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 			s.authExpired = true
 			return nil, fmt.Errorf("INVALID_TOKEN after refresh")
 		}
+		if retryResp.StatusCode == http.StatusUnauthorized {
+			utils.LogError("[ainstruct-sync] Still 401 after refresh — stopping watcher\n")
+			s.authExpired = true
+			return nil, fmt.Errorf("still 401 after refresh")
+		}
 		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
+			// Transient server error — token was refreshed, don't kill watcher
 			utils.Log("[ainstruct-sync] API retry error response body: %s\n", utils.Redact(string(respBody)))
 			return nil, fmt.Errorf("API %s %s (retry) returned %d: %s", method, path, retryResp.StatusCode, string(respBody))
 		}
+		s.authExpired = false
 		return respBody, nil
 	}
 
@@ -191,12 +198,17 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 			return nil, fmt.Errorf("reading retry response: %w", err)
 		}
 		utils.Log("[ainstruct-sync] API %s %s (retry) => %d\n", method, path, retryResp.StatusCode)
-		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
-			utils.Log("[ainstruct-sync] API retry error response body: %s\n", utils.Redact(string(respBody)))
-			utils.LogError("[ainstruct-sync] Token invalid after refresh — stopping watcher\n")
+		if retryResp.StatusCode == http.StatusUnauthorized {
+			utils.LogError("[ainstruct-sync] Still 401 after refresh — stopping watcher\n")
 			s.authExpired = true
+			return nil, fmt.Errorf("still 401 after refresh")
+		}
+		if retryResp.StatusCode < 200 || retryResp.StatusCode >= 300 {
+			// Transient server error — don't kill watcher
+			utils.Log("[ainstruct-sync] API retry error response body: %s\n", utils.Redact(string(respBody)))
 			return nil, fmt.Errorf("API %s %s (retry) returned %d: %s", method, path, retryResp.StatusCode, string(respBody))
 		}
+		s.authExpired = false
 		return respBody, nil
 	}
 
@@ -204,6 +216,7 @@ func (s *Syncer) apiRequest(method, path string, body any) ([]byte, error) {
 		utils.Log("[ainstruct-sync] API error response body: %s\n", utils.Redact(string(respBody)))
 		return nil, fmt.Errorf("API %s %s returned %d: %s", method, path, resp.StatusCode, string(respBody))
 	}
+	s.authExpired = false
 	return respBody, nil
 }
 
