@@ -4,10 +4,22 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
+
+var jsoncCommentRe = regexp.MustCompile(`(?s)(\"(?:[^\"\\]|\\.)*\")|//.*?$|/\*.*?\*/`)
+
+func stripJSONCComments(data []byte) []byte {
+	return jsoncCommentRe.ReplaceAllFunc(data, func(match []byte) []byte {
+		if match[0] == '"' {
+			return match
+		}
+		return nil
+	})
+}
 
 // mcpServerDefaults defines the canonical MCP server entries.
 // When a server is enabled and the entry is missing from kilo.jsonc
@@ -159,6 +171,7 @@ func updateMCPEnabledStates(configPath string, enabled map[string]bool) error {
 		utils.LogError("[MCP Config] Failed to read config file: %v\n", err)
 		return err
 	}
+	data = stripJSONCComments(data)
 	utils.Log("[MCP Config] Config file read successfully (%d bytes)\n", len(data))
 
 	var config map[string]any
@@ -244,6 +257,7 @@ func ensureMCPEntry(configPath, name string, entryDef map[string]any) error {
 	if err != nil {
 		return err
 	}
+	data = stripJSONCComments(data)
 
 	var configObj map[string]any
 	if err := json.Unmarshal(data, &configObj); err != nil {
@@ -292,6 +306,7 @@ func migrateContext7Header(configPath string) error {
 		}
 		return err
 	}
+	data = stripJSONCComments(data)
 
 	var config map[string]any
 	if err := json.Unmarshal(data, &config); err != nil {
