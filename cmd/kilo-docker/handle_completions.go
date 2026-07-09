@@ -34,13 +34,15 @@ func handleCompletions(cfg config) {
 }
 
 const bashCompletionScript = `_kilo_docker_completions() {
-    local cur prev commands subcommands session_targets
+    local cur prev commands subcommands session_targets profile_subcommands profile_targets
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     commands="sessions networks playwright profile backup restore init cleanup update install-dev version help completions"
     subcommands="cleanup recreate stop"
     session_targets=$(kilo-docker sessions --complete 2>/dev/null)
+    profile_subcommands="save list show edit delete import export set-default unset-default show-default"
+    profile_targets=$(kilo-docker profile --complete 2>/dev/null)
 
     # Top-level command completion (kilo-docker <TAB>)
     if [ "${COMP_CWORD}" -eq 1 ]; then
@@ -61,6 +63,22 @@ const bashCompletionScript = `_kilo_docker_completions() {
                     COMPREPLY=( $(compgen -W "$session_targets" -- "$cur") )
                     return 0
                 fi
+            fi
+            ;;
+        profile)
+            # kilo-docker profile <TAB> — show subcommands
+            if [ "${COMP_CWORD}" -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "$profile_subcommands" -- "$cur") )
+                return 0
+            fi
+            # kilo-docker profile <subcommand> <TAB> — show profile names for subcommands that take one
+            if [ "${COMP_CWORD}" -eq 3 ]; then
+                case "${COMP_WORDS[2]}" in
+                    show|edit|delete|export|set-default)
+                        COMPREPLY=( $(compgen -W "$profile_targets" -- "$cur") )
+                        return 0
+                        ;;
+                esac
             fi
             ;;
         completions)
@@ -102,6 +120,20 @@ _kilo_docker() {
         'stop:Stop sessions'
     )
 
+    local -a profile_subcommands
+    profile_subcommands=(
+        'save:Save current flags as a profile'
+        'list:List all profiles'
+        'show:Show a profile'
+        'edit:Open a profile in $EDITOR'
+        'delete:Delete a profile'
+        'import:Import a profile from JSON file'
+        'export:Export a profile as JSON'
+        'set-default:Set a profile as default'
+        'unset-default:Remove the default profile'
+        'show-default:Show the current default profile'
+    )
+
     _arguments -C \
         '1:command:->command' \
         '*::arg:->args'
@@ -122,6 +154,19 @@ _kilo_docker() {
                         local -a completions
                         completions=(${(f)"$(kilo-docker sessions --complete 2>/dev/null)"})
                         _describe 'session' completions
+                    fi
+                    ;;
+                profile)
+                    if (( ${#words[@]} == 2 )); then
+                        _describe 'subcommand' profile_subcommands
+                    else
+                        case ${words[2]} in
+                            show|edit|delete|export|set-default)
+                                local -a profile_targets
+                                profile_targets=(${(f)"$(kilo-docker profile --complete 2>/dev/null)"})
+                                _describe 'profile' profile_targets
+                                ;;
+                        esac
                     fi
                     ;;
                 completions)
@@ -160,6 +205,21 @@ complete -c kilo-docker -n '__fish_seen_subcommand_from sessions' -a stop -d 'St
 
 # Session target (dynamic completions)
 complete -c kilo-docker -n '__fish_seen_subcommand_from sessions' -a '(kilo-docker sessions --complete 2>/dev/null)'
+
+# Profile sub-subcommands
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a save -d 'Save current flags as a profile'
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a list -d 'List all profiles'
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a show -d 'Show a profile'
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a edit -d 'Open a profile in $EDITOR'
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a delete -d 'Delete a profile'
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a import -d 'Import a profile from JSON file'
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a export -d 'Export a profile as JSON'
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a set-default -d 'Set a profile as default'
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a unset-default -d 'Remove the default profile'
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a show-default -d 'Show the current default profile'
+
+# Profile name (dynamic completions for subcommands that take a name)
+complete -c kilo-docker -n '__fish_seen_subcommand_from profile; and __fish_seen_subcommand_from show edit delete export set-default' -a '(kilo-docker profile --complete 2>/dev/null)'
 
 # Completions subcommand
 complete -c kilo-docker -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish'

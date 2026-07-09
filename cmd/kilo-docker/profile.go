@@ -213,6 +213,13 @@ func hasAnyFlags(cfg config) bool {
 // appropriate handler: save, list, show, edit, delete, import, export,
 // set-default, unset-default, or show-default.
 func handleProfile(cfg config) {
+	// Hidden flag for shell tab-completion — must be checked before any
+	// other arg parsing since it looks like a regular argument.
+	if len(cfg.args) > 0 && cfg.args[0] == "--complete" {
+		showProfileCompletions()
+		return
+	}
+
 	if cfg.help {
 		printCommandHelp("profile")
 		return
@@ -518,4 +525,19 @@ func runProfileExport(name string) {
 	}
 	data, _ := json.MarshalIndent(p, "", "  ")
 	fmt.Println(string(data))
+}
+
+// showProfileCompletions prints tab-completion candidates to stdout, one per
+// line — one for each saved profile name.
+func showProfileCompletions() {
+	entries, err := os.ReadDir(profileDir())
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		fmt.Println(strings.TrimSuffix(e.Name(), ".json"))
+	}
 }
