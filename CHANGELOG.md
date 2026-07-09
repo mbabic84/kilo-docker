@@ -1,3 +1,10 @@
+## [3.45.3](https://github.com/mbabic84/kilo-docker/compare/v3.45.2...v3.45.3) (2026-07-09)
+
+### Bug Fixes
+
+* **profile:** add overwrite confirmation and missing diagnostics flag ([3a94c57](https://github.com/mbabic84/kilo-docker/commit/3a94c57e637399326b2daed937a7ed4b8620718f))
+* **profile:** add tab completion for profile subcommand ([5080f20](https://github.com/mbabic84/kilo-docker/commit/5080f20e403da68b0d7ff83f1e49f32685ef5793))
+
 ## [3.45.2](https://github.com/mbabic84/kilo-docker/compare/v3.45.1...v3.45.2) (2026-07-07)
 
 ### Bug Fixes
