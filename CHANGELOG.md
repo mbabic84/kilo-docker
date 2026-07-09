@@ -1,3 +1,9 @@
+## [3.45.4](https://github.com/mbabic84/kilo-docker/compare/v3.45.3...v3.45.4) (2026-07-09)
+
+### Bug Fixes
+
+* **completions:** add update config subcommand to shell completions ([c81b334](https://github.com/mbabic84/kilo-docker/commit/c81b3343259ce4adbcacf28cdba1eba0bd52ed51))
+
 ## [3.45.3](https://github.com/mbabic84/kilo-docker/compare/v3.45.2...v3.45.3) (2026-07-09)
 
 ### Bug Fixes
