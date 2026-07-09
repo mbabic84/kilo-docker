@@ -1,3 +1,9 @@
+## [3.48.0](https://github.com/mbabic84/kilo-docker/compare/v3.47.0...v3.48.0) (2026-07-09)
+
+### Features
+
+* **entrypoint:** resilient sync watcher with auto-restart and smarter auth expiry ([8cbd893](https://github.com/mbabic84/kilo-docker/commit/8cbd8934a1c7295d4e12c40e10a03f001e0446be))
+
 ## [3.47.0](https://github.com/mbabic84/kilo-docker/compare/v3.46.0...v3.47.0) (2026-07-09)
 
 ### Features
