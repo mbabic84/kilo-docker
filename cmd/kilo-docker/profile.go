@@ -15,16 +15,17 @@ import (
 // profileFlags holds the boolean service/feature flags stored in a profile.
 // Services use omitempty so absent fields default to false.
 type profileFlags struct {
-	Go        bool `json:"go,omitempty"`
-	Docker    bool `json:"docker,omitempty"`
-	UV        bool `json:"uv,omitempty"`
-	GH        bool `json:"gh,omitempty"`
-	SSH       bool `json:"ssh,omitempty"`
-	NVM       bool `json:"nvm,omitempty"`
-	Build     bool `json:"build,omitempty"`
-	Rclone    bool `json:"rclone,omitempty"`
-	Gitnexus  bool `json:"gitnexus,omitempty"`
-	Picomamba bool `json:"picomamba,omitempty"`
+	Go          bool `json:"go,omitempty"`
+	Docker      bool `json:"docker,omitempty"`
+	UV          bool `json:"uv,omitempty"`
+	GH          bool `json:"gh,omitempty"`
+	SSH         bool `json:"ssh,omitempty"`
+	NVM         bool `json:"nvm,omitempty"`
+	Build       bool `json:"build,omitempty"`
+	Rclone      bool `json:"rclone,omitempty"`
+	Gitnexus    bool `json:"gitnexus,omitempty"`
+	Picomamba   bool `json:"picomamba,omitempty"`
+	Diagnostics bool `json:"diagnostics,omitempty"`
 }
 
 // Profile represents a named set of reusable CLI flags stored as JSON under
@@ -153,6 +154,9 @@ func mergeProfile(cfg *config, p Profile) {
 	if p.Flags.Gitnexus {
 		addServiceIfMissing(cfg, "gitnexus")
 	}
+	if p.Flags.Diagnostics {
+		addServiceIfMissing(cfg, "diagnostics")
+	}
 	if p.Flags.Picomamba {
 		addServiceIfMissing(cfg, "picomamba")
 	}
@@ -209,6 +213,13 @@ func hasAnyFlags(cfg config) bool {
 // appropriate handler: save, list, show, edit, delete, import, export,
 // set-default, unset-default, or show-default.
 func handleProfile(cfg config) {
+	// Hidden flag for shell tab-completion — must be checked before any
+	// other arg parsing since it looks like a regular argument.
+	if len(cfg.args) > 0 && cfg.args[0] == "--complete" {
+		showProfileCompletions()
+		return
+	}
+
 	if cfg.help {
 		printCommandHelp("profile")
 		return
@@ -310,6 +321,20 @@ func runProfileSave(cfg config, name string) {
 		os.Exit(1)
 	}
 
+	existing, err := loadProfile(name)
+	exists := err == nil
+
+	if exists && !cfg.yes {
+		desc := existing.Description
+		if desc != "" {
+			desc = " (" + desc + ")"
+		}
+		if !promptConfirm(fmt.Sprintf("Profile '%s'%s already exists. Overwrite? [y/N]: ", name, desc), cfg.yes) {
+			utils.Log("[kilo-docker] Cancelled\n", utils.WithOutput())
+			return
+		}
+	}
+
 	p := Profile{
 		Name: name,
 		Flags: profileFlags{
@@ -336,6 +361,8 @@ func runProfileSave(cfg config, name string) {
 			p.Flags.Rclone = true
 		case "gitnexus":
 			p.Flags.Gitnexus = true
+		case "diagnostics":
+			p.Flags.Diagnostics = true
 		}
 	}
 
@@ -356,7 +383,11 @@ func runProfileSave(cfg config, name string) {
 		utils.LogError("[kilo-docker] Failed to save profile: %v\n", err, utils.WithOutput())
 		os.Exit(1)
 	}
-	utils.Log("[kilo-docker] Profile '%s' saved\n", name, utils.WithOutput())
+	if exists {
+		utils.Log("[kilo-docker] Profile '%s' overwritten\n", name, utils.WithOutput())
+	} else {
+		utils.Log("[kilo-docker] Profile '%s' saved\n", name, utils.WithOutput())
+	}
 }
 
 // runProfileList prints all saved profiles with name and description,
@@ -494,4 +525,19 @@ func runProfileExport(name string) {
 	}
 	data, _ := json.MarshalIndent(p, "", "  ")
 	fmt.Println(string(data))
+}
+
+// showProfileCompletions prints tab-completion candidates to stdout, one per
+// line — one for each saved profile name.
+func showProfileCompletions() {
+	entries, err := os.ReadDir(profileDir())
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		fmt.Println(strings.TrimSuffix(e.Name(), ".json"))
+	}
 }
