@@ -285,3 +285,78 @@ func TestMergeProfileGHAndNVM(t *testing.T) {
 		t.Error("expected picomamba service")
 	}
 }
+
+func TestProfileSaveOverwriteWithYes(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	cfg1 := config{
+		enabledServices: []string{"go"},
+		ssh:             true,
+	}
+	runProfileSave(cfg1, "test")
+
+	loaded, err := loadProfile("test")
+	if err != nil {
+		t.Fatalf("failed to load profile: %v", err)
+	}
+	if !loaded.Flags.Go || !loaded.Flags.SSH {
+		t.Error("expected Go and SSH flags")
+	}
+
+	cfg2 := config{
+		enabledServices: []string{"docker"},
+		ssh:             false,
+		yes:             true,
+	}
+	runProfileSave(cfg2, "test")
+
+	loaded, err = loadProfile("test")
+	if err != nil {
+		t.Fatalf("failed to load profile after overwrite: %v", err)
+	}
+	if loaded.Flags.Go {
+		t.Error("expected Go flag to be false after overwrite")
+	}
+	if !loaded.Flags.Docker {
+		t.Error("expected Docker flag to be true after overwrite")
+	}
+	if loaded.Flags.SSH {
+		t.Error("expected SSH flag to be false after overwrite")
+	}
+}
+
+func TestProfileSaveOverwritePromptDecline(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	cfg1 := config{
+		enabledServices: []string{"go"},
+		ssh:             true,
+	}
+	runProfileSave(cfg1, "test")
+
+	cfg2 := config{
+		enabledServices: []string{"docker"},
+		yes:             false,
+	}
+
+	origStdin := os.Stdin
+	defer func() { os.Stdin = origStdin }()
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+	_ = w.Close()
+
+	runProfileSave(cfg2, "test")
+
+	loaded, err := loadProfile("test")
+	if err != nil {
+		t.Fatalf("failed to load profile: %v", err)
+	}
+	if !loaded.Flags.Go {
+		t.Error("expected original Go flag to be preserved after decline")
+	}
+	if loaded.Flags.Docker {
+		t.Error("expected Docker flag to not be saved after decline")
+	}
+}

@@ -289,6 +289,24 @@ the current invocation).
 The profile is stored at ~/.config/kilo-docker/profiles/<name>.json and
 can be reused later with --profile <name>.
 
+Service flags:
+  --docker          Mount Docker socket
+  --go              Install Go
+  --gh              Install GitHub CLI (gh-mcp extension)
+  --uv              Install uv (Python package manager)
+  --nvm             Install NVM (Node Version Manager)
+  --build           Install build base dependencies
+  --rclone          Install rclone
+  --gitnexus        Install GitNexus
+  --diagnostics     Install diagnostic tools
+  --picomamba       Install picomamba
+
+Other flags:
+  --ssh             Enable SSH agent forwarding
+  --network <name>  Connect to a Docker network
+  --port <mapping>  Map a port (repeatable)
+  --volume <mount>  Mount a volume (repeatable)
+
 Options:
   -h, --help            Show this help message
 
