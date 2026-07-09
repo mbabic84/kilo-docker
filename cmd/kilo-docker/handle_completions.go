@@ -87,6 +87,12 @@ const bashCompletionScript = `_kilo_docker_completions() {
                 return 0
             fi
             ;;
+        update)
+            if [ "${COMP_CWORD}" -eq 2 ]; then
+                COMPREPLY=( $(compgen -W "config" -- "$cur") )
+                return 0
+            fi
+            ;;
     esac
     return 0
 }
@@ -172,6 +178,13 @@ _kilo_docker() {
                 completions)
                     _values 'shell' bash zsh fish
                     ;;
+                update)
+                    local -a update_subcommands
+                    update_subcommands=(
+                        'config:Merge opencode.json template'
+                    )
+                    _describe 'subcommand' update_subcommands
+                    ;;
             esac
             ;;
     esac
@@ -205,6 +218,9 @@ complete -c kilo-docker -n '__fish_seen_subcommand_from sessions' -a stop -d 'St
 
 # Session target (dynamic completions)
 complete -c kilo-docker -n '__fish_seen_subcommand_from sessions' -a '(kilo-docker sessions --complete 2>/dev/null)'
+
+# Update sub-subcommands
+complete -c kilo-docker -n '__fish_seen_subcommand_from update' -a config -d 'Merge opencode.json template'
 
 # Profile sub-subcommands
 complete -c kilo-docker -n '__fish_seen_subcommand_from profile' -a save -d 'Save current flags as a profile'
