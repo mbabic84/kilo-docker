@@ -1,3 +1,9 @@
+## [3.49.1](https://github.com/mbabic84/kilo-docker/compare/v3.49.0...v3.49.1) (2026-07-12)
+
+### Bug Fixes
+
+* set HOME from user config for sync and log path resolution ([46c9c23](https://github.com/mbabic84/kilo-docker/commit/46c9c234864f66f0fb03de63e56eb6102946fb3c)), closes [#245](https://github.com/mbabic84/kilo-docker/issues/245) [#246](https://github.com/mbabic84/kilo-docker/issues/246)
+
 ## [3.49.0](https://github.com/mbabic84/kilo-docker/compare/v3.48.0...v3.49.0) (2026-07-09)
 
 ### Features
