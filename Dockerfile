@@ -37,7 +37,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY configs/zellij.kdl /etc/zellij/template-config.kdl
 COPY configs/kilo.jsonc /etc/kilo/template-kilo.jsonc
 COPY --from=builder /tmp/kilo /usr/local/bin/kilo-real
-COPY --from=builder /tmp/bwrap /usr/local/bin/bwrap
 COPY --from=builder /tmp/tree-sitter /usr/local/bin/tree-sitter
 COPY --from=builder /tmp/console /usr/local/bin/console
 COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
