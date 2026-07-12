@@ -553,6 +553,7 @@ func ensureSyncForCurrentUser() {
 	_ = syscall.Setgid(gid)
 	_ = syscall.Setuid(uid)
 
+	_ = os.Setenv("HOME", homeDir)
 	utils.Log("[zellijattach] Starting file sync for user %s (UID=%d)\n", username, uid)
 	_ = startSyncWithTokens(homeDir, userID)
 }
