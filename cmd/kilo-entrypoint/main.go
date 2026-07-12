@@ -473,6 +473,14 @@ func runPrintEnv() {
 
 func main() {
 	parsed := parseEntrypointArgs(os.Args[1:])
+
+	// Set HOME to the user's home directory before any log calls so that
+	// getLogFile() resolves the log path under the correct user home
+	// instead of /root (the container's default HOME).
+	if homeDir, _, _, _ := loadUserConfig(); homeDir != "" {
+		_ = os.Setenv("HOME", homeDir)
+	}
+
 	utils.Log("[main] Entrypoint started, os.Args=%v\n", os.Args)
 
 	// Handle -h/--help flag, mirroring kilo-docker.
