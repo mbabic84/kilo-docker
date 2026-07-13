@@ -115,6 +115,28 @@ func TestSerializeArgsEmpty(t *testing.T) {
 	}
 }
 
+func TestSerializeArgsNoneNetwork(t *testing.T) {
+	cfg := config{
+		networks: []string{"none"},
+	}
+	result := serializeArgs(cfg, false)
+	expected := "--network none"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestSerializeArgsContainerNetwork(t *testing.T) {
+	cfg := config{
+		networks: []string{"container:my-app"},
+	}
+	result := serializeArgs(cfg, false)
+	expected := "--network container:my-app"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
 func TestSerializeArgsOnce(t *testing.T) {
 	cfg := config{
 		once:            true,
@@ -280,6 +302,46 @@ func TestSerializeStoredArgsEmpty(t *testing.T) {
 	}
 }
 
+func TestSerializeStoredArgsNoneNetwork(t *testing.T) {
+	stored := "--network none"
+	displayed := serializeStoredArgs(stored)
+	if !strings.Contains(displayed, "--network none") {
+		t.Errorf("expected '--network none' in displayed, got %q", displayed)
+	}
+}
+
+func TestSerializeStoredArgsContainerNetwork(t *testing.T) {
+	stored := "--network container:my-app"
+	displayed := serializeStoredArgs(stored)
+	if !strings.Contains(displayed, "--network container:my-app") {
+		t.Errorf("expected '--network container:my-app' in displayed, got %q", displayed)
+	}
+}
+
+func TestArgsMatchNoneNetworkRoundTrip(t *testing.T) {
+	if !argsMatch("--network none", "--network none") {
+		t.Error("identical none network args should match")
+	}
+}
+
+func TestArgsMatchContainerNetworkRoundTrip(t *testing.T) {
+	if !argsMatch("--network container:app", "--network container:app") {
+		t.Error("identical container network args should match")
+	}
+}
+
+func TestArgsMatchSpecialVsRegular(t *testing.T) {
+	if argsMatch("--network none", "--network kilo-shared") {
+		t.Error("none and kilo-shared should not match")
+	}
+}
+
+func TestArgsMatchHostVsNone(t *testing.T) {
+	if argsMatch("--network host", "--network none") {
+		t.Error("host and none should not match")
+	}
+}
+
 func TestSerializeStoredArgsPorts(t *testing.T) {
 	stored := "--port 8080:80 --port 3000:3000"
 	displayed := serializeStoredArgs(stored)
@@ -362,5 +424,38 @@ func TestCheckPortConflictsNoRunningSessions(t *testing.T) {
 	cfg := config{}
 	if err := checkPortConflicts(cfg); err != nil {
 		t.Errorf("expected no error for empty config, got %v", err)
+	}
+}
+
+func TestBuildContainerArgsSkipsHostnameForNone(t *testing.T) {
+	cfg := config{
+		networks: []string{"none"},
+	}
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	argsStr := strings.Join(args, " ")
+	if strings.Contains(argsStr, "--hostname") {
+		t.Error("expected no --hostname flag when using none network mode")
+	}
+}
+
+func TestBuildContainerArgsSkipsHostnameForContainer(t *testing.T) {
+	cfg := config{
+		networks: []string{"container:my-app"},
+	}
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	argsStr := strings.Join(args, " ")
+	if strings.Contains(argsStr, "--hostname") {
+		t.Error("expected no --hostname flag when using container network mode")
+	}
+}
+
+func TestBuildContainerArgsIncludesHostnameForRegular(t *testing.T) {
+	cfg := config{
+		networks: []string{"my-network"},
+	}
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	argsStr := strings.Join(args, " ")
+	if !strings.Contains(argsStr, "--hostname test-container") {
+		t.Error("expected --hostname flag for regular network")
 	}
 }
