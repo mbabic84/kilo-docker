@@ -1,3 +1,9 @@
+## [3.50.1](https://github.com/mbabic84/kilo-docker/compare/v3.50.0...v3.50.1) (2026-07-13)
+
+### Bug Fixes
+
+* detect and clean up failed container after docker run -d ([4b7d805](https://github.com/mbabic84/kilo-docker/commit/4b7d8058eeecb64e4505e09497e86b7954424920))
+
 ## [3.50.0](https://github.com/mbabic84/kilo-docker/compare/v3.49.1...v3.50.0) (2026-07-13)
 
 ### Features
