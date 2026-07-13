@@ -16,6 +16,12 @@ const (
 	SharedPlaywrightContainerName = "kilo-playwright-mcp"
 )
 
+// isSpecialNetworkMode returns true if name is a Docker network mode that
+// excludes all other networks: host, none, or container:<name>.
+func isSpecialNetworkMode(name string) bool {
+	return name == "host" || name == "none" || strings.HasPrefix(name, "container:")
+}
+
 // containsNet returns true if name is in the networks slice.
 func containsNet(networks []string, name string) bool {
 	for _, n := range networks {
@@ -26,28 +32,34 @@ func containsNet(networks []string, name string) bool {
 	return false
 }
 
-// normalizeNetworks ensures kilo-shared is always present if includeShared is true,
-// removes duplicates, and returns a deterministic order (shared first, then user-provided).
-// When "host" is present, it takes precedence and all other networks are dropped,
-// because Docker does not allow combining --network host with other networks.
-func normalizeNetworks(networks []string, includeShared bool) []string {
-	hasHost := false
+// containsSpecialNetwork returns true if any network in the slice is a special
+// mode (host, none, or container:<name>).
+func containsSpecialNetwork(networks []string) bool {
 	for _, n := range networks {
-		if n == "host" {
-			hasHost = true
-			break
+		if isSpecialNetworkMode(n) {
+			return true
 		}
 	}
+	return false
+}
 
-	if hasHost {
-		return []string{"host"}
+// normalizeNetworks ensures kilo-shared is always present if includeShared is true,
+// removes duplicates, and returns a deterministic order (shared first, then user-provided).
+// When a special mode (host, none, container:*) is present, it takes precedence and
+// all other networks are dropped, because Docker does not allow combining special
+// modes with other networks.
+func normalizeNetworks(networks []string, includeShared bool) []string {
+	for _, n := range networks {
+		if isSpecialNetworkMode(n) {
+			return []string{n}
+		}
 	}
 
 	seen := make(map[string]bool)
 	var result []string
 
-	// Always include shared network first if requested, unless host network is used
-	if includeShared && SharedNetworkName != "" && !hasHost {
+	// Always include shared network first if requested
+	if includeShared && SharedNetworkName != "" {
 		result = append(result, SharedNetworkName)
 		seen[SharedNetworkName] = true
 	}

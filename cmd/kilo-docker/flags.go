@@ -132,7 +132,7 @@ var valueFlags = []valueFlag{
 	},
 	{
 		Names:           []string{"--network"},
-		Description:     "Connect to a Docker network (repeatable). 'kilo-shared' is always included.",
+		Description:     "Connect to a Docker network (repeatable). Special modes: host, none, container:<name>. These are mutually exclusive.",
 		setField:        func(c *config, v string) { c.networks = append(c.networks, v); c.networkFlag = true },
 		serializeArgs:   func(c config) []string { return flatten("--network", normalizeNetworks(c.networks, true)) },
 		buildDockerArgs: func(c config) []string { return flatten("--network", normalizeNetworks(c.networks, true)) },
@@ -382,16 +382,19 @@ func parseFlags() config {
 		mergeProfile(&cfg, p)
 	}
 
-	// --network host is incompatible with other networks (Docker restriction)
-	if containsNet(cfg.networks, "host") && len(cfg.networks) > 1 {
-		var others []string
-		for _, n := range cfg.networks {
-			if n != "host" {
-				others = append(others, n)
+	// Special network modes (host, none, container:*) are incompatible with other networks
+	for _, net := range cfg.networks {
+		if isSpecialNetworkMode(net) && len(cfg.networks) > 1 {
+			var others []string
+			for _, n := range cfg.networks {
+				if n != net {
+					others = append(others, n)
+				}
 			}
+			utils.LogWarn("[kilo-docker] --network %s cannot be combined with other networks; ignoring %v\n", net, others, utils.WithOutput())
+			cfg.networks = []string{net}
+			break
 		}
-		utils.LogWarn("[kilo-docker] --network host cannot be combined with other networks; ignoring %v\n", others, utils.WithOutput())
-		cfg.networks = []string{"host"}
 	}
 
 	return cfg

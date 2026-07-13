@@ -83,7 +83,7 @@ kilo-docker
 | `--port`, `-p` | Map port (host_port:container_port), repeatable |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
 | `--ssh` | Enable SSH agent forwarding into the container |
-| `--network <name>` | Attach to a Docker network (repeatable, `kilo-shared` included by default). Use `host` to share the host network stack |
+| `--network <name>` | Connect to a Docker network (repeatable, `kilo-shared` included by default). Special modes: `host`, `none`, `container:<name>` — these are mutually exclusive with all other networks |
 | `--profile <name>` | Load a named flag profile from `~/.config/kilo-docker/profiles/` |
 | `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
 
@@ -156,7 +156,7 @@ kilo-docker --ssh                  # CLI flags override profile flags
 kilo-docker profile unset-default  # stop auto-loading
 ```
 
-**Merge precedence:** CLI flags always win. Services from the profile are additive — a service already enabled by CLI won't be disabled. SSH only enables from the profile if not already set on the CLI. Ports, volumes, and networks are always additive. When `--network host` is used, all other networks are discarded (Docker does not allow combining host with other network modes).
+**Merge precedence:** CLI flags always win. Services from the profile are additive — a service already enabled by CLI won't be disabled. SSH only enables from the profile if not already set on the CLI. Ports, volumes, and networks are always additive. Special network modes (`host`, `none`, `container:<name>`) are mutually exclusive with other networks — when one is used, all others are discarded (Docker restriction).
 
 #### Import/Export
 
@@ -235,6 +235,26 @@ kilo-docker --network host
 When `host` is specified, all other networks (including `kilo-shared`) are ignored, and a warning is printed if additional `--network` flags were passed. This matches Docker's restriction that host networking cannot be combined with other networks.
 
 Host networking also bypasses port mapping — all host ports are directly accessible inside the container without needing `--port` / `-p`.
+
+### No Network Mode
+
+Use `--network none` to run the container with no network access:
+
+```bash
+kilo-docker --network none
+```
+
+This is useful for isolated execution environments where network access is not required or not permitted.
+
+### Container Network Mode
+
+Use `--network container:<name>` to share another container's network namespace. The container will have the same IP address and network interfaces as the referenced container:
+
+```bash
+kilo-docker --network container:my-app
+```
+
+Both `none` and `container:<name>` are mutually exclusive with other networks, just like `host`.
 
 Kilo Docker uses a data-driven service architecture. Services are defined as structured data, making it easy to add new capabilities without modifying core logic.
 

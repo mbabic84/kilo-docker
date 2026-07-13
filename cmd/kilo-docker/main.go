@@ -125,10 +125,12 @@ func runContainer(cfg config) {
 		os.Exit(1)
 	}
 
-	// Ensure shared resources
-	if err := EnsureSharedNetwork(); err != nil {
-		utils.LogError("[kilo-docker] Failed to ensure shared network: %v\n", err)
-		os.Exit(1)
+	// Ensure shared resources (skip for special network modes that are incompatible)
+	if !containsSpecialNetwork(cfg.networks) {
+		if err := EnsureSharedNetwork(); err != nil {
+			utils.LogError("[kilo-docker] Failed to ensure shared network: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	if cfg.playwright {
@@ -258,15 +260,18 @@ func runContainer(cfg config) {
 		}
 	}
 
-	// Warn if host network is combined with other networks (Docker forbids this)
-	if containsNet(cfg.networks, "host") && len(cfg.networks) > 1 {
-		var others []string
-		for _, n := range cfg.networks {
-			if n != "host" {
-				others = append(others, n)
+	// Warn if a special network mode is combined with other networks (Docker forbids this)
+	for _, net := range cfg.networks {
+		if isSpecialNetworkMode(net) && len(cfg.networks) > 1 {
+			var others []string
+			for _, n := range cfg.networks {
+				if n != net {
+					others = append(others, n)
+				}
 			}
+			utils.LogWarn("[kilo-docker] --network %s cannot be combined with other networks; ignoring %v\n", net, others, utils.WithOutput())
+			break
 		}
-		utils.LogWarn("[kilo-docker] --network host cannot be combined with other networks; ignoring %v\n", others, utils.WithOutput())
 	}
 
 	if !cfg.once {
