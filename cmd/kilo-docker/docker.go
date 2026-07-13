@@ -156,6 +156,30 @@ func startAndWaitForRunning(container string) error {
 	return fmt.Errorf("container '%s' did not reach running state within 10s (current: %s).\nContainer logs:\n%s", container, state, logs)
 }
 
+// waitForContainerCreated polls after a `docker run -d` until the container
+// reaches "running" or fails. Some Docker versions return success from
+// `docker run -d` even when the container cannot start (e.g. invalid network),
+// leaving it in "created" state. This function catches that case and returns
+// a descriptive error with container logs.
+func waitForContainerCreated(container string) error {
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		state := dockerState(container)
+		switch state {
+		case "running":
+			return nil
+		case "exited", "created":
+			logs, _ := dockerRun("logs", "--tail", "30", container)
+			return fmt.Errorf("container '%s' failed to start (state: %s).\nContainer logs:\n%s", container, state, logs)
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	state := dockerState(container)
+	logs, _ := dockerRun("logs", "--tail", "30", container)
+	return fmt.Errorf("container '%s' did not reach running state within 5s (current: %s).\nContainer logs:\n%s", container, state, logs)
+}
+
 // execDockerInteractive replaces the current process with a docker exec
 // command for interactive sessions (e.g. attaching to zellij). It uses
 // -it for interactive TTY and runs as root — privilege drop is handled

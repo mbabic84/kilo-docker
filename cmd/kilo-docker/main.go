@@ -313,6 +313,12 @@ func runContainer(cfg config) {
 		utils.Log("[kilo-docker] Docker run args: docker %s\n", strings.Join(runArgs, " "))
 		if _, err := dockerRunDetached(runArgs...); err != nil {
 			utils.LogError("%v\n", err)
+			_, _ = dockerRun("rm", "-f", containerName)
+			os.Exit(1)
+		}
+		if err := waitForContainerCreated(containerName); err != nil {
+			utils.LogError("[kilo-docker] %v\n", err)
+			_, _ = dockerRun("rm", "-f", containerName)
 			os.Exit(1)
 		}
 		_ = execDockerInteractive(containerName, "kilo-entrypoint", "zellij-attach")
