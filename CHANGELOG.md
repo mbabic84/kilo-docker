@@ -1,3 +1,9 @@
+## [3.50.0](https://github.com/mbabic84/kilo-docker/compare/v3.49.1...v3.50.0) (2026-07-13)
+
+### Features
+
+* add full network_mode support (none, container:<name>) ([e893d9c](https://github.com/mbabic84/kilo-docker/commit/e893d9c796f5814219369381db389ae0b9086481))
+
 ## [3.49.1](https://github.com/mbabic84/kilo-docker/compare/v3.49.0...v3.49.1) (2026-07-12)
 
 ### Bug Fixes
