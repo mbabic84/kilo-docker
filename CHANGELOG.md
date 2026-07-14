@@ -1,3 +1,13 @@
+## [3.52.0](https://github.com/mbabic84/kilo-docker/compare/v3.51.0...v3.52.0) (2026-07-14)
+
+### Features
+
+* add kilo-entrypoint shell completion support ([704c95f](https://github.com/mbabic84/kilo-docker/commit/704c95f6a93c90e4e433f004bc6e95522a69b334))
+
+### Bug Fixes
+
+* use fixed-length mask in custom-envs list output ([7155fc2](https://github.com/mbabic84/kilo-docker/commit/7155fc28709870e8615833cf581a03938561c23c))
+
 ## [3.51.0](https://github.com/mbabic84/kilo-docker/compare/v3.50.1...v3.51.0) (2026-07-13)
 
 ### Features
