@@ -196,3 +196,24 @@ func runCustomEnvsRemove(homeDir, userID, key string) {
 	}
 	utils.Log("[kilo-docker] Removed %s\n", key, utils.WithOutput())
 }
+
+// showCustomEnvsCompletions prints tab-completion candidates for custom env
+// keys to stdout, one per line.
+func showCustomEnvsCompletions() {
+	homeDir, _, _, userID := loadUserConfig()
+	if homeDir == "" || userID == "" {
+		return
+	}
+	envs, err := loadCustomEnvs(homeDir, userID)
+	if err != nil {
+		return
+	}
+	keys := make([]string, 0, len(envs))
+	for k := range envs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Println(k)
+	}
+}
