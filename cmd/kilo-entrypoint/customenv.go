@@ -107,7 +107,7 @@ func runCustomEnvsGet(homeDir, userID, key string) {
 		return
 	}
 	if val, ok := envs[key]; ok {
-		fmt.Print(val)
+		fmt.Println(val)
 	}
 }
 
