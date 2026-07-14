@@ -26,6 +26,7 @@ func TestSubcommandsContainsAllInternal(t *testing.T) {
 		"zellij-attach",
 		"print-env",
 		"custom-envs",
+		"completions",
 		"help",
 	}
 
@@ -93,6 +94,7 @@ func TestResolveCommandInternalSubcommands(t *testing.T) {
 		"zellij-attach",
 		"print-env",
 		"custom-envs",
+		"completions",
 		"help",
 	}
 

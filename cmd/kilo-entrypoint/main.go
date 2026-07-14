@@ -40,6 +40,7 @@ var subcommands = map[string]bool{
 	"zellij-attach":   true,
 	"print-env":       true,
 	"custom-envs":     true,
+	"completions":     true,
 	"help":            true,
 }
 
@@ -107,6 +108,7 @@ func printHelp() {
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "zellij-attach", "Attach to existing zellij session"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "print-env", "Print export statements for current tokens and custom envs"))
 	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "custom-envs", "Manage user-defined custom environment variables"))
+	cmdLines = append(cmdLines, fmt.Sprintf("  %-*s %s", w-2, "completions <shell>", "Generate shell completion scripts"))
 
 	var exLines []string
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-entrypoint zellij-attach", "# attach to existing zellij session"))
@@ -409,6 +411,19 @@ Examples:
   kilo-entrypoint custom-envs remove MY_VAR
   kilo-entrypoint custom-envs remove -h
 `
+	case "completions":
+		help = `Usage: kilo-entrypoint completions <shell>
+
+Generate shell completion scripts for kilo-entrypoint.
+
+Arguments:
+  <shell>             Target shell: bash, zsh, or fish
+
+Examples:
+  kilo-entrypoint completions bash
+  kilo-entrypoint completions zsh
+  kilo-entrypoint completions fish
+`
 	case "help":
 		help = `Usage: kilo-entrypoint help [command]
 
@@ -616,7 +631,13 @@ func main() {
 		}
 	case "print-env":
 		runPrintEnv()
+	case "completions":
+		handleCompletions(parsed.args)
 	case "custom-envs":
+		if len(parsed.args) > 0 && parsed.args[0] == "--complete" {
+			showCustomEnvsCompletions()
+			return
+		}
 		homeDir, _, _, userID := loadUserConfig()
 		if homeDir == "" || userID == "" {
 			utils.LogError("[kilo-docker] No user config found\n", utils.WithOutput())

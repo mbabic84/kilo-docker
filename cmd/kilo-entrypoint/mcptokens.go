@@ -74,5 +74,5 @@ func maskToken(token string) string {
 	if len(token) <= 8 {
 		return strings.Repeat("*", len(token))
 	}
-	return token[:4] + strings.Repeat("*", len(token)-8) + token[len(token)-4:]
+	return token[:4] + "****" + token[len(token)-4:]
 }

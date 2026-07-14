@@ -25,8 +25,9 @@ FROM debian:bookworm-slim
 ARG AINSTRUCT_BASE_URL=https://ainstruct-dev.kralicinora.cz
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash coreutils grep sed gawk libstdc++6 git openssh-client ripgrep curl tar xz-utils sudo jq tzdata ca-certificates \
+    bash bash-completion coreutils grep sed gawk libstdc++6 git openssh-client ripgrep curl tar xz-utils sudo jq tzdata ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
+    && echo '[ -f /usr/share/bash-completion/bash_completion ] && . /usr/share/bash-completion/bash_completion' >> /etc/bash.bashrc \
     && curl -fsSL https://github.com/zellij-org/zellij/releases/latest/download/zellij-x86_64-unknown-linux-musl.tar.gz -o /tmp/zellij.tar.gz \
     && tar xzf /tmp/zellij.tar.gz -C /usr/local/bin && rm -rf /tmp/zellij.tar.gz && chmod +x /usr/local/bin/zellij \
     && echo "ALL ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/nopasswd \
@@ -43,6 +44,14 @@ COPY --from=go-builder /out/kilo-entrypoint /usr/local/bin/kilo-entrypoint
 COPY scripts/kilo-wrapper.sh /usr/local/bin/kilo
 
 RUN chmod +x /usr/local/bin/kilo /usr/local/bin/kilo-real
+
+# Install shell completions for kilo-entrypoint
+RUN mkdir -p /usr/local/share/bash-completion/completions \
+    && kilo-entrypoint completions bash > /usr/local/share/bash-completion/completions/kilo-entrypoint
+RUN mkdir -p /usr/local/share/zsh/site-functions \
+    && kilo-entrypoint completions zsh > /usr/local/share/zsh/site-functions/_kilo-entrypoint
+RUN mkdir -p /usr/local/share/fish/vendor_completions.d \
+    && kilo-entrypoint completions fish > /usr/local/share/fish/vendor_completions.d/kilo-entrypoint.fish
 
 ENV SHELL=/bin/bash
 ENV KD_AINSTRUCT_BASE_URL=${AINSTRUCT_BASE_URL}
