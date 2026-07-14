@@ -1,3 +1,9 @@
+## [3.52.1](https://github.com/mbabic84/kilo-docker/compare/v3.52.0...v3.52.1) (2026-07-14)
+
+### Bug Fixes
+
+* add missing newline in custom-envs get output ([460aa15](https://github.com/mbabic84/kilo-docker/commit/460aa15d40b51f70037168a3f20d7623f4e80742))
+
 ## [3.52.0](https://github.com/mbabic84/kilo-docker/compare/v3.51.0...v3.52.0) (2026-07-14)
 
 ### Features
