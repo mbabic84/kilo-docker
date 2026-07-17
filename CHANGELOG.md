@@ -1,3 +1,9 @@
+## [3.55.1](https://github.com/mbabic84/kilo-docker/compare/v3.55.0...v3.55.1) (2026-07-17)
+
+### Bug Fixes
+
+* avoid ETXTBSY when upgrading gh-mcp extension in parallel containers ([c2fb337](https://github.com/mbabic84/kilo-docker/commit/c2fb337bb7d0079ba094bc3f9c14fceac11970de))
+
 ## [3.55.0](https://github.com/mbabic84/kilo-docker/compare/v3.54.0...v3.55.0) (2026-07-17)
 
 ### Features
