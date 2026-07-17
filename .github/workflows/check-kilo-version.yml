@@ -18,17 +18,21 @@ jobs:
 
       - name: Get latest Kilo release
         id: latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -o pipefail
           MAX_ATTEMPTS=10
           for i in $(seq 1 $MAX_ATTEMPTS); do
-            LATEST=$(curl -sSf "https://api.github.com/repos/Kilo-Org/kilocode/releases?per_page=30" | jq -r '[.[] | select((.tag_name | test("^v[0-9]")) and (.prerelease | not)) | .tag_name] | first' | sed 's/^v//')
-            if [ $? -eq 0 ] && [ -n "$LATEST" ] && [ "$LATEST" != "null" ]; then
+            if LATEST=$(curl -sSf \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/Kilo-Org/kilocode/releases?per_page=30" \
+              | jq -r '[.[] | select((.tag_name | test("^v[0-9]")) and (.prerelease | not)) | .tag_name] | first' \
+              | sed 's/^v//') && [ -n "$LATEST" ] && [ "$LATEST" != "null" ]; then
               break
             fi
-            BACKOFF=$((2 ** (i - 1)))
+            BACKOFF=$(( (2 ** (i - 1)) + (RANDOM % 5) ))
             echo "::warning::Attempt $i/$MAX_ATTEMPTS failed, retrying in ${BACKOFF}s..."
-            sleep $BACKOFF
+            sleep "$BACKOFF"
           done
           if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
             echo "::error::Failed to fetch latest Kilo version after $MAX_ATTEMPTS attempts"
