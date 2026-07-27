@@ -146,9 +146,9 @@ var BuiltInServices = []Service{
 	{
 		Name:        "diagnostics",
 		Flag:        "--diagnostics",
-		Description: "Install diagnostic tools (ps, top, ss, lsof, netstat, nc, ping, pstree)",
+		Description: "Install diagnostic tools (ps, top, htop, ss, lsof, netstat, nc, ping, tracepath, mtr, dig, iostat, sar, iotop, ncdu, tree, file, pstree)",
 		Install: []string{
-			"command -v ps >/dev/null || (apt-get update && apt-get install -y --no-install-recommends procps iproute2 lsof net-tools netcat-openbsd iputils-ping psmisc && rm -rf /var/lib/apt/lists/*)",
+			"command -v ps >/dev/null || (apt-get update && apt-get install -y --no-install-recommends procps iproute2 lsof net-tools netcat-openbsd iputils-ping iputils-tracepath psmisc dnsutils htop sysstat iotop mtr-tiny ncdu tree file && rm -rf /var/lib/apt/lists/*)",
 		},
 		EnvVars: map[string]string{
 			"DIAGNOSTICS_ENABLED": "1",
