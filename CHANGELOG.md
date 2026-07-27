@@ -1,3 +1,9 @@
+## [3.58.0](https://github.com/mbabic84/kilo-docker/compare/v3.57.0...v3.58.0) (2026-07-27)
+
+### Features
+
+* extend --diagnostics with dnsutils, htop, sysstat, iotop, mtr, ncdu, tree, file, tracepath ([f81ad22](https://github.com/mbabic84/kilo-docker/commit/f81ad225f4d4ec3eb197a50a0f67c2973aee67e6))
+
 ## [3.57.0](https://github.com/mbabic84/kilo-docker/compare/v3.56.0...v3.57.0) (2026-07-25)
 
 ### Features
