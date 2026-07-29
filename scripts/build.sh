@@ -107,7 +107,7 @@ case "$COMMAND" in
         ;;
     clean)
         echo "Cleaning..."
-        rm -rf "${PROJECT_DIR}/bin"
+        rm -rf "${PROJECT_DIR:?}/bin"
         echo "Done."
         ;;
     *)
