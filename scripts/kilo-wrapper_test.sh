@@ -91,12 +91,14 @@ do_case2() {
     ( cd "$cwd" && git init -q )
 
     # First invocation: creates the entry and the tmp dir.
+    # shellcheck source=scripts/kilo-wrapper-lib.sh
     ( cd "$cwd" && . "$LIB" && setup_kilo_tmpdir ) >/dev/null
     assert_file_exists  "tmp/ created"       "$cwd/tmp"
     assert_file_exists  ".gitignore created" "$cwd/.gitignore"
     assert_file_contains "tmp/ listed"       "$cwd/.gitignore" "tmp/"
 
     # Second invocation: must not add a duplicate tmp/ line.
+    # shellcheck source=scripts/kilo-wrapper-lib.sh
     ( cd "$cwd" && . "$LIB" && setup_kilo_tmpdir ) >/dev/null
     local count
     count="$(grep -cE '^tmp/$' -- "$cwd/.gitignore")"

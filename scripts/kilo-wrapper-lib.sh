@@ -63,21 +63,40 @@ ensure_tmp_gitignore() {
         return 0
     fi
 
-    {
-        if [ -f "$gi" ]; then
-            cat -- "$gi"
-            # Ensure separator newline before our marker so the appended
-            # block is well-formed even if the existing file ends
-            # without a trailing newline.
-            if [ -s "$gi" ] && [ "$(tail -c1 -- "$gi")" != $'\n' ]; then
-                echo
-            fi
-        else
-            : > "$gi" || { rm -f -- "$tmp_gi"; log "Cannot create $gi (permission denied); tmp/ will not be gitignored"; return 0; }
+    # Build the new .gitignore contents in the staging file using only
+    # explicit per-line appends. This avoids the shellcheck-confusing
+    # pattern of a `} > "$tmp_gi"` redirect whose block also writes to
+    # `$gi` (`: > "$gi"`). Reads touch `$gi`; writes touch `$tmp_gi`
+    # exclusively, which shellcheck can verify.
+    if ! : > "$tmp_gi" 2>/dev/null; then
+        rm -f -- "$tmp_gi"
+        log "Cannot truncate staging file; tmp/ will not be gitignored"
+        return 0
+    fi
+
+    if [ -f "$gi" ]; then
+        if ! cat -- "$gi" >> "$tmp_gi" 2>/dev/null; then
+            rm -f -- "$tmp_gi"
+            log "Cannot read existing $gi; tmp/ will not be gitignored"
+            return 0
         fi
-        printf '# Kilo CLI workspace temp dir (managed by kilo-docker wrapper)\n'
-        printf '%s\n' "$marker"
-    } > "$tmp_gi" || { rm -f -- "$tmp_gi"; log "Cannot stage $gi update; tmp/ will not be gitignored"; return 0; }
+        # Ensure a separator newline between pre-existing content and
+        # the marker, even if $gi didn't end with one.
+        if [ -s "$gi" ] && [ "$(tail -c1 -- "$gi")" != $'\n' ]; then
+            if ! printf '\n' >> "$tmp_gi" 2>/dev/null; then
+                rm -f -- "$tmp_gi"
+                log "Cannot stage separator newline; tmp/ will not be gitignored"
+                return 0
+            fi
+        fi
+    fi
+
+    if ! printf '# Kilo CLI workspace temp dir (managed by kilo-docker wrapper)\n' >> "$tmp_gi" 2>/dev/null \
+        || ! printf '%s\n' "$marker" >> "$tmp_gi" 2>/dev/null; then
+        rm -f -- "$tmp_gi"
+        log "Cannot stage $gi update; tmp/ will not be gitignored"
+        return 0
+    fi
 
     if ! mv -f -- "$tmp_gi" "$gi" 2>/dev/null; then
         rm -f -- "$tmp_gi"
