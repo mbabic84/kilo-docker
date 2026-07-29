@@ -109,6 +109,27 @@ Volume mounts follow the same format as Docker's `-v` flag:
 
 The current working directory is always mounted at the same path automatically.
 
+### Temp Directory Policy
+
+The `kilo` wrapper inside the container sets Kilo's temp dir to
+`<cwd>/tmp` for every invocation by exporting `TMPDIR`, `TMP`, and
+`TEMP`. Kilo resolves these through `os.tmpdir()` and lands its
+scratch files (sandbox proxy socket, JDT-LS data, session-diff
+patches, etc.) inside the workspace rather than the system `/tmp`.
+
+- `<cwd>/tmp` is created on demand by the wrapper. If it cannot be
+  created (read-only filesystem), the wrapper falls back to `/tmp`
+  and logs a warning — Kilo still runs.
+- If the workspace is a git repository, the wrapper appends `tmp/`
+  to the worktree-local `.gitignore` so the scratch data does not
+  leak into commits or the indexer. The change is **not** staged or
+  committed automatically; it shows up in `git status` for you to
+  review.
+- Direct invocation of `/usr/local/bin/kilo-real` (or anything that
+  bypasses the wrapper) keeps upstream's default `/tmp/kilo`. The
+  workspace-scoped tmpdir is a wrapper feature, not a Kilo CLI
+  feature.
+
 ### Services
 
 | Service | Description |

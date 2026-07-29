@@ -62,6 +62,28 @@ func TestBuildContainerArgsOnceMode(t *testing.T) {
 	}
 }
 
+// TestBuildContainerArgsWorkspaceMount locks in the same-path
+// bind-mount + workdir that the kilo wrapper relies on to resolve
+// `<cwd>/tmp` and locate the worktree-local .gitignore. If either
+// disappears, the workspace-scoped tmpdir policy in
+// scripts/kilo-wrapper-lib.sh silently degrades to /tmp.
+func TestBuildContainerArgsWorkspaceMount(t *testing.T) {
+	cfg := config{
+		once:            false,
+		enabledServices: []string{},
+	}
+
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	argsStr := strings.Join(args, " ")
+
+	if !strings.Contains(argsStr, "-v /pwd:/pwd") {
+		t.Error("expected -v /pwd:/pwd bind mount (same-path workspace mount)")
+	}
+	if !strings.Contains(argsStr, "-w /pwd") {
+		t.Error("expected -w /pwd workdir")
+	}
+}
+
 func TestBuildContainerArgsWithPorts(t *testing.T) {
 	cfg := config{
 		once:  false,

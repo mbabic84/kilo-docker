@@ -47,6 +47,9 @@ jobs:
       - name: Run tests with race detector
         run: go test -race ./...
 
+      - name: Run wrapper policy test
+        run: ./scripts/kilo-wrapper_test.sh
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 

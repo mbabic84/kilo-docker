@@ -39,3 +39,7 @@ kilo-docker-darwin-*
 
 # Plans directory (local planning)
 plans/
+
+# Workspace-local tmp dir used by the kilo wrapper (TMPDIR/TMP/TEMP)
+# and any test scaffolding placed under ./tmp/ during development.
+tmp/
