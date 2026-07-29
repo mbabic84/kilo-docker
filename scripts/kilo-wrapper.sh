@@ -5,14 +5,16 @@
 # Security: Environment variables are set ONLY immediately before Kilo starts,
 # minimizing token exposure in the shell environment.
 
-# Shared logging function (mimics kilo-docker logging format)
-log() {
-    echo "[kilo-wrapper] $*" >&2
-}
+# Shared library containing the kilo-docker tmp-dir policy
+# (workspace-local tmp + per-worktree .gitignore append).
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/kilo-wrapper-lib.sh
+. "$SCRIPT_DIR/kilo-wrapper-lib.sh"
 
 # Check if we need to skip token loading (e.g., if called from kilo-entrypoint)
 if [ "$1" = "--no-token-load" ]; then
     shift
+    setup_kilo_tmpdir
     exec /usr/local/bin/kilo-real "$@"
 fi
 
@@ -42,13 +44,19 @@ fi
 # Using bash -c ensures tokens are only available to Kilo, not the wrapper shell
 log "Starting kilo..."
 if [ -n "$env_output" ]; then
-    # Export tokens and exec Kilo in a single step
-    # The bash -c creates a minimal shell, eval sets the exports, then exec replaces with Kilo
+    # Export tokens, re-apply the kilo-docker tmp-dir policy last (so
+    # user-supplied TMPDIR/TMP/TEMP cannot override the canonical
+    # workspace-local tmpdir), then exec Kilo. The lib file shipped
+    # at /usr/local/share/kilo/wrapper-lib.sh is reachable from the
+    # bash -c child without inline copying.
     exec bash -c '
         eval "$1"
         shift
+        . /usr/local/share/kilo/wrapper-lib.sh
+        setup_kilo_tmpdir
         exec "$@"
     ' _ "$env_output" /usr/local/bin/kilo-real "$@"
 else
+    setup_kilo_tmpdir
     exec /usr/local/bin/kilo-real "$@"
 fi
