@@ -1,3 +1,16 @@
+## [3.60.0](https://github.com/mbabic84/kilo-docker/compare/v3.59.0...v3.60.0) (2026-07-29)
+
+### Features
+
+* redirect Kilo CLI temp dir to <cwd>/tmp via the kilo wrapper ([c305a68](https://github.com/mbabic84/kilo-docker/commit/c305a688a6bd699d445ea097a001f03341594762))
+
+### Bug Fixes
+
+* **dockerfile:** remove stray placeholder; ci: drop redundant smoke step ([50f3df2](https://github.com/mbabic84/kilo-docker/commit/50f3df21e20e759039cfb02c7fc060a26bed8fd5))
+* **scripts:** use ${var:?} to silence SC2115 in build.sh ([e1284f9](https://github.com/mbabic84/kilo-docker/commit/e1284f938c881894d8404b3c6947df2635b32ab9))
+* **wrapper:** restructure gitignore update to satisfy shellcheck ([93b923a](https://github.com/mbabic84/kilo-docker/commit/93b923a80fdee736dad76b88a77198f13eb01d6c))
+* **wrapper:** source lib from install path, fall back to sibling ([f658f39](https://github.com/mbabic84/kilo-docker/commit/f658f3911a6306164a07f98fc147c80e5fd1fd34))
+
 ## [3.59.0](https://github.com/mbabic84/kilo-docker/compare/v3.58.0...v3.59.0) (2026-07-29)
 
 ### Features
