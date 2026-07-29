@@ -45,7 +45,7 @@ COPY scripts/kilo-wrapper.sh /usr/local/bin/kilo
 # Shared lib for the tmp-dir policy; reached from inside the
 # wrapper's `bash -c` child after `eval "$1"` so the policy always
 # wins over user-supplied TMPDIR/TMP/TEMP.
-COPY scripts/kilo-wrapper-lib.sh /usr/local/share/kilo/wrapper-lib.sh</newString>
+COPY scripts/kilo-wrapper-lib.sh /usr/local/share/kilo/wrapper-lib.sh
 
 RUN chmod +x /usr/local/bin/kilo /usr/local/bin/kilo-real
 

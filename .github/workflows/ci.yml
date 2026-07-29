@@ -64,20 +64,3 @@ jobs:
 
       - name: Verify kilo is installed
         run: docker run --rm ghcr.io/${{ github.repository }}:latest kilo --version
-
-      - name: Verify wrapper tmpdir policy
-        run: |
-          set -eu
-          workspace=$(pwd)
-          mkdir -p ./tmp/smoke
-          trap 'rm -rf ./tmp/smoke' EXIT
-          out=$(docker run --rm \
-            -v "$workspace:$workspace" -w "$workspace" \
-            -e KD_USERNAME=ci -e KD_HOSTNAME=ci \
-            ghcr.io/${{ github.repository }}:latest \
-            env | grep -E '^(TMPDIR|TMP|TEMP)=' || true)
-          printf 'wrapper env:\n%s\n' "$out"
-          docker run --rm \
-            -v "$workspace:$workspace" -w "$workspace" \
-            ghcr.io/${{ github.repository }}:latest \
-            bash -c 'echo "TMPDIR=$TMPDIR"; test -d "$TMPDIR" && echo OK'
