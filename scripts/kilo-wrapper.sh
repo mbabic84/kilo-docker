@@ -5,11 +5,28 @@
 # Security: Environment variables are set ONLY immediately before Kilo starts,
 # minimizing token exposure in the shell environment.
 
+# Tiny local log so warnings below remain functional even if the
+# shared lib fails to source (e.g. missing install path). The shared
+# lib also defines log() with identical semantics, which simply
+# shadows this one.
+log() {
+    echo "[kilo-wrapper] $*" >&2
+}
+
 # Shared library containing the kilo-docker tmp-dir policy
 # (workspace-local tmp + per-worktree .gitignore append).
+# The lib is shipped to /usr/local/share/kilo/wrapper-lib.sh in the
+# image; the sibling path is the fallback for local-dev runs and the
+# wrapper test harness (./scripts/kilo-wrapper_test.sh).
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/kilo-wrapper-lib.sh
-. "$SCRIPT_DIR/kilo-wrapper-lib.sh"
+# shellcheck disable=SC1090
+if [ -f /usr/local/share/kilo/wrapper-lib.sh ]; then
+    . /usr/local/share/kilo/wrapper-lib.sh
+elif [ -f "$SCRIPT_DIR/kilo-wrapper-lib.sh" ]; then
+    . "$SCRIPT_DIR/kilo-wrapper-lib.sh"
+else
+    log "Cannot locate wrapper-lib.sh; tmpdir policy disabled"
+fi
 
 # Check if we need to skip token loading (e.g., if called from kilo-entrypoint)
 if [ "$1" = "--no-token-load" ]; then
