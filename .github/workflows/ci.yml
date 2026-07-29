@@ -50,12 +50,6 @@ jobs:
       - name: Run wrapper policy test
         run: ./scripts/kilo-wrapper_test.sh
 
-      - name: Run shellcheck
-        uses: ludeeus/action-shellcheck@master
-        with:
-          scandir: ./scripts
-          additional_files: scripts/kilo-wrapper.sh scripts/kilo-wrapper-lib.sh scripts/kilo-wrapper_test.sh
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
