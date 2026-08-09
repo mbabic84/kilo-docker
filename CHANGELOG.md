@@ -1,3 +1,9 @@
+## [3.64.0](https://github.com/mbabic84/kilo-docker/compare/v3.63.0...v3.64.0) (2026-08-09)
+
+### Features
+
+* expose kilo-docker identity context via env vars ([ebedf31](https://github.com/mbabic84/kilo-docker/commit/ebedf3172c57daa54a766d5b41368b19e6215bb8))
+
 ## [3.63.0](https://github.com/mbabic84/kilo-docker/compare/v3.62.0...v3.63.0) (2026-08-04)
 
 ### Features
