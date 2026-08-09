@@ -481,3 +481,38 @@ func TestBuildContainerArgsIncludesHostnameForRegular(t *testing.T) {
 		t.Error("expected --hostname flag for regular network")
 	}
 }
+
+// TestBuildContainerArgsIdentityEnvVars locks in the host-identity env vars
+// that agents use to disambiguate host from container. KD_HOST_USER must
+// alias KD_USERNAME for backward compatibility. KD_WORKSPACE is propagated
+// from the host so the entrypoint does not have to derive it.
+func TestBuildContainerArgsIdentityEnvVars(t *testing.T) {
+	cfg := config{}
+
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	argsStr := strings.Join(args, " ")
+
+	mustContain := []string{
+		"-e KD_IS_KILO_DOCKER=1",
+		"-e KD_WORKSPACE=/pwd",
+		"-e KD_HOST_UID=",
+		"-e KD_HOST_GID=",
+		"-e KD_USERNAME=",
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(argsStr, want) {
+			t.Errorf("expected %q in args, got:\n%s", want, argsStr)
+		}
+	}
+
+	if !strings.Contains(argsStr, "-e KD_HOST_USER=") {
+		t.Errorf("expected -e KD_HOST_USER=... in args, got:\n%s", argsStr)
+	}
+
+	// user.Current() may return empty HomeDir in some sandboxed test
+	// environments, so we don't assert KD_HOST_HOME is always present.
+	// Instead, ensure that if KD_HOST_HOME appears, it is preceded by -e.
+	if strings.Contains(argsStr, "KD_HOST_HOME=") && !strings.Contains(argsStr, "-e KD_HOST_HOME=") {
+		t.Errorf("KD_HOST_HOME present but not as -e flag, got:\n%s", argsStr)
+	}
+}

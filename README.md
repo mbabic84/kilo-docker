@@ -4,7 +4,7 @@ Docker environment for [Kilo CLI](https://kilo.ai/docs/code-with-ai/platforms/cl
 
 ## Features
 
-- **Non-root user** - Runs as `kilo` user with dynamic `PUID`/`PGID` mapping to match host user
+- **Non-root user** - Runs as a derived in-container user (`kd-<hash>`) with dynamic `PUID`/`PGID` mapping to match the host user. Identity context is exposed via env vars (`KD_HOST_USER`, `KD_CONTAINER_USER`, `KD_WORKSPACE`, etc.); see `~/.config/kilo/rules/kilo-docker.md` (if installed) for the full mapping.
 - **Persistent database** - SQLite database and auth state survive container restarts via named volume
 - **Token persistence** - MCP server tokens are prompted once and saved in encrypted volume storage
 - **Custom environment variables** - Store your own API keys and config values in encrypted storage, available in all sessions
@@ -297,7 +297,7 @@ Inside the container, the entrypoint reads `KD_SERVICES`, runs installation comm
 
 ## Data Persistence
 
-The host binary uses a per-user named Docker volume mounted at `/home`. Each user gets their own volume (named by SHA-256 hash of the username, e.g. `kilo-a1b2c3d4e5f6-data`), providing data isolation between users. All sessions for the same user share this volume. Inside the container, the user home directory is dynamically generated as `/home/kd-<hash>`. This stores:
+The host binary uses a per-user named Docker volume mounted at `/home`. Each user gets their own volume (named by SHA-256 hash of the username, e.g. `kilo-a1b2c3d4e5f6-data`), providing data isolation between users. All sessions for the same user share this volume. Inside the container, the user home directory is dynamically generated as `/home/kd-<hash>` (see `KD_CONTAINER_HOME`). The bind-mounted workspace path equals the host workspace path (see `KD_WORKSPACE`). This stores:
 
 - SQLite database, auth state, logs
 - Configuration (`kilo.jsonc` — model selection, provider connections, MCP settings)
