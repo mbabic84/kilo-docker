@@ -56,6 +56,10 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 		"-e", "PGID=" + strconv.Itoa(os.Getgid()),
 		"-v", workspace + ":" + workspace,
 		"-w", workspace,
+		// Workspace path propagated so the entrypoint can export KD_WORKSPACE
+		// without relying on os.Getwd() (which differs across `docker exec`
+		// invocations).
+		"-e", "KD_WORKSPACE=" + workspace,
 	}
 
 	// Pass supplementary group IDs so the container user can access
@@ -153,6 +157,20 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 	args = append(args, "-e", "KD_HOSTNAME="+hostname)
 	args = append(args, "--label", "kilo.owner="+username)
 	args = append(args, "-e", "KILO_CONTAINER_NAME="+containerName)
+
+	// Explicit host identity context for agents. These let scripts and the
+	// agent distinguish host identity (KD_HOST_*) from in-container identity
+	// (KD_CONTAINER_*, set by the entrypoint). KD_USERNAME above is kept as
+	// a backward-compatible alias for KD_HOST_USER.
+	if u != nil {
+		args = append(args, "-e", "KD_HOST_USER="+u.Username)
+		if u.HomeDir != "" {
+			args = append(args, "-e", "KD_HOST_HOME="+u.HomeDir)
+		}
+		args = append(args, "-e", "KD_HOST_UID="+strconv.Itoa(os.Getuid()))
+		args = append(args, "-e", "KD_HOST_GID="+strconv.Itoa(os.Getgid()))
+	}
+	args = append(args, "-e", "KD_IS_KILO_DOCKER=1")
 
 	return args
 }

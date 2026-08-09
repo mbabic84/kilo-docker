@@ -317,6 +317,12 @@ func runUserInit() error {
 	_ = os.Setenv("SHELL", userConfig["shell"])
 	_ = os.Setenv("BASH_ENV", filepath.Join(homeDir, ".bashrc"))
 
+	// Explicit container identity context for agents. KD_HOST_* and
+	// KD_IS_KILO_DOCKER are inherited from the container's initial env
+	// (set by kilo-docker via -e flags); KD_CONTAINER_* and KD_WORKSPACE
+	// are only knowable inside the container.
+	setContainerIdentityEnv(username, homeDir, "[userinit]")
+
 	// Chown everything to the new user (after all root-level file writes)
 	utils.Log("[userinit] Setting ownership: %s\n", homeDir)
 	chownRecursive(homeDir, puid, pgid)
@@ -554,8 +560,36 @@ func ensureSyncForCurrentUser() {
 	_ = syscall.Setuid(uid)
 
 	_ = os.Setenv("HOME", homeDir)
+	// Re-export container identity env vars on re-attach. The host-passed
+	// KD_HOST_* and KD_IS_KILO_DOCKER survive via the container's initial
+	// env, but KD_CONTAINER_* are only set during runUserInit() so they
+	// must be mirrored here for re-attached zellij sessions.
+	setContainerIdentityEnv(username, homeDir, "[zellijattach]")
 	utils.Log("[zellijattach] Starting file sync for user %s (UID=%d)\n", username, uid)
 	_ = startSyncWithTokens(homeDir, userID)
+}
+
+// setContainerIdentityEnv exports KD_CONTAINER_USER, KD_CONTAINER_HOME, and
+// KD_WORKSPACE into the process environment so that every child (including
+// the zellij-attached shell and the kilo CLI itself) inherits them via
+// os.Environ(). KD_HOST_* and KD_IS_KILO_DOCKER are set by the host and
+// survive via the container's initial env. Called from both runUserInit()
+// (first-time init) and ensureSyncForCurrentUser() (re-attach paths where
+// runUserInit is skipped). The logPrefix distinguishes the two callers in
+// the log output.
+func setContainerIdentityEnv(username, homeDir, logPrefix string) {
+	_ = os.Setenv("KD_CONTAINER_USER", username)
+	_ = os.Setenv("KD_CONTAINER_HOME", homeDir)
+	if workspace := os.Getenv("KD_WORKSPACE"); workspace != "" {
+		_ = os.Setenv("KD_WORKSPACE", workspace)
+		return
+	}
+	if wd, wdErr := os.Getwd(); wdErr == nil {
+		utils.Log("%s KD_WORKSPACE not set by host, falling back to os.Getwd(): %s\n", logPrefix, wd)
+		_ = os.Setenv("KD_WORKSPACE", wd)
+	} else {
+		utils.LogWarn("%s KD_WORKSPACE not set and os.Getwd() failed: %v\n", logPrefix, wdErr)
+	}
 }
 
 // updateBashrcManaged writes NVM and Python wrapper functions to a managed
