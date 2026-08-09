@@ -43,7 +43,7 @@ func TestSaveProfileRoundTrip(t *testing.T) {
 	p := Profile{
 		Name:        "roundtrip",
 		Description: "Round trip test",
-		Flags:       profileFlags{Go: true, SSH: true},
+		Flags:       profileFlags{Go: true},
 		Networks:    []string{"dev"},
 		Ports:       []string{"8080:80"},
 	}
@@ -75,9 +75,6 @@ func TestSaveProfileRoundTrip(t *testing.T) {
 	if !loaded.Flags.Go {
 		t.Error("expected Go flag to be true")
 	}
-	if !loaded.Flags.SSH {
-		t.Error("expected SSH flag to be true")
-	}
 	if len(loaded.Networks) != 1 || loaded.Networks[0] != "dev" {
 		t.Errorf("expected networks [dev], got %v", loaded.Networks)
 	}
@@ -105,10 +102,9 @@ func TestMergeProfileServices(t *testing.T) {
 func TestMergeProfileCLIOverridesProfile(t *testing.T) {
 	cfg := &config{
 		enabledServices: []string{"go"},
-		ssh:             true,
 	}
 	p := Profile{
-		Flags: profileFlags{Go: true, SSH: true, Docker: true},
+		Flags: profileFlags{Go: true, Docker: true},
 	}
 
 	mergeProfile(cfg, p)
@@ -118,9 +114,6 @@ func TestMergeProfileCLIOverridesProfile(t *testing.T) {
 	}
 	if !isServiceEnabled(*cfg, "docker") {
 		t.Error("expected docker service (additive)")
-	}
-	if !cfg.ssh {
-		t.Error("expected ssh flag")
 	}
 }
 
@@ -192,10 +185,6 @@ func TestHasAnyFlags(t *testing.T) {
 		t.Error("config with service should have flags")
 	}
 
-	if !hasAnyFlags(config{ssh: true}) {
-		t.Error("config with ssh should have flags")
-	}
-
 	if !hasAnyFlags(config{playwright: true}) {
 		t.Error("config with playwright should have flags")
 	}
@@ -233,7 +222,7 @@ func TestSerializeArgsWithProfile(t *testing.T) {
 	cfg := config{
 		profile: "fullstack",
 	}
-	result := serializeArgs(cfg, false)
+	result := serializeArgs(cfg)
 	if result != "--profile fullstack --network kilo-shared" {
 		t.Errorf("expected '--profile fullstack --network kilo-shared', got %q", result)
 	}
@@ -292,7 +281,6 @@ func TestProfileSaveOverwriteWithYes(t *testing.T) {
 
 	cfg1 := config{
 		enabledServices: []string{"go"},
-		ssh:             true,
 	}
 	runProfileSave(cfg1, "test")
 
@@ -300,13 +288,12 @@ func TestProfileSaveOverwriteWithYes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load profile: %v", err)
 	}
-	if !loaded.Flags.Go || !loaded.Flags.SSH {
-		t.Error("expected Go and SSH flags")
+	if !loaded.Flags.Go {
+		t.Error("expected Go flag")
 	}
 
 	cfg2 := config{
 		enabledServices: []string{"docker"},
-		ssh:             false,
 		yes:             true,
 	}
 	runProfileSave(cfg2, "test")
@@ -321,9 +308,6 @@ func TestProfileSaveOverwriteWithYes(t *testing.T) {
 	if !loaded.Flags.Docker {
 		t.Error("expected Docker flag to be true after overwrite")
 	}
-	if loaded.Flags.SSH {
-		t.Error("expected SSH flag to be false after overwrite")
-	}
 }
 
 func TestProfileSaveOverwritePromptDecline(t *testing.T) {
@@ -332,7 +316,6 @@ func TestProfileSaveOverwritePromptDecline(t *testing.T) {
 
 	cfg1 := config{
 		enabledServices: []string{"go"},
-		ssh:             true,
 	}
 	runProfileSave(cfg1, "test")
 

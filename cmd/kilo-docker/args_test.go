@@ -11,7 +11,7 @@ func TestBuildContainerArgsWithDockerService(t *testing.T) {
 		enabledServices: []string{"docker"},
 	}
 
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found")
 
 	argsStr := strings.Join(args, " ")
 
@@ -38,7 +38,7 @@ func TestBuildContainerArgsNoServices(t *testing.T) {
 		enabledServices: []string{},
 	}
 
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found")
 
 	argsStr := strings.Join(args, " ")
 
@@ -53,7 +53,7 @@ func TestBuildContainerArgsOnceMode(t *testing.T) {
 		enabledServices: []string{"gh"},
 	}
 
-	args := buildContainerArgs(cfg, "", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "", "/pwd", "test-container", "not_found")
 
 	argsStr := strings.Join(args, " ")
 
@@ -73,7 +73,7 @@ func TestBuildContainerArgsWorkspaceMount(t *testing.T) {
 		enabledServices: []string{},
 	}
 
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found")
 	argsStr := strings.Join(args, " ")
 
 	if !strings.Contains(argsStr, "-v /pwd:/pwd") {
@@ -90,7 +90,7 @@ func TestBuildContainerArgsWithPorts(t *testing.T) {
 		ports: []string{"8080:80", "3000:3000"},
 	}
 
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found")
 
 	argsStr := strings.Join(args, " ")
 
@@ -113,7 +113,7 @@ func TestBuildContainerArgsNoPorts(t *testing.T) {
 		once: false,
 	}
 
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found")
 
 	argsStr := strings.Join(args, " ")
 
@@ -130,7 +130,7 @@ func TestSerializeArgsEmpty(t *testing.T) {
 		once:            false,
 		enabledServices: []string{},
 	}
-	result := serializeArgs(cfg, false)
+	result := serializeArgs(cfg)
 	expected := "--network kilo-shared"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
@@ -141,7 +141,7 @@ func TestSerializeArgsNoneNetwork(t *testing.T) {
 	cfg := config{
 		networks: []string{"none"},
 	}
-	result := serializeArgs(cfg, false)
+	result := serializeArgs(cfg)
 	expected := "--network none"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
@@ -152,7 +152,7 @@ func TestSerializeArgsContainerNetwork(t *testing.T) {
 	cfg := config{
 		networks: []string{"container:my-app"},
 	}
-	result := serializeArgs(cfg, false)
+	result := serializeArgs(cfg)
 	expected := "--network container:my-app"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
@@ -164,7 +164,7 @@ func TestSerializeArgsOnce(t *testing.T) {
 		once:            true,
 		enabledServices: []string{},
 	}
-	result := serializeArgs(cfg, false)
+	result := serializeArgs(cfg)
 	expected := "--once --network kilo-shared"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
@@ -176,7 +176,7 @@ func TestSerializeArgsServices(t *testing.T) {
 		once:            false,
 		enabledServices: []string{"docker", "gh"},
 	}
-	result := serializeArgs(cfg, false)
+	result := serializeArgs(cfg)
 	if !strings.Contains(result, "--docker") {
 		t.Errorf("expected '--docker' in result, got %q", result)
 	}
@@ -191,7 +191,7 @@ func TestSerializeArgsCombined(t *testing.T) {
 		enabledServices: []string{"docker"},
 		playwright:      true,
 	}
-	result := serializeArgs(cfg, true)
+	result := serializeArgs(cfg)
 	if !strings.Contains(result, "--once") {
 		t.Errorf("expected '--once' in result, got %q", result)
 	}
@@ -201,9 +201,6 @@ func TestSerializeArgsCombined(t *testing.T) {
 	if !strings.Contains(result, "--playwright") {
 		t.Errorf("expected '--playwright' in result, got %q", result)
 	}
-	if !strings.Contains(result, "--ssh") {
-		t.Errorf("expected '--ssh' in result, got %q", result)
-	}
 }
 
 func TestSerializeArgsPorts(t *testing.T) {
@@ -212,7 +209,7 @@ func TestSerializeArgsPorts(t *testing.T) {
 		enabledServices: []string{},
 		ports:           []string{"8080:80", "3000:3000"},
 	}
-	result := serializeArgs(cfg, false)
+	result := serializeArgs(cfg)
 	if !strings.Contains(result, "--port 8080:80") {
 		t.Errorf("expected '--port 8080:80' in result, got %q", result)
 	}
@@ -227,7 +224,7 @@ func TestSerializeArgsNetwork(t *testing.T) {
 		enabledServices: []string{},
 		networks:        []string{"my-network"},
 	}
-	result := serializeArgs(cfg, false)
+	result := serializeArgs(cfg)
 	expected := "--network kilo-shared --network my-network"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
@@ -236,13 +233,13 @@ func TestSerializeArgsNetwork(t *testing.T) {
 
 func TestSerializeArgsYesOnlyWhenExplicit(t *testing.T) {
 	cfgWithoutYes := config{}
-	resultWithoutYes := serializeArgs(cfgWithoutYes, false)
+	resultWithoutYes := serializeArgs(cfgWithoutYes)
 	if strings.Contains(resultWithoutYes, "--yes") {
 		t.Errorf("expected no '--yes' when cfg.yes=false, got %q", resultWithoutYes)
 	}
 
 	cfgWithYes := config{yes: true}
-	resultWithYes := serializeArgs(cfgWithYes, false)
+	resultWithYes := serializeArgs(cfgWithYes)
 	if !strings.Contains(resultWithYes, "--yes") {
 		t.Errorf("expected '--yes' when cfg.yes=true, got %q", resultWithYes)
 	}
@@ -297,24 +294,11 @@ func TestArgsMatchDifferentRepeatableValues(t *testing.T) {
 	}
 }
 
-func TestArgsMatchSSH(t *testing.T) {
-	// --ssh should be compared like any other flag
-	if !argsMatch("--ssh", "--ssh") {
-		t.Error("identical args with --ssh should match")
-	}
-	if argsMatch("--ssh", "") {
-		t.Error("args with --ssh should not match empty args")
-	}
-}
-
 func TestSerializeStoredArgsRoundTrip(t *testing.T) {
-	stored := "--once --ssh"
+	stored := "--once"
 	displayed := serializeStoredArgs(stored)
 	if !strings.Contains(displayed, "--once") {
 		t.Errorf("expected '--once' in displayed, got %q", displayed)
-	}
-	if !strings.Contains(displayed, "--ssh") {
-		t.Errorf("expected '--ssh' in displayed, got %q", displayed)
 	}
 }
 
@@ -375,13 +359,13 @@ func TestSerializeStoredArgsPorts(t *testing.T) {
 	}
 }
 
-func TestArgsMatchExitedContainerSSHMismatch(t *testing.T) {
-	// This simulates the scenario where a container was created with --ssh
-	// but the user runs without it — args should not match
-	current := serializeForDisplay(config{}, false)
-	stored := serializeArgs(config{ssh: true}, true)
+func TestArgsMatchExitedContainerFlagMismatch(t *testing.T) {
+	// Verify that a flag difference is detected by argsMatch (the SSH-specific
+	// case was removed when --ssh was deleted; this guards the general behavior).
+	current := serializeForDisplay(config{})
+	stored := serializeArgs(config{once: true})
 	if argsMatch(current, stored) {
-		t.Error("args should not match when SSH flag differs")
+		t.Error("args should not match when --once flag differs")
 	}
 }
 
@@ -453,7 +437,7 @@ func TestBuildContainerArgsSkipsHostnameForNone(t *testing.T) {
 	cfg := config{
 		networks: []string{"none"},
 	}
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found")
 	argsStr := strings.Join(args, " ")
 	if strings.Contains(argsStr, "--hostname") {
 		t.Error("expected no --hostname flag when using none network mode")
@@ -464,7 +448,7 @@ func TestBuildContainerArgsSkipsHostnameForContainer(t *testing.T) {
 	cfg := config{
 		networks: []string{"container:my-app"},
 	}
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found")
 	argsStr := strings.Join(args, " ")
 	if strings.Contains(argsStr, "--hostname") {
 		t.Error("expected no --hostname flag when using container network mode")
@@ -475,7 +459,7 @@ func TestBuildContainerArgsIncludesHostnameForRegular(t *testing.T) {
 	cfg := config{
 		networks: []string{"my-network"},
 	}
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found")
 	argsStr := strings.Join(args, " ")
 	if !strings.Contains(argsStr, "--hostname test-container") {
 		t.Error("expected --hostname flag for regular network")
@@ -489,7 +473,7 @@ func TestBuildContainerArgsIncludesHostnameForRegular(t *testing.T) {
 func TestBuildContainerArgsIdentityEnvVars(t *testing.T) {
 	cfg := config{}
 
-	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found", "")
+	args := buildContainerArgs(cfg, "vol", "/pwd", "test-container", "not_found")
 	argsStr := strings.Join(args, " ")
 
 	mustContain := []string{

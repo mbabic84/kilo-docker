@@ -23,7 +23,6 @@ type config struct {
 	once                     bool
 	playwright               bool
 	playwrightRecreateVolume bool
-	ssh                      bool
 	yes                      bool
 	help                     bool
 	profile                  string
@@ -80,12 +79,6 @@ var boolFlags = []boolFlag{
 		Description: "Start a Playwright MCP sidecar container for browser automation",
 		setField:    func(c *config) { c.playwright = true },
 		serialize:   func(c config) (string, bool) { return "--playwright", c.playwright },
-	},
-	{
-		Names:       []string{"--ssh"},
-		Description: "Enable SSH agent forwarding into the container",
-		setField:    func(c *config) { c.ssh = true },
-		serialize:   func(c config) (string, bool) { return "--ssh", c.ssh },
 	},
 	{
 		Names:       []string{"--volume", "-v"},
@@ -168,7 +161,6 @@ func comparisonSignature(cfg config) string {
 		strconv.FormatBool(cfg.once),
 		strconv.FormatBool(cfg.playwright),
 		strconv.FormatBool(cfg.playwrightRecreateVolume),
-		strconv.FormatBool(cfg.ssh),
 		strconv.FormatBool(cfg.yes),
 		strconv.FormatBool(cfg.help),
 		cfg.profile,
@@ -200,7 +192,7 @@ func joinSorted(values []string) string {
 }
 
 // serializeForDisplay serializes args for display in session list, excluding implicit kilo-shared network.
-func serializeForDisplay(cfg config, sshEnabled bool) string {
+func serializeForDisplay(cfg config) string {
 	var parts []string
 
 	for _, f := range boolFlags {
@@ -240,10 +232,6 @@ func serializeForDisplay(cfg config, sshEnabled bool) string {
 		}
 	}
 
-	if sshEnabled && !cfg.ssh {
-		parts = append(parts, "--ssh")
-	}
-
 	if len(cfg.args) > 0 {
 		parts = append(parts, cfg.args...)
 	}
@@ -264,6 +252,11 @@ func parseArgs(args []string) config {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		consumed := false
+
+		if arg == "--ssh" {
+			fmt.Fprintf(os.Stderr, "kilo-docker: --ssh has been removed; use dedicated SSH keys inside the container (e.g. mount a key with -v or add it via ssh-add in a post-init step)\n")
+			os.Exit(2)
+		}
 
 		for _, f := range boolFlags {
 			for _, name := range f.Names {
@@ -327,9 +320,6 @@ func mergeOverrides(base, override config) config {
 	}
 	if override.playwrightRecreateVolume {
 		base.playwrightRecreateVolume = true
-	}
-	if override.ssh {
-		base.ssh = true
 	}
 	if override.yes {
 		base.yes = true
@@ -416,5 +406,5 @@ func serializeStoredArgs(storedArgs string) string {
 		return ""
 	}
 	cfg := parseArgs(strings.Fields(storedArgs))
-	return serializeForDisplay(cfg, false)
+	return serializeForDisplay(cfg)
 }

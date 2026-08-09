@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,7 +21,6 @@ const initReadyMarker = "/tmp/.kilo-init-ready"
 // It runs as root and handles infrastructure setup:
 //   - Installs enabled services from KD_SERVICES env var
 //   - Sets up service groups for socket access
-//   - Validates SSH agent socket
 //
 // User creation, home directory, and privilege drop are handled by
 // runUserInit() when docker exec calls kilo-entrypoint zellij-attach.
@@ -32,19 +30,6 @@ func runInit() error {
 		utils.Log("[init] Running as root (UID=0)\n")
 		if err := installServices(); err != nil {
 			utils.LogWarn("[init] service installation error: %v\n", err)
-		}
-
-		if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
-			if info, err := os.Stat(sshAuthSock); err == nil && info.Mode()&os.ModeSocket != 0 {
-				if conn, err := net.DialTimeout("unix", sshAuthSock, 0); err != nil {
-					utils.LogWarn("[init] SSH socket not accessible: %v\n", err)
-				} else {
-					_ = conn.Close()
-					utils.Log("[init] SSH agent socket ready: %s\n", sshAuthSock)
-				}
-			} else {
-				utils.LogWarn("[init] SSH_AUTH_SOCK=%s is not a valid socket\n", sshAuthSock)
-			}
 		}
 
 		if err := os.WriteFile(initReadyMarker, []byte("1\n"), 0o600); err != nil {

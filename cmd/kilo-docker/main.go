@@ -16,7 +16,6 @@
 //	--volume, -v      Mount a volume (host_path:container_path), repeatable
 //	--workspace, -w   Specify a custom workspace path (defaults to current directory)
 //	--playwright      Start Playwright MCP sidecar
-//	--ssh             Enable SSH agent forwarding
 //	--network <name>  Connect to a Docker network
 //	--profile <name>  Load a named flag profile from ~/.config/kilo-docker/profiles/
 //	--yes, -y         Auto-confirm all prompts
@@ -183,7 +182,7 @@ func runContainer(cfg config) {
 	} else {
 		switch containerState {
 		case "exited", "created":
-			currentFlags := serializeForDisplay(cfg, cfg.ssh)
+			currentFlags := serializeForDisplay(cfg)
 			storedFlags := getContainerLabel(containerName, "kilo.args")
 			displayedStoredFlags := serializeStoredArgs(storedFlags)
 			if !argsMatch(currentFlags, storedFlags) {
@@ -202,7 +201,7 @@ func runContainer(cfg config) {
 	}
 
 	if containerState == "running" {
-		currentFlags := serializeForDisplay(cfg, cfg.ssh)
+		currentFlags := serializeForDisplay(cfg)
 		storedFlags := getContainerLabel(containerName, "kilo.args")
 		displayedStoredFlags := serializeStoredArgs(storedFlags)
 		if !argsMatch(currentFlags, storedFlags) {
@@ -217,16 +216,6 @@ func runContainer(cfg config) {
 				handleSessionEnd(containerName, cfg.once)
 				return
 			}
-		}
-	}
-
-	sshAuthSock := ""
-	sshAgentStarted := false
-	sshAgentPid := ""
-	if cfg.ssh {
-		sshAuthSock, _, sshAgentStarted = setupSSH()
-		if sshAgentStarted {
-			sshAgentPid = os.Getenv("SSH_AGENT_PID")
 		}
 	}
 
@@ -280,12 +269,7 @@ func runContainer(cfg config) {
 		}
 	}
 
-	containerArgs := buildContainerArgs(cfg, dataVolume, workspace, containerName, containerState,
-		sshAuthSock)
-
-	if sshAgentStarted {
-		defer cleanupSSH(sshAgentPid)
-	}
+	containerArgs := buildContainerArgs(cfg, dataVolume, workspace, containerName, containerState)
 
 	image := repoURL + ":latest"
 

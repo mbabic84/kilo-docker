@@ -89,7 +89,6 @@ func printHelp() {
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker", "# start a shell in the container"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --once", "# one-time session"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --playwright", "# with Playwright browser automation"))
-	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker --ssh", "# with SSH agent forwarding"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker -p 8080:8080 -p 3000:3000", "# with port mappings"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions", "# list all sessions"))
 	exLines = append(exLines, fmt.Sprintf("  %-*s %s", w-2, "kilo-docker sessions -h", "# see sessions help"))
@@ -183,7 +182,6 @@ Any flags provided after the session name override the stored values.
 
 Examples:
   kilo-docker sessions recreate 1                    # recreate with stored flags
-  kilo-docker sessions recreate my-session --ssh     # add SSH forwarding
   kilo-docker sessions recreate my-session --port 9090:80 --profile dev
   kilo-docker sessions recreate -h                   # show this help
 `
@@ -253,7 +251,7 @@ Examples:
 Manage named flag profiles stored under ~/.config/kilo-docker/profiles/.
 
 Commands:
-  save <name> <flags>   Save current flags as a profile (e.g. save fullstack --go --ssh)
+  save <name> <flags>   Save current flags as a profile (e.g. save fullstack --go --docker)
   list                  List all profiles (default marked with *)
   show <name>           Display full profile JSON
   edit <name>           Open profile in $EDITOR (falls back to vi)
@@ -270,7 +268,7 @@ Options:
 Use 'kilo-docker profile <command> --help' for details on a specific command.
 
 Examples:
-  kilo-docker profile save fullstack --go --ssh --docker  # save a profile
+  kilo-docker profile save fullstack --go --docker  # save a profile
   kilo-docker profile list                                 # list all profiles
   kilo-docker profile show fullstack                       # inspect one
   kilo-docker profile set-default fullstack                # make it the default
@@ -302,7 +300,6 @@ Service flags:
   --picomamba       Install picomamba
 
 Other flags:
-  --ssh             Enable SSH agent forwarding
   --network <name>  Connect to a Docker network
   --port <mapping>  Map a port (repeatable)
   --volume <mount>  Mount a volume (repeatable)
@@ -312,7 +309,7 @@ Options:
 
 Examples:
   # Save a full-stack development setup
-  kilo-docker profile save fullstack --go --ssh --docker --uv
+  kilo-docker profile save fullstack --go --docker --uv
 
   # Save a minimal profile
   kilo-docker profile save minimal --gh
