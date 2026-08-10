@@ -1,3 +1,9 @@
+## [3.65.2](https://github.com/mbabic84/kilo-docker/compare/v3.65.1...v3.65.2) (2026-08-10)
+
+### Bug Fixes
+
+* **ci:** pin conventional-changelog-conventionalcommits to v9 ([4fffe55](https://github.com/mbabic84/kilo-docker/commit/4fffe55b4683d451962692c55b1ac6264116faa2)), closes [semantic-release/release-notes-generator#992](https://github.com/semantic-release/release-notes-generator/issues/992) [semantic-release/commit-analyzer#921](https://github.com/semantic-release/commit-analyzer/issues/921)
+
 ## [3.65.1](https://github.com/mbabic84/kilo-docker/compare/v3.65.0...v3.65.1) (2026-08-10)
 
 ## [3.65.0](https://github.com/mbabic84/kilo-docker/compare/v3.64.0...v3.65.0) (2026-08-10)
