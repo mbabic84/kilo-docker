@@ -1,3 +1,5 @@
+## [3.65.1](https://github.com/mbabic84/kilo-docker/compare/v3.65.0...v3.65.1) (2026-08-10)
+
 ## [3.65.0](https://github.com/mbabic84/kilo-docker/compare/v3.64.0...v3.65.0) (2026-08-10)
 
 ## [3.64.0](https://github.com/mbabic84/kilo-docker/compare/v3.63.0...v3.64.0) (2026-08-09)
