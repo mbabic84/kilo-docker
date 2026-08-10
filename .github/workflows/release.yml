@@ -43,7 +43,7 @@ jobs:
             --package @semantic-release/git \
             --package @semantic-release/exec \
             --package @semantic-release/github \
-            --package conventional-changelog-conventionalcommits \
+            --package conventional-changelog-conventionalcommits@^9 \
             semantic-release
 
           if [ -f .release-version ]; then
