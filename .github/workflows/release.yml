@@ -87,7 +87,7 @@ jobs:
         run: |
           echo "KILO_DOCKER_VERSION=v${{ steps.versions.outputs.kilo_docker_version }}" > .versions
           echo "KILO_VERSION=${{ steps.versions.outputs.kilo_version }}" >> .versions
-          gh release upload "v${{ steps.versions.outputs.new_release_version }}" \
+          gh release upload "v${{ steps.versions.outputs.kilo_docker_version }}" \
             kilo-docker-linux-amd64 \
             kilo-docker-linux-arm64 \
             kilo-docker-darwin-amd64 \
