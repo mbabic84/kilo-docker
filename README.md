@@ -82,7 +82,6 @@ kilo-docker
 | `--workspace`, `-w` | Set custom workspace path (default: current directory) |
 | `--port`, `-p` | Map port (host_port:container_port), repeatable |
 | `--playwright` | Start a Playwright MCP sidecar container for browser automation |
-| `--ssh` | Enable SSH agent forwarding into the container |
 | `--network <name>` | Connect to a Docker network (repeatable, `kilo-shared` included by default). Special modes: `host`, `none`, `container:<name>` — these are mutually exclusive with all other networks |
 | `--profile <name>` | Load a named flag profile from `~/.config/kilo-docker/profiles/` |
 | `--yes`, `-y` | Auto-confirm all prompts (useful for piped/non-interactive installs) |
@@ -150,7 +149,7 @@ Named profiles let you save reusable flag combinations and apply them with a sin
 
 ```bash
 # Save current flags as a profile
-kilo-docker --go --ssh --docker --workspace /path profile save fullstack
+kilo-docker --go --docker --workspace /path profile save fullstack
 
 # List all profiles (default marked with *)
 kilo-docker profile list
@@ -171,13 +170,13 @@ Set a default profile and it auto-loads whenever you run `kilo-docker` with no f
 
 ```bash
 kilo-docker profile set-default fullstack
-kilo-docker                        # auto-loads --go --ssh --docker
+kilo-docker                        # auto-loads --go --docker
 kilo-docker --profile other       # explicit profile overrides default
-kilo-docker --ssh                  # CLI flags override profile flags
+kilo-docker --docker              # CLI flags override profile flags
 kilo-docker profile unset-default  # stop auto-loading
 ```
 
-**Merge precedence:** CLI flags always win. Services from the profile are additive — a service already enabled by CLI won't be disabled. SSH only enables from the profile if not already set on the CLI. Ports, volumes, and networks are always additive. Special network modes (`host`, `none`, `container:<name>`) are mutually exclusive with other networks — when one is used, all others are discarded (Docker restriction).
+**Merge precedence:** CLI flags always win. Services from the profile are additive — a service already enabled by CLI won't be disabled. Ports, volumes, and networks are always additive. Special network modes (`host`, `none`, `container:<name>`) are mutually exclusive with other networks — when one is used, all others are discarded (Docker restriction).
 
 #### Import/Export
 
@@ -211,20 +210,21 @@ The sidecar runs headless Chromium in HTTP mode on port 8931 inside the shared D
 
 Screenshots and output files are saved to a shared volume (`kilo-playwright-output`) mounted at `/mnt/playwright-output` inside the Kilo container.
 
-## SSH Agent Forwarding
+## SSH Access Inside the Container
 
-Use the `--ssh` flag to enable SSH agent forwarding. The host binary detects whether an SSH agent is running on the host:
+`kilo-docker` does not forward the host's SSH agent into the container. While SSH agent forwarding is convenient, it grants the container (and any code it runs) access to **every** identity loaded in the host agent — the wrong trust model for ephemeral, isolated sessions.
 
-- **Agent running** — Uses the existing agent via `$SSH_AUTH_SOCK`
-- **No agent** — Starts one automatically, loads all private keys from `~/.ssh/`, and cleans up on exit
+For SSH access inside the container, use dedicated keys scoped to this use case:
 
-The container mounts the host's SSH agent socket, allowing `git`, `ssh`, and `scp` to use your host SSH keys without copying private keys into the container.
+- **Mount a key from the host** (read-only):
 
-```bash
-kilo-docker --ssh
-```
+  ```bash
+  kilo-docker -v ~/.ssh/id_kilo:/home/kd-xxx/.ssh/id_kilo:ro
+  ```
 
-> **Security:** Private keys never enter the container. The container communicates with the host's SSH agent via a Unix socket.
+- **Add a key inside the container** with `ssh-add` after first run; persisted on the bind-mounted `$HOME`.
+
+This keeps host identities separate from container identities and revokes independently.
 
 ## Networking
 
@@ -396,7 +396,6 @@ kilo-docker sessions stop --all
 kilo-docker sessions recreate <name-or-index>
 
 # Recreate a session with flag overrides
-kilo-docker sessions recreate <name-or-index> --ssh
 kilo-docker sessions recreate <name-or-index> --port 9090:80 --profile dev
 
 # Show recreate help

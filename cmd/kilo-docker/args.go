@@ -11,10 +11,10 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
-func serializeArgs(cfg config, sshEnabled bool) string {
+func serializeArgs(cfg config) string {
 	var parts []string
 
-	utils.Log("[serializeArgs] cfg.ssh=%v, cfg.once=%v, cfg.yes=%v\n", cfg.ssh, cfg.once, cfg.yes)
+	utils.Log("[serializeArgs] cfg.once=%v, cfg.yes=%v\n", cfg.once, cfg.yes)
 
 	for _, f := range boolFlags {
 		if serialized, ok := f.serialize(cfg); ok {
@@ -35,10 +35,6 @@ func serializeArgs(cfg config, sshEnabled bool) string {
 		}
 	}
 
-	if sshEnabled && !cfg.ssh {
-		parts = append(parts, "--ssh")
-	}
-
 	if len(cfg.args) > 0 {
 		parts = append(parts, cfg.args...)
 	}
@@ -46,8 +42,7 @@ func serializeArgs(cfg config, sshEnabled bool) string {
 	return strings.Join(parts, " ")
 }
 
-func buildContainerArgs(cfg config, volume, workspace, containerName, containerState,
-	sshAuthSock string) []string {
+func buildContainerArgs(cfg config, volume, workspace, containerName, containerState string) []string {
 
 	args := []string{
 		"--init",
@@ -83,7 +78,7 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 
 	args = append(args, "--label", "kilo.workspace="+workspace)
 
-	sessionArgs := serializeArgs(cfg, sshAuthSock != "")
+	sessionArgs := serializeArgs(cfg)
 	args = append(args, "--label", "kilo.args="+sessionArgs)
 	args = append(args, "--label", "kilo.version="+version)
 
@@ -111,10 +106,6 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 	}
 	if len(cfg.enabledServices) > 0 {
 		args = append(args, "-e", "KD_SERVICES="+strings.Join(cfg.enabledServices, ","))
-	}
-	if sshAuthSock != "" {
-		args = append(args, "-v", sshAuthSock+":/ssh-agent.sock")
-		args = append(args, "-e", "SSH_AUTH_SOCK=/ssh-agent.sock")
 	}
 
 	args = append(args, "--name", containerName)

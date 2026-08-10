@@ -191,9 +191,9 @@ func handleSessions(cfg config) {
 		utils.Log("[kilo-docker] Recreating with stored args: %q, parsed: %v\n", storedArgs, parsedArgs)
 
 		newCfg := parseArgs(parsedArgs)
-		utils.Log("[kilo-docker] Parsed config: ssh=%v, yes=%v, services=%v\n", newCfg.ssh, newCfg.yes, newCfg.enabledServices)
+		utils.Log("[kilo-docker] Parsed config: yes=%v, services=%v\n", newCfg.yes, newCfg.enabledServices)
 		newCfg.command = "" // ensure runContainer creates a new container
-		utils.Log("[kilo-docker] Recreate config after normalization: yes=%v, serialized=%q\n", newCfg.yes, serializeArgs(newCfg, newCfg.ssh))
+		utils.Log("[kilo-docker] Recreate config after normalization: yes=%v, serialized=%q\n", newCfg.yes, serializeArgs(newCfg))
 
 		// Merge any flags the user passed on the command line as overrides
 		newCfg = mergeOverrides(newCfg, cfg)
@@ -337,19 +337,6 @@ func handleSessions(cfg config) {
 		_ = execDockerInteractive(containerToAttach, "kilo-entrypoint", "zellij-attach")
 		handleSessionEnd(containerToAttach, false)
 	case "exited", "created":
-		needsSSH := false
-		for _, s := range sessions {
-			if s.Name == containerToAttach && strings.Contains(s.Args, "--ssh") {
-				needsSSH = true
-				break
-			}
-		}
-		if needsSSH {
-			_, _, sshStarted := setupSSH()
-			if sshStarted {
-				defer cleanupSSH(os.Getenv("SSH_AGENT_PID"))
-			}
-		}
 		// Check port conflicts before starting
 		storedLabel := getContainerLabel(containerToAttach, "kilo.args")
 		if storedLabel != "" {

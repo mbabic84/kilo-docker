@@ -270,12 +270,9 @@ func runUserInit() error {
 		utils.LogWarn("[userinit] token init failed: %v\n", err)
 	}
 
-	// Chown SSH agent socket to the new user
-	if sshAuthSock := os.Getenv("SSH_AUTH_SOCK"); sshAuthSock != "" {
-		utils.Log("[userinit] Setting SSH agent socket ownership: %s\n", sshAuthSock)
-		_ = os.Chown(sshAuthSock, puid, pgid)
-		_ = os.Chmod(sshAuthSock, 0600)
-	}
+	// Chown SSH agent socket to the new user is intentionally not performed:
+	// kilo-docker no longer forwards a host SSH agent. Any SSH_AUTH_SOCK set
+	// inside the container is the responsibility of the container's owner.
 
 	_ = os.Setenv("HOME", savedHome)
 

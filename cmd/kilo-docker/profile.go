@@ -19,7 +19,6 @@ type profileFlags struct {
 	Docker      bool `json:"docker,omitempty"`
 	UV          bool `json:"uv,omitempty"`
 	GH          bool `json:"gh,omitempty"`
-	SSH         bool `json:"ssh,omitempty"`
 	NVM         bool `json:"nvm,omitempty"`
 	Build       bool `json:"build,omitempty"`
 	Rclone      bool `json:"rclone,omitempty"`
@@ -127,8 +126,8 @@ func unsetDefaultProfile() error {
 }
 
 // mergeProfile applies a profile's flags to a config. CLI flags already set
-// on the config take precedence: services never get removed, SSH only gets
-// enabled if not already set, and ports/volumes/networks are always additive.
+// on the config take precedence: services never get removed, and
+// ports/volumes/networks are always additive.
 func mergeProfile(cfg *config, p Profile) {
 	if p.Flags.Go {
 		addServiceIfMissing(cfg, "go")
@@ -160,9 +159,6 @@ func mergeProfile(cfg *config, p Profile) {
 	if p.Flags.Picomamba {
 		addServiceIfMissing(cfg, "picomamba")
 	}
-	if p.Flags.SSH && !cfg.ssh {
-		cfg.ssh = true
-	}
 
 	cfg.networks = append(cfg.networks, p.Networks...)
 
@@ -182,13 +178,10 @@ func addServiceIfMissing(cfg *config, name string) {
 }
 
 // hasAnyFlags returns true if the config has any user-specified flags set
-// (services, ssh, playwright, once, networks, ports, or volumes). Used as
+// (services, playwright, once, networks, ports, or volumes). Used as
 // a heuristic to decide whether to auto-load the default profile.
 func hasAnyFlags(cfg config) bool {
 	if len(cfg.enabledServices) > 0 {
-		return true
-	}
-	if cfg.ssh {
 		return true
 	}
 	if cfg.playwright {
@@ -338,7 +331,6 @@ func runProfileSave(cfg config, name string) {
 	p := Profile{
 		Name: name,
 		Flags: profileFlags{
-			SSH:       cfg.ssh,
 			Picomamba: isServiceEnabled(cfg, "picomamba"),
 		},
 	}

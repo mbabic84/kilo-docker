@@ -47,7 +47,7 @@ func getSessions() ([]session, error) {
 				// Parse stored args to get network config for display
 				storedArgs := strings.TrimPrefix(label, "kilo.args=")
 				cfg := parseArgs(strings.Fields(storedArgs))
-				s.Args = serializeForDisplay(cfg, false)
+				s.Args = serializeForDisplay(cfg)
 			}
 			if strings.HasPrefix(label, "kilo.owner=") {
 				s.User = strings.TrimPrefix(label, "kilo.owner=")
