@@ -1,3 +1,9 @@
+## [3.67.0](https://github.com/mbabic84/kilo-docker/compare/v3.66.0...v3.67.0) (2026-08-13)
+
+### Features
+
+* **services:** add xxd to diagnostics tools ([67bdfd1](https://github.com/mbabic84/kilo-docker/commit/67bdfd147d79c1ca167bfdab31c4ff85d66fd28b))
+
 ## [3.66.0](https://github.com/mbabic84/kilo-docker/compare/v3.65.2...v3.66.0) (2026-08-11)
 
 ### Features
