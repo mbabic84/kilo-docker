@@ -30,10 +30,40 @@ kilo-docker --diagnostics -y
 | `nc` | `netcat-openbsd` | TCP/UDP connectivity tests |
 | `ping` | `iputils-ping` | Reachability and latency checks |
 | `pstree`, `fuser`, `killall` | `psmisc` | Process tree and signal helpers |
+| `gitleaks` | upstream binary | Pre-commit secret detection in staged/unstaged changes |
 
 The install step is idempotent — running `init` again on a prepared volume is a
 no-op. Tools are only installed in sessions that opt in; the base image is
 unchanged.
+
+### Pre-commit secret detection with gitleaks
+
+`--diagnostics` also installs [`gitleaks`](https://github.com/gitleaks/gitleaks)
+for detecting secrets (API keys, tokens, passwords) in git changes. Always use
+the `--redact 100` flag so matched secrets are masked as `***` in stdout and
+never reach the agent transcript:
+
+```bash
+# Scan staged changes (drop-in for `git commit`)
+gitleaks protect --staged --no-banner --redact 100 -v
+
+# Scan unstaged working-tree changes
+gitleaks protect --no-banner --redact 100 -v
+
+# Pre-commit hook mode (used by git hooks)
+gitleaks git --pre-commit --no-banner --redact 100 -v
+```
+
+A pre-commit hook can be enabled by adding `.git/hooks/pre-commit`:
+
+```bash
+#!/usr/bin/env bash
+exec gitleaks git --pre-commit --no-banner --redact 100 -v
+```
+
+`gitleaks protect --staged` runs `git diff --staged` under the hood, so secrets
+in unstaged-only edits are not flagged. Use `gitleaks protect` (without
+`--staged`) to scan working-tree edits before staging.
 
 When `--diagnostics` is set, the environment variable `DIAGNOSTICS_ENABLED=1` is
 available inside the session.
