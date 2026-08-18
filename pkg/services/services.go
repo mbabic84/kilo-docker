@@ -146,9 +146,9 @@ var BuiltInServices = []Service{
 	{
 		Name:        "diagnostics",
 		Flag:        "--diagnostics",
-		Description: "Install diagnostic tools (ps, top, htop, ss, lsof, netstat, nc, ping, tracepath, mtr, dig, iostat, sar, iotop, ncdu, tree, file, pstree, xxd)",
+		Description: "Install diagnostic tools (ps, top, htop, ss, lsof, netstat, nc, ping, tracepath, mtr, dig, iostat, sar, iotop, ncdu, tree, file, pstree, xxd) plus gitleaks for pre-commit secret detection",
 		Install: []string{
-			"command -v ps >/dev/null || (apt-get update && apt-get install -y --no-install-recommends procps iproute2 lsof net-tools netcat-openbsd iputils-ping iputils-tracepath psmisc dnsutils htop sysstat iotop mtr-tiny ncdu tree file xxd && rm -rf /var/lib/apt/lists/*)",
+			"command -v ps >/dev/null || (apt-get update && apt-get install -y --no-install-recommends procps iproute2 lsof net-tools netcat-openbsd iputils-ping iputils-tracepath psmisc dnsutils htop sysstat iotop mtr-tiny ncdu tree file xxd && rm -rf /var/lib/apt/lists/*) && command -v gitleaks >/dev/null || (GITLEAKS_VERSION=$(curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && GITLEAKS_ARCH=$(case $(uname -m) in x86_64) echo 'x64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz\" | tar -xz -C /tmp gitleaks && mv /tmp/gitleaks /usr/local/bin/gitleaks && chmod +x /usr/local/bin/gitleaks)",
 		},
 		EnvVars: map[string]string{
 			"DIAGNOSTICS_ENABLED": "1",

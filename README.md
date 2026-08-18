@@ -141,7 +141,7 @@ patches, etc.) inside the workspace rather than the system `/tmp`.
 | `--nvm` | Install NVM (Node Version Manager) for managing Node.js versions |
 | `--rclone` | Install rclone, a universal CLI for S3 and 40+ cloud storage backends |
 | `--gitnexus` | Install GitNexus for codebase knowledge graph indexing and MCP-based code intelligence |
-| `--diagnostics` | Install diagnostic tools (ps, top, ss, lsof, netstat, nc, ping, pstree) |
+| `--diagnostics` | Install diagnostic tools (ps, top, ss, lsof, netstat, nc, ping, pstree) plus gitleaks for pre-commit secret detection |
 
 ### Config Profiles
 
