@@ -1,3 +1,9 @@
+## [3.69.0](https://github.com/mbabic84/kilo-docker/compare/v3.68.0...v3.69.0) (2026-08-18)
+
+### Features
+
+* **services:** add gitleaks to diagnostics tools ([cfdeaf7](https://github.com/mbabic84/kilo-docker/commit/cfdeaf76f6209301cffe53920ed054b408568704))
+
 ## [3.68.0](https://github.com/mbabic84/kilo-docker/compare/v3.67.0...v3.68.0) (2026-08-14)
 
 ### Features
