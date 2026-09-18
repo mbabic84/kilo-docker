@@ -128,14 +128,9 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 		}
 	}
 
-	if tz := os.Getenv("TZ"); tz != "" {
+	if tz := resolveHostTimezone(); tz != "" {
+		utils.Log("[args] host timezone: %s\n", tz)
 		args = append(args, "-e", "TZ="+tz)
-	} else if _, err := os.Stat("/etc/timezone"); err == nil {
-		data, _ := os.ReadFile("/etc/timezone")
-		args = append(args, "-e", "TZ="+strings.TrimSpace(string(data)))
-	} else if info, _ := os.Lstat("/etc/localtime"); info != nil && info.Mode()&os.ModeSymlink != 0 {
-		target, _ := os.Readlink("/etc/localtime")
-		args = append(args, "-e", "TZ="+filepath.Base(target))
 	}
 
 	u, _ := user.Current()
@@ -164,4 +159,106 @@ func buildContainerArgs(cfg config, volume, workspace, containerName, containerS
 	args = append(args, "-e", "KD_IS_KILO_DOCKER=1")
 
 	return args
+}
+
+// Host timezone sources are package variables so tests can redirect them
+// to a temporary tree instead of the real filesystem.
+var (
+	hostLocaltimePath = "/etc/localtime"
+	hostTimezonePath  = "/etc/timezone"
+	hostZoneinfoRoot  = "/usr/share/zoneinfo"
+)
+
+// resolveHostTimezone returns the host's IANA timezone (for example
+// "Europe/Berlin") so it can be propagated into the container via TZ.
+//
+// Detection order:
+//  1. The TZ environment variable, when the user set it explicitly.
+//  2. The /etc/localtime symlink, which systemd maintains on every
+//     supported Ubuntu release (22.04 through 26.04 and newer). Ubuntu
+//     25.10 removed /etc/timezone entirely, so this is the only reliable
+//     source on current releases.
+//  3. The legacy /etc/timezone file, still present and consistent on
+//     22.04/24.04 and other Debian-derived hosts.
+//
+// The result is validated against the local zoneinfo tree, so a dangling
+// or malformed source yields "" instead of an unusable TZ.
+func resolveHostTimezone() string {
+	if tz := strings.TrimSpace(os.Getenv("TZ")); tz != "" {
+		return tz
+	}
+	if zone := zoneFromLocaltime(); zone != "" {
+		return zone
+	}
+	return zoneFromEtcTimezone()
+}
+
+// zoneFromLocaltime derives an IANA zone from the /etc/localtime symlink.
+// It returns "" when the path is missing, is a regular file copy rather
+// than a symlink, or does not resolve inside a zoneinfo tree.
+func zoneFromLocaltime() string {
+	info, err := os.Lstat(hostLocaltimePath)
+	if err != nil || info.Mode()&os.ModeSymlink == 0 {
+		return ""
+	}
+	target, err := os.Readlink(hostLocaltimePath)
+	if err != nil {
+		return ""
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(hostLocaltimePath), target)
+	}
+	return zoneFromZoneinfoPath(filepath.Clean(target))
+}
+
+// zoneFromZoneinfoPath extracts the zone suffix from a resolved zoneinfo
+// path such as "/usr/share/zoneinfo/Europe/Berlin" or
+// "/usr/share/zoneinfo/America/Argentina/Buenos_Aires". Splitting on the
+// final "zoneinfo/" component preserves region prefixes, unlike
+// filepath.Base which returned only "Berlin"/"Buenos_Aires".
+func zoneFromZoneinfoPath(path string) string {
+	const marker = "zoneinfo/"
+	idx := strings.LastIndex(path, marker)
+	if idx < 0 {
+		return ""
+	}
+	zone := path[idx+len(marker):]
+	if !validZone(zone) {
+		return ""
+	}
+	return zone
+}
+
+// zoneFromEtcTimezone reads the legacy /etc/timezone file, validating the
+// value so a stale or malformed entry is not propagated.
+func zoneFromEtcTimezone() string {
+	data, err := os.ReadFile(hostTimezonePath)
+	if err != nil {
+		return ""
+	}
+	zone := strings.TrimSpace(string(data))
+	if !validZone(zone) {
+		return ""
+	}
+	return zone
+}
+
+// validZone reports whether zone names an existing entry in the local
+// zoneinfo tree. It rejects empty values, absolute paths, and traversal
+// so the value is always safe to embed in TZ. os.Root confines lookups to
+// the zoneinfo tree even if the name contains unexpected path segments.
+func validZone(zone string) bool {
+	if zone == "" || strings.HasPrefix(zone, "/") || strings.Contains(zone, "..") {
+		return false
+	}
+	root, err := os.OpenRoot(hostZoneinfoRoot)
+	if err != nil {
+		return false
+	}
+	info, statErr := root.Stat(zone)
+	closeErr := root.Close()
+	if statErr != nil || closeErr != nil {
+		return false
+	}
+	return !info.IsDir()
 }

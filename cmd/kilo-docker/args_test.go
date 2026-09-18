@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -498,5 +500,174 @@ func TestBuildContainerArgsIdentityEnvVars(t *testing.T) {
 	// Instead, ensure that if KD_HOST_HOME appears, it is preceded by -e.
 	if strings.Contains(argsStr, "KD_HOST_HOME=") && !strings.Contains(argsStr, "-e KD_HOST_HOME=") {
 		t.Errorf("KD_HOST_HOME present but not as -e flag, got:\n%s", argsStr)
+	}
+}
+
+// useHostTimezoneTree redirects the host timezone sources to a temporary
+// tree and clears TZ so filesystem-based detection is deterministic. It
+// returns the temporary zoneinfo root.
+func useHostTimezoneTree(t *testing.T) string {
+	t.Helper()
+	t.Setenv("TZ", "")
+
+	dir := t.TempDir()
+	root := filepath.Join(dir, "zoneinfo")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("create zoneinfo root: %v", err)
+	}
+
+	prevLocaltime, prevTimezone, prevRoot := hostLocaltimePath, hostTimezonePath, hostZoneinfoRoot
+	hostLocaltimePath = filepath.Join(dir, "localtime")
+	hostTimezonePath = filepath.Join(dir, "timezone")
+	hostZoneinfoRoot = root
+	t.Cleanup(func() {
+		hostLocaltimePath, hostTimezonePath, hostZoneinfoRoot = prevLocaltime, prevTimezone, prevRoot
+	})
+	return root
+}
+
+func writeZoneFile(t *testing.T, root, zone string) string {
+	t.Helper()
+	path := filepath.Join(root, zone)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("create zone dir: %v", err)
+	}
+	if err := os.WriteFile(path, []byte("TZif"), 0o644); err != nil {
+		t.Fatalf("write zone file: %v", err)
+	}
+	return path
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func symlinkZone(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatalf("symlink %s -> %s: %v", link, target, err)
+	}
+}
+
+// TestResolveHostTimezonePrefersEnv locks in the explicit user override.
+func TestResolveHostTimezonePrefersEnv(t *testing.T) {
+	useHostTimezoneTree(t)
+	t.Setenv("TZ", "Pacific/Auckland")
+
+	if got := resolveHostTimezone(); got != "Pacific/Auckland" {
+		t.Fatalf("resolveHostTimezone() = %q, want %q", got, "Pacific/Auckland")
+	}
+}
+
+// TestResolveHostTimezoneRegionPreserved is the regression guard for the
+// old filepath.Base behaviour, which turned "/usr/share/zoneinfo/Europe/Berlin"
+// into the invalid zone "Berlin".
+func TestResolveHostTimezoneRegionPreserved(t *testing.T) {
+	root := useHostTimezoneTree(t)
+	zoneFile := writeZoneFile(t, root, "Europe/Berlin")
+	symlinkZone(t, zoneFile, hostLocaltimePath)
+
+	if got := resolveHostTimezone(); got != "Europe/Berlin" {
+		t.Fatalf("resolveHostTimezone() = %q, want %q (region must not be stripped)", got, "Europe/Berlin")
+	}
+}
+
+// TestResolveHostTimezoneNestedRegion covers multi-level zone names.
+func TestResolveHostTimezoneNestedRegion(t *testing.T) {
+	root := useHostTimezoneTree(t)
+	zoneFile := writeZoneFile(t, root, "America/Argentina/Buenos_Aires")
+	symlinkZone(t, zoneFile, hostLocaltimePath)
+
+	const want = "America/Argentina/Buenos_Aires"
+	if got := resolveHostTimezone(); got != want {
+		t.Fatalf("resolveHostTimezone() = %q, want %q", got, want)
+	}
+}
+
+// TestResolveHostTimezoneRelativeSymlink covers hosts whose /etc/localtime
+// uses a relative symlink target.
+func TestResolveHostTimezoneRelativeSymlink(t *testing.T) {
+	root := useHostTimezoneTree(t)
+	writeZoneFile(t, root, "Etc/UTC")
+	symlinkZone(t, filepath.Join("zoneinfo", "Etc", "UTC"), hostLocaltimePath)
+
+	if got := resolveHostTimezone(); got != "Etc/UTC" {
+		t.Fatalf("resolveHostTimezone() = %q, want %q", got, "Etc/UTC")
+	}
+}
+
+// TestResolveHostTimezoneLegacyEtcTimezone covers older Debian/Ubuntu hosts
+// where /etc/localtime is a regular file and /etc/timezone carries the zone.
+func TestResolveHostTimezoneLegacyEtcTimezone(t *testing.T) {
+	root := useHostTimezoneTree(t)
+	writeZoneFile(t, root, "Europe/Paris")
+	writeFile(t, hostLocaltimePath, "regular file, not a symlink")
+	writeFile(t, hostTimezonePath, "Europe/Paris\n")
+
+	if got := resolveHostTimezone(); got != "Europe/Paris" {
+		t.Fatalf("resolveHostTimezone() = %q, want %q", got, "Europe/Paris")
+	}
+}
+
+// TestResolveHostTimezonePrefersLocaltimeOverStaleTimezone reproduces the
+// Ubuntu 24.04+ case where systemd stops updating /etc/timezone and it goes
+// stale, while /etc/localtime stays correct.
+func TestResolveHostTimezonePrefersLocaltimeOverStaleTimezone(t *testing.T) {
+	root := useHostTimezoneTree(t)
+	current := writeZoneFile(t, root, "America/New_York")
+	writeZoneFile(t, root, "Europe/Berlin")
+	symlinkZone(t, current, hostLocaltimePath)
+	writeFile(t, hostTimezonePath, "Europe/Berlin\n")
+
+	if got := resolveHostTimezone(); got != "America/New_York" {
+		t.Fatalf("resolveHostTimezone() = %q, want %q", got, "America/New_York")
+	}
+}
+
+// TestResolveHostTimezoneDanglingLocaltimeFallsBack covers a broken
+// /etc/localtime symlink that must yield to the legacy source.
+func TestResolveHostTimezoneDanglingLocaltimeFallsBack(t *testing.T) {
+	root := useHostTimezoneTree(t)
+	writeZoneFile(t, root, "Asia/Tokyo")
+	symlinkZone(t, filepath.Join(root, "Does", "Not", "Exist"), hostLocaltimePath)
+	writeFile(t, hostTimezonePath, "Asia/Tokyo")
+
+	if got := resolveHostTimezone(); got != "Asia/Tokyo" {
+		t.Fatalf("resolveHostTimezone() = %q, want %q", got, "Asia/Tokyo")
+	}
+}
+
+// TestResolveHostTimezoneNoSources verifies that missing sources produce no
+// TZ override rather than an empty or bogus value.
+func TestResolveHostTimezoneNoSources(t *testing.T) {
+	useHostTimezoneTree(t)
+
+	if got := resolveHostTimezone(); got != "" {
+		t.Fatalf("resolveHostTimezone() = %q, want empty", got)
+	}
+}
+
+// TestResolveHostTimezoneRejectsInvalidLegacyValue ensures a malformed
+// /etc/timezone entry is not propagated into the container.
+func TestResolveHostTimezoneRejectsInvalidLegacyValue(t *testing.T) {
+	useHostTimezoneTree(t)
+	writeFile(t, hostLocaltimePath, "regular file, not a symlink")
+	writeFile(t, hostTimezonePath, "Not/AZone\n")
+
+	if got := resolveHostTimezone(); got != "" {
+		t.Fatalf("resolveHostTimezone() = %q, want empty", got)
+	}
+}
+
+// TestZoneFromZoneinfoPathOutsideTree rejects paths that are not within a
+// zoneinfo tree, such as a copied /etc/localtime file.
+func TestZoneFromZoneinfoPathOutsideTree(t *testing.T) {
+	useHostTimezoneTree(t)
+
+	if got := zoneFromZoneinfoPath("/etc/localtime"); got != "" {
+		t.Fatalf("zoneFromZoneinfoPath(/etc/localtime) = %q, want empty", got)
 	}
 }
