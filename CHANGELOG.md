@@ -1,3 +1,9 @@
+## [3.80.1](https://github.com/mbabic84/kilo-docker/compare/v3.80.0...v3.80.1) (2026-09-18)
+
+### Bug Fixes
+
+* detect host timezone across Ubuntu 22.04-26.04 ([b7708eb](https://github.com/mbabic84/kilo-docker/commit/b7708eb6d3dbc5bf1e75fc7ec7cd4497619b63d0))
+
 ## [3.80.0](https://github.com/mbabic84/kilo-docker/compare/v3.79.0...v3.80.0) (2026-09-18)
 
 ### Features
