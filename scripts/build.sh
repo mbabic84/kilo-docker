@@ -2,7 +2,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR}")"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 NO_CACHE=""
 IMAGE_TAG="ghcr.io/mbabic84/kilo-docker:latest"
@@ -21,6 +21,9 @@ usage() {
     echo ""
     echo "Options:"
     echo "  --no-cache   Build Docker image without using cache"
+    echo ""
+    echo "Environment:"
+    echo "  KILO_VERSION   Pin a specific Kilo CLI version (default: latest stable)"
     exit 1
 }
 
@@ -68,9 +71,61 @@ run_go_env() {
         "$@"
 }
 
+# Latest stable Kilo CLI release tag (e.g. 7.8.12) from GitHub. Mirrors
+# .github/workflows/check-kilo-version.yml: keep only tags shaped like vX.Y.Z
+# that are not pre-releases. GITHUB_TOKEN/GH_TOKEN (when set) raise the
+# unauthenticated API rate limit.
+latest_kilo_version() {
+    _api_url="https://api.github.com/repos/Kilo-Org/kilocode/releases?per_page=30"
+    _token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+    if [ -n "$_token" ]; then
+        curl -sSf -H "Authorization: Bearer $_token" "$_api_url"
+    else
+        curl -sSf "$_api_url"
+    fi \
+        | jq -r '[.[] | select((.tag_name | test("^v[0-9]")) and (.prerelease | not)) | .tag_name] | first' \
+        | sed 's/^v//'
+}
+
+# Kilo CLI version pinned in the Dockerfile, used as an offline fallback.
+dockerfile_kilo_version() {
+    sed -n 's/^ARG KILO_VERSION=//p' "${PROJECT_DIR}/Dockerfile" | head -1
+}
+
+# Kilo CLI version to build with: an explicit KILO_VERSION override, otherwise
+# the latest stable release, otherwise the version pinned in the Dockerfile.
+resolve_kilo_version() {
+    if [ -n "${KILO_VERSION:-}" ]; then
+        echo "Using KILO_VERSION override: v${KILO_VERSION}" >&2
+        printf '%s' "$KILO_VERSION"
+        return 0
+    fi
+
+    _latest=""
+    if command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+        _latest="$(latest_kilo_version 2>/dev/null || true)"
+    fi
+
+    if [ -n "$_latest" ] && [ "$_latest" != "null" ]; then
+        echo "Using latest stable Kilo CLI: v${_latest}" >&2
+        printf '%s' "$_latest"
+        return 0
+    fi
+
+    _fallback="$(dockerfile_kilo_version)"
+    echo "Warning: could not resolve the latest Kilo CLI release (needs curl, jq and network access)." >&2
+    echo "Falling back to the Dockerfile pin: v${_fallback}" >&2
+    printf '%s' "$_fallback"
+}
+
 build_image() {
-    echo "Building Docker image..."
-    docker build $NO_CACHE -t "${IMAGE_TAG}" "${PROJECT_DIR}"
+    RESOLVED_KILO_VERSION="$(resolve_kilo_version)"
+    if [ -z "$RESOLVED_KILO_VERSION" ]; then
+        echo "Error: could not determine a Kilo CLI version to build with." >&2
+        exit 1
+    fi
+    echo "Building Docker image (Kilo CLI v${RESOLVED_KILO_VERSION})..."
+    docker build $NO_CACHE --build-arg "KILO_VERSION=${RESOLVED_KILO_VERSION}" -t "${IMAGE_TAG}" "${PROJECT_DIR}"
     echo "Image: ${IMAGE_TAG}"
 }
 
