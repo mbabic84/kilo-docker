@@ -91,6 +91,7 @@ func installServices() error {
 		markerMatches = true
 	}
 
+	installFailed := false
 	for _, svcName := range strings.Split(servicesEnv, ",") {
 		svc := getService(svcName)
 		if svc == nil {
@@ -115,10 +116,19 @@ func installServices() error {
 			}
 			if err := runInstallCmd(installCmd); err != nil {
 				utils.LogWarn("[init] Installing %s: error: %v\n", svc.Name, err)
+				installFailed = true
 			} else {
 				utils.Log("[init] Installing %s: ok\n", svc.Name)
 			}
 		}
+	}
+
+	// Only record the marker when every install succeeded. Otherwise a failed
+	// download (e.g. a transient network/API-limit error) would be treated as
+	// "already installed" on the next container start and never retried.
+	if installFailed {
+		utils.LogWarn("[init] Some services failed to install; leaving marker unset so the next start retries\n")
+		return fmt.Errorf("one or more services failed to install")
 	}
 
 	if err := os.WriteFile(servicesMarkerPath, []byte(servicesEnv+"\n"), 0o600); err != nil {

@@ -37,9 +37,9 @@ var BuiltInServices = []Service{
 		Flag:        "--docker",
 		Description: "Mount Docker socket for container management from within Kilo",
 		Install: []string{
-			"command -v docker >/dev/null || (DOCKER_VERSION=$(curl -fsSL https://api.github.com/repos/docker/docker/releases/latest 2>/dev/null | grep -o 'docker-v[0-9.]*' | head -1 | sed 's/docker-v//') && curl -fsSL \"https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz\" -o /tmp/docker.tgz && tar xzf /tmp/docker.tgz -C /tmp && mv /tmp/docker/docker /usr/local/bin/docker && chmod +x /usr/local/bin/docker && rm -rf /tmp/docker*)",
+			"command -v docker >/dev/null || (DOCKER_VERSION=$(curl -fsSL https://download.docker.com/linux/static/stable/x86_64/ | grep -oE 'docker-[0-9]+\\.[0-9]+\\.[0-9]+\\.tgz' | sed 's/docker-//;s/\\.tgz//' | sort -V | tail -1) && curl -fsSL \"https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz\" -o /tmp/docker.tgz && tar xzf /tmp/docker.tgz -C /tmp && mv /tmp/docker/docker /usr/local/bin/docker && chmod +x /usr/local/bin/docker && rm -rf /tmp/docker*)",
 			"command -v docker-compose >/dev/null || (curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose && chmod +x /usr/local/bin/docker-compose && mkdir -p /usr/libexec/docker/cli-plugins && ln -sf /usr/local/bin/docker-compose /usr/libexec/docker/cli-plugins/docker-compose)",
-			"command -v docker-buildx >/dev/null || (BUILDX_VERSION=$(curl -fsSL https://api.github.com/repos/docker/buildx/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && BUILDX_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${BUILDX_ARCH}\" -o /tmp/docker-buildx && chmod +x /tmp/docker-buildx && mkdir -p /usr/libexec/docker/cli-plugins && mv /tmp/docker-buildx /usr/libexec/docker/cli-plugins/docker-buildx)",
+			"command -v docker-buildx >/dev/null || (BUILDX_VERSION=$(curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/docker/buildx/releases/latest | sed 's#.*/tag/v\\?##') && BUILDX_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${BUILDX_ARCH}\" -o /tmp/docker-buildx && chmod +x /tmp/docker-buildx && mkdir -p /usr/libexec/docker/cli-plugins && mv /tmp/docker-buildx /usr/libexec/docker/cli-plugins/docker-buildx)",
 		},
 		EnvVars: map[string]string{
 			"DOCKER_ENABLED": "1",
@@ -67,15 +67,15 @@ var BuiltInServices = []Service{
 		Flag:        "--gh",
 		Description: "Install GitHub CLI for interacting with GitHub",
 		Install: []string{
-			"(GH_VERSION=$(curl -fsSL https://api.github.com/repos/cli/cli/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && GH_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz\" -o /tmp/gh.tar.gz && tar xzf /tmp/gh.tar.gz -C /tmp && mv /tmp/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh && chmod +x /usr/local/bin/gh && rm -rf /tmp/gh*)",
+			"(GH_VERSION=$(curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/cli/cli/releases/latest | sed 's#.*/tag/v\\?##') && GH_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz\" -o /tmp/gh.tar.gz && tar xzf /tmp/gh.tar.gz -C /tmp && mv /tmp/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh && chmod +x /usr/local/bin/gh && rm -rf /tmp/gh*)",
 		},
 		UserInstall: []string{
 			"gh extension remove shuymn/gh-mcp 2>/dev/null; gh extension install shuymn/gh-mcp",
 		},
 		VersionCheck:         "gh extension list 2>/dev/null | grep 'shuymn/gh-mcp' | awk '{print $NF}' | sed 's/^v//'",
-		LatestVersion:        "curl -s https://api.github.com/repos/shuymn/gh-mcp/releases/latest | grep '\"tag_name\":' | sed 's/.*\"v*\\([0-9.]*\\)\".*/\\1/'",
+		LatestVersion:        "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/shuymn/gh-mcp/releases/latest | sed 's#.*/tag/v\\?##'",
 		InstallVersionCheck:  "command -v gh >/dev/null && gh --version 2>/dev/null | head -1 | awk '{print $3}'",
-		InstallLatestVersion: "curl -s https://api.github.com/repos/cli/cli/releases/latest | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\).*/\\1/'",
+		InstallLatestVersion: "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/cli/cli/releases/latest | sed 's#.*/tag/v\\?##'",
 		Volumes:              []string{},
 		RequiresSocket:       "",
 	},
@@ -87,7 +87,7 @@ var BuiltInServices = []Service{
 			"curl -LsSf https://astral.sh/uv/install.sh | sh",
 		},
 		VersionCheck:  "[ -f \"$HOME/.local/bin/uv\" ] && \"$HOME/.local/bin/uv\" --version 2>/dev/null | awk '{print $2}'",
-		LatestVersion: "curl -s https://api.github.com/repos/astral-sh/uv/releases/latest | grep '\"tag_name\":' | sed 's/.*\"v*\\([0-9.]*\\)\".*/\\1/'",
+		LatestVersion: "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/astral-sh/uv/releases/latest | sed 's#.*/tag/v\\?##'",
 		EnvVars: map[string]string{
 			"UV_ENABLED": "1",
 		},
@@ -115,7 +115,7 @@ var BuiltInServices = []Service{
 			"curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash",
 		},
 		VersionCheck:  "[ -f \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\" && nvm --version 2>/dev/null || echo \"\"",
-		LatestVersion: "curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep '\"tag_name\":' | sed 's/.*v\\([0-9.]*\\).*/\\1/'",
+		LatestVersion: "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/nvm-sh/nvm/releases/latest | sed 's#.*/tag/v\\?##'",
 		EnvVars: map[string]string{},
 		Volumes:        []string{},
 		RequiresSocket: "",
@@ -125,7 +125,7 @@ var BuiltInServices = []Service{
 		Flag:        "--rclone",
 		Description: "Install rclone, a universal CLI for S3 and 40+ cloud storage backends",
 		Install: []string{
-			"command -v rclone >/dev/null || (RCLONE_VERSION=$(curl -fsSL https://api.github.com/repos/rclone/rclone/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && RCLONE_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && command -v unzip >/dev/null || apt-get update && apt-get install -y --no-install-recommends unzip && curl -fsSL \"https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}.zip\" -o /tmp/rclone.zip && unzip -o /tmp/rclone.zip -d /tmp && mv /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}/rclone /usr/local/bin/rclone && chmod +x /usr/local/bin/rclone && rm -rf /tmp/rclone.zip /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH})",
+			"command -v rclone >/dev/null || (RCLONE_VERSION=$(curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/rclone/rclone/releases/latest | sed 's#.*/tag/v\\?##') && RCLONE_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && command -v unzip >/dev/null || apt-get update && apt-get install -y --no-install-recommends unzip && curl -fsSL \"https://github.com/rclone/rclone/releases/download/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}.zip\" -o /tmp/rclone.zip && unzip -o /tmp/rclone.zip -d /tmp && mv /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH}/rclone /usr/local/bin/rclone && chmod +x /usr/local/bin/rclone && rm -rf /tmp/rclone.zip /tmp/rclone-v${RCLONE_VERSION}-linux-${RCLONE_ARCH})",
 		},
 		Volumes:        []string{},
 		RequiresSocket: "",
@@ -148,7 +148,7 @@ var BuiltInServices = []Service{
 		Flag:        "--diagnostics",
 		Description: "Install diagnostic tools (ps, top, htop, ss, lsof, netstat, nc, ping, tracepath, mtr, dig, iostat, sar, iotop, ncdu, tree, file, pstree, xxd) plus gitleaks for pre-commit secret detection",
 		Install: []string{
-			"command -v ps >/dev/null || (apt-get update && apt-get install -y --no-install-recommends procps iproute2 lsof net-tools netcat-openbsd iputils-ping iputils-tracepath psmisc dnsutils htop sysstat iotop mtr-tiny ncdu tree file xxd && rm -rf /var/lib/apt/lists/*) && command -v gitleaks >/dev/null || (GITLEAKS_VERSION=$(curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest 2>/dev/null | grep '\"tag_name\":' | head -1 | sed 's/.*\"v*\\([^\"]*\\)\".*/\\1/') && GITLEAKS_ARCH=$(case $(uname -m) in x86_64) echo 'x64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz\" | tar -xz -C /tmp gitleaks && mv /tmp/gitleaks /usr/local/bin/gitleaks && chmod +x /usr/local/bin/gitleaks)",
+			"command -v ps >/dev/null || (apt-get update && apt-get install -y --no-install-recommends procps iproute2 lsof net-tools netcat-openbsd iputils-ping iputils-tracepath psmisc dnsutils htop sysstat iotop mtr-tiny ncdu tree file xxd && rm -rf /var/lib/apt/lists/*) && command -v gitleaks >/dev/null || (GITLEAKS_VERSION=$(curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/gitleaks/gitleaks/releases/latest | sed 's#.*/tag/v\\?##') && GITLEAKS_ARCH=$(case $(uname -m) in x86_64) echo 'x64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz\" | tar -xz -C /tmp gitleaks && mv /tmp/gitleaks /usr/local/bin/gitleaks && chmod +x /usr/local/bin/gitleaks)",
 		},
 		EnvVars: map[string]string{
 			"DIAGNOSTICS_ENABLED": "1",

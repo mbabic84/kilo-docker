@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,6 +155,27 @@ func TestInstallServicesChangedServicesReinstalls(t *testing.T) {
 	}
 	if strings.TrimSpace(string(data)) != "gh,node" {
 		t.Errorf("marker content = %q, want %q", strings.TrimSpace(string(data)), "gh,node")
+	}
+}
+
+func TestInstallServicesFailedInstallNotRecorded(t *testing.T) {
+	orig := runInstallCmd
+	runInstallCmd = func(cmd string) error { return fmt.Errorf("simulated failure") }
+	defer func() { runInstallCmd = orig }()
+
+	tmpDir := t.TempDir()
+	origMarker := servicesMarkerPath
+	servicesMarkerPath = filepath.Join(tmpDir, ".kilo-services-installed")
+	defer func() { servicesMarkerPath = origMarker }()
+
+	_ = os.Setenv("KD_SERVICES", "docker")
+	defer func() { _ = os.Unsetenv("KD_SERVICES") }()
+
+	if err := installServices(); err == nil {
+		t.Error("expected an error when an install command fails")
+	}
+	if _, err := os.Stat(servicesMarkerPath); !os.IsNotExist(err) {
+		t.Error("marker must not be written when an install fails (so the next start retries)")
 	}
 }
 
