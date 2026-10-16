@@ -502,6 +502,8 @@ docker run --rm kilo-docker version
 docker run -it --rm -v $(pwd):/workspace -e PUID=$(id -u) -e PGID=$(id -g) kilo-docker
 ```
 
+`scripts/build.sh` resolves the latest stable Kilo CLI release at build time and passes it as the `KILO_VERSION` build arg. Set `KILO_VERSION=<version>` to pin a specific release; if the lookup fails it falls back to the version pinned in the `Dockerfile`.
+
 After building the host binary, install it for local development with:
 
 ```bash
