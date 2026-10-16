@@ -1,3 +1,10 @@
+## [3.88.1](https://github.com/mbabic84/kilo-docker/compare/v3.88.0...v3.88.1) (2026-10-16)
+
+### Bug Fixes
+
+* resolve service versions without the GitHub API ([145abb8](https://github.com/mbabic84/kilo-docker/commit/145abb8ac5cf271783eb073bfd1013207729ad4e))
+* retry login and recover from leaked user-init marker ([90e6208](https://github.com/mbabic84/kilo-docker/commit/90e6208e37903594e0406317188f28f7c5dcadd2))
+
 ## [3.88.0](https://github.com/mbabic84/kilo-docker/compare/v3.87.0...v3.88.0) (2026-10-15)
 
 ### Features
