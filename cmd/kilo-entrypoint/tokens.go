@@ -17,7 +17,32 @@ func saveEncryptedTokens(home, userID, context7Token, ainstructToken, syncToken,
 		return err
 	}
 	tokenPath := filepath.Join(home, ".local/share/kilo-docker/.tokens.env.enc")
-	return os.WriteFile(tokenPath, encData, 0600)
+	// Write atomically (temp + rename) so a concurrent reader never sees a
+	// truncated/empty token file and a crash mid-write cannot corrupt it.
+	tmp, err := os.CreateTemp(filepath.Dir(tokenPath), ".tokens.env.enc.*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(encData); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Chmod(0600); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, tokenPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 // loadEncryptedTokens reads and decrypts MCP and sync tokens from the volume.

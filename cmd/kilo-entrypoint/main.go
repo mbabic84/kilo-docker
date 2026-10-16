@@ -16,6 +16,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -626,6 +627,11 @@ func main() {
 		utils.Log("[main] Resync complete.\n")
 	case "zellij-attach":
 		if err := runZellijAttach(); err != nil {
+			if errors.Is(err, errLoginCancelled) {
+				utils.LogWarn("[kilo-docker] login cancelled\n", utils.WithOutput())
+				removeOwnedInitMarker()
+				os.Exit(130)
+			}
 			utils.LogError("[main] zellij-attach error: %v\n", err, utils.WithOutput())
 			os.Exit(1)
 		}
