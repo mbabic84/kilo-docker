@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mbabic84/kilo-docker/pkg/constants"
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
@@ -123,8 +124,28 @@ func runUserInit() error {
 		}
 	}
 
-	// Interactive login (required every time)
-	if loginRes.UserID == "" {
+	// A persisted user config may exist even when no token file was found;
+	// recover only the userID so username/homeDir can be derived from the
+	// authenticated identity below. The config's homeDir/username are
+	// deliberately ignored here: they are user-writable and must never steer
+	// the root-privileged filesystem operations that follow.
+	if userID == "" {
+		if _, _, _, id := loadUserConfig(); id != "" {
+			userID = id
+		}
+	}
+
+	// Reuse stored credentials when possible; otherwise prompt interactively.
+	// This is what makes a container recreate skip the login prompt.
+	reused := false
+	if homeDir != "" && userID != "" {
+		if resolved, ok := resolveCredentials(homeDir, userID, constants.AinstructAPIBaseURL); ok {
+			utils.Log("[kilo-docker] Reusing stored credentials, skipping login prompt.\n", utils.WithOutput())
+			loginRes = resolved
+			reused = true
+		}
+	}
+	if !reused {
 		utils.Log("[kilo-docker] Starting Ainstruct authentication\n", utils.WithOutput())
 		newLoginRes, err := runLoginInteractive()
 		if err != nil {
