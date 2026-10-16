@@ -1,3 +1,9 @@
+## [3.89.0](https://github.com/mbabic84/kilo-docker/compare/v3.88.1...v3.89.0) (2026-10-16)
+
+### Features
+
+* **build:** use latest stable Kilo CLI in build.sh ([3f55d31](https://github.com/mbabic84/kilo-docker/commit/3f55d315f83b26657ac8e547cd02df6e563cee73))
+
 ## [3.88.1](https://github.com/mbabic84/kilo-docker/compare/v3.88.0...v3.88.1) (2026-10-16)
 
 ### Bug Fixes
