@@ -10,7 +10,13 @@ import (
 	"github.com/mbabic84/kilo-docker/pkg/utils"
 )
 
-var jsoncCommentRe = regexp.MustCompile(`(?s)(\"(?:[^\"\\]|\\.)*\")|//.*?$|/\*.*?\*/`)
+// jsoncCommentRe matches JSONC comments. Go's regexp engine (RE2) is used,
+// which differs from PCRE/JS regexes in two ways that matter here:
+//   - `$` matches end of *text* only, not end of line, even with `(?m)`;
+//     `//.*?$` would therefore swallow every following line to EOF.
+//   - `.` with the `s` flag matches newlines too, so `//.*` must be
+//     terminated explicitly by `\r?\n` or `\z`.
+var jsoncCommentRe = regexp.MustCompile(`(?s)("(?:[^"\\]|\\.)*")|//[^\n]*|/\*.*?\*/`)
 
 func stripJSONCComments(data []byte) []byte {
 	return jsoncCommentRe.ReplaceAllFunc(data, func(match []byte) []byte {
@@ -60,7 +66,7 @@ var mcpServerDefaults = map[string]map[string]any{
 }
 
 // applyMCPEnabledFromEnv updates opencode.json MCP enabled states by reading tokens
-// from encrypted storage. It does NOT read from environment variables for security - 
+// from encrypted storage. It does NOT read from environment variables for security -
 // tokens are only available in env vars during the Kilo session managed by kilo-wrapper.sh.
 //
 // This function reads tokens directly from the encrypted file to determine which MCP
