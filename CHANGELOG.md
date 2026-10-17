@@ -1,3 +1,9 @@
+## [3.89.1](https://github.com/mbabic84/kilo-docker/compare/v3.89.0...v3.89.1) (2026-10-17)
+
+### Bug Fixes
+
+* **entrypoint:** stop JSONC line comments swallowing the config tail ([bb94411](https://github.com/mbabic84/kilo-docker/commit/bb94411812b64f8e7e7f057f05c52dcdab44ccb3))
+
 ## [3.89.0](https://github.com/mbabic84/kilo-docker/compare/v3.88.1...v3.89.0) (2026-10-16)
 
 ### Features
