@@ -250,13 +250,16 @@ func TestAddServiceIfMissing(t *testing.T) {
 func TestMergeProfileGHAndNVM(t *testing.T) {
 	cfg := &config{}
 	p := Profile{
-		Flags: profileFlags{GH: true, NVM: true, Build: true, Rclone: true, Gitnexus: true, Picomamba: true},
+		Flags: profileFlags{GH: true, Gitea: true, NVM: true, Build: true, Rclone: true, Gitnexus: true, Picomamba: true},
 	}
 
 	mergeProfile(cfg, p)
 
 	if !isServiceEnabled(*cfg, "gh") {
 		t.Error("expected gh service")
+	}
+	if !isServiceEnabled(*cfg, "gitea") {
+		t.Error("expected gitea service")
 	}
 	if !isServiceEnabled(*cfg, "nvm") {
 		t.Error("expected nvm service")
@@ -341,5 +344,19 @@ func TestProfileSaveOverwritePromptDecline(t *testing.T) {
 	}
 	if loaded.Flags.Docker {
 		t.Error("expected Docker flag to not be saved after decline")
+	}
+}
+
+func TestProfileSaveGiteaService(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	runProfileSave(config{enabledServices: []string{"gitea"}}, "gitea-test")
+
+	loaded, err := loadProfile("gitea-test")
+	if err != nil {
+		t.Fatalf("failed to load profile: %v", err)
+	}
+	if !loaded.Flags.Gitea {
+		t.Error("expected Gitea flag to be saved")
 	}
 }

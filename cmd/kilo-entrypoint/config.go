@@ -47,6 +47,16 @@ var mcpServerDefaults = map[string]map[string]any{
 		"command": []any{"gh", "mcp"},
 		"enabled": false,
 	},
+	"gitea": {
+		"type":    "local",
+		"command": []any{"gitea-mcp", "-t", "stdio"},
+		"enabled": false,
+		"environment": map[string]any{
+			"GITEA_HOST":         "{env:KD_GITEA_HOST}",
+			"GITEA_ACCESS_TOKEN": "{env:KD_MCP_GITEA_TOKEN}",
+			"GITEA_INSECURE":     "{env:KD_GITEA_INSECURE}",
+		},
+	},
 	"ainstruct": {
 		"type":    "remote",
 		"url":     "{env:KD_AINSTRUCT_BASE_URL}/mcp",
@@ -63,6 +73,30 @@ var mcpServerDefaults = map[string]map[string]any{
 			"CONTEXT7_API_KEY": "{env:KD_MCP_CONTEXT7_TOKEN}",
 		},
 	},
+}
+
+// isGiteaServiceEnabledIn reports whether the comma-separated service list
+// contains "gitea". Wrapping the list in commas avoids matching future service
+// names that merely contain the substring.
+func isGiteaServiceEnabledIn(servicesEnv string) bool {
+	return strings.Contains(","+servicesEnv+",", ",gitea,")
+}
+
+func isGiteaServiceEnabled() bool {
+	return isGiteaServiceEnabledIn(os.Getenv("KD_SERVICES"))
+}
+
+// mcpEnabledStates computes which MCP servers should be enabled based on
+// service selection and tokens stored in the encrypted store.
+func mcpEnabledStates(servicesEnv string, store TokenStore) map[string]bool {
+	return map[string]bool{
+		"playwright": os.Getenv("PLAYWRIGHT_ENABLED") == "1",
+		"gitnexus":   os.Getenv("GITNEXUS_ENABLED") == "1",
+		"github":     strings.Contains(","+servicesEnv+",", ",gh,"),
+		"context7":   store.Get(tokenKeyContext7) != "",
+		"ainstruct":  store.Get(tokenKeyAinstruct) != "",
+		"gitea":      isGiteaServiceEnabledIn(servicesEnv) && store.Get(tokenKeyGiteaToken) != "",
+	}
 }
 
 // applyMCPEnabledFromEnv updates opencode.json MCP enabled states by reading tokens
@@ -86,29 +120,19 @@ func applyMCPEnabledFromEnv(homeDir string) error {
 
 	// Determine enabled states for env-var-controlled servers
 	servicesEnv := os.Getenv("KD_SERVICES")
-	enabled := map[string]bool{
-		"playwright": os.Getenv("PLAYWRIGHT_ENABLED") == "1",
-		"gitnexus":   os.Getenv("GITNEXUS_ENABLED") == "1",
-		"github":     strings.Contains(","+servicesEnv+",", ",gh,"),
-	}
 
-	// context7 and ainstruct tokens are read from encrypted storage only
-	var context7Token, ainstructToken string
+	// context7, ainstruct, and gitea tokens are read from encrypted storage only
+	var store TokenStore
 
 	if homeDir != "" {
 		_, _, _, userID := loadUserConfig()
 		if userID != "" {
-			if encData, err := os.ReadFile(filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")); err == nil {
-				if decrypted, err := decryptAES(encData, userID); err == nil {
-					c7, aInst, _, _, _, _, _ := parseTokenEnv(string(decrypted))
-					context7Token = c7
-					ainstructToken = aInst
-					utils.Log("[MCP Config] Loaded tokens from encrypted storage\n")
-				} else {
-					utils.Log("[MCP Config] Failed to decrypt token file: %v\n", err)
-				}
+			var loadErr error
+			store, loadErr = loadTokenStore(homeDir, userID)
+			if loadErr != nil {
+				utils.Log("[MCP Config] Failed to load encrypted tokens: %v\n", loadErr)
 			} else {
-				utils.Log("[MCP Config] No encrypted token file found: %v\n", err)
+				utils.Log("[MCP Config] Loaded tokens from encrypted storage\n")
 			}
 		} else {
 			utils.Log("[MCP Config] No userID available to decrypt tokens\n")
@@ -117,16 +141,17 @@ func applyMCPEnabledFromEnv(homeDir string) error {
 		utils.Log("[MCP Config] No homeDir available to load encrypted tokens\n")
 	}
 
-	enabled["context7"] = context7Token != ""
-	enabled["ainstruct"] = ainstructToken != ""
+	enabled := mcpEnabledStates(servicesEnv, store)
 
-	context7TokenLen := len(context7Token)
-	aintTokenLen := len(ainstructToken)
+	if isGiteaServiceEnabledIn(servicesEnv) && !enabled["gitea"] {
+		utils.LogWarn("[MCP Config] Gitea enabled but no token configured; run kilo-entrypoint mcp-tokens\n")
+	}
 
-	utils.Log("[MCP Config] Environment check - PLAYWRIGHT_ENABLED=%v, GITNEXUS_ENABLED=%v, context7=[%d chars], ainstruct=[%d chars]\n",
-		enabled["playwright"], enabled["gitnexus"], context7TokenLen, aintTokenLen)
-	utils.Log("[MCP Config] Determined enabled states - playwright=%v, gitnexus=%v, context7=%v, ainstruct=%v\n",
-		enabled["playwright"], enabled["gitnexus"], enabled["context7"], enabled["ainstruct"])
+	utils.Log("[MCP Config] Environment check - PLAYWRIGHT_ENABLED=%v, GITNEXUS_ENABLED=%v, context7=[%d chars], ainstruct=[%d chars], gitea=[%d chars]\n",
+		enabled["playwright"], enabled["gitnexus"],
+		len(store.Get(tokenKeyContext7)), len(store.Get(tokenKeyAinstruct)), len(store.Get(tokenKeyGiteaToken)))
+	utils.Log("[MCP Config] Determined enabled states - playwright=%v, gitnexus=%v, context7=%v, ainstruct=%v, gitea=%v\n",
+		enabled["playwright"], enabled["gitnexus"], enabled["context7"], enabled["ainstruct"], enabled["gitea"])
 
 	// Check if we have homeDir for config update
 	if homeDir == "" {

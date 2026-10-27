@@ -117,11 +117,12 @@ func needsAinstructPATRefresh() bool {
 		return false
 	}
 
-	_, _, _, _, _, patExpiryStr, err := loadEncryptedTokens(homeDir, userID)
+	store, err := loadTokenStore(homeDir, userID)
 	if err != nil {
 		utils.Log("[zellijattach] Cannot load encrypted tokens: %v\n", err)
 		return false
 	}
+	patExpiryStr := store.Get(tokenKeyPATExtiry)
 	if patExpiryStr == "" {
 		utils.Log("[zellijattach] No PAT expiry stored, refreshing proactively\n")
 		return true
@@ -181,8 +182,17 @@ func refreshPATOnly() error {
 	// Persist the token set even when the PAT call failed: loadUsableSyncTokens
 	// may have silently rotated the refresh token, and that update must not be
 	// dropped or the next attach can no longer refresh.
-	if err := saveEncryptedTokens(homeDir, userID, set.context7, pat, set.accessToken, set.refreshToken,
-		formatExpiry(set.syncExpiry), formatExpiry(patExpiry)); err != nil {
+	store, loadErr := loadTokenStore(homeDir, userID)
+	if loadErr != nil {
+		store = TokenStore{}
+	}
+	store.Set(tokenKeyContext7, set.context7)
+	store.Set(tokenKeyAinstruct, pat)
+	store.Set(tokenKeySync, set.accessToken)
+	store.Set(tokenKeySyncRefresh, set.refreshToken)
+	store.Set(tokenKeySyncExpiry, formatExpiry(set.syncExpiry))
+	store.Set(tokenKeyPATExtiry, formatExpiry(patExpiry))
+	if err := saveTokenStore(homeDir, userID, store); err != nil {
 		utils.LogWarn("[zellijattach] Failed to save rotated tokens: %v\n", err)
 	} else {
 		chownTokenFile(homeDir)

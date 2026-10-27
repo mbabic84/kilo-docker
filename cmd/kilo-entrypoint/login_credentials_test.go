@@ -111,7 +111,13 @@ func writeStoredTokens(t *testing.T, home, userID, ainstruct, access, refresh, s
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := saveEncryptedTokens(home, userID, "", ainstruct, access, refresh, syncExpiry, patExpiry); err != nil {
+	store := TokenStore{}
+	store.Set(tokenKeyAinstruct, ainstruct)
+	store.Set(tokenKeySync, access)
+	store.Set(tokenKeySyncRefresh, refresh)
+	store.Set(tokenKeySyncExpiry, syncExpiry)
+	store.Set(tokenKeyPATExtiry, patExpiry)
+	if err := saveTokenStore(home, userID, store); err != nil {
 		t.Fatal(err)
 	}
 }

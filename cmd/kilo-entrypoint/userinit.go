@@ -419,21 +419,29 @@ func initTokens(homeDir, userID string, loginRes loginResult) error {
 		ainstructPATExpiry = strconv.FormatInt(loginRes.AinstructPATExpiry, 10)
 	}
 
-	storedContext7, storedAinstruct, storedSync, storedSyncRefresh, storedSyncExpiry, storedPatExpiry, loadErr := loadEncryptedTokens(homeDir, userID)
-	if loadErr == nil {
-		ainstructToken = coalesce(ainstructToken, storedAinstruct)
-		context7Token = coalesce(context7Token, storedContext7)
-		syncToken = coalesce(syncToken, storedSync)
-		syncRefreshToken = coalesce(syncRefreshToken, storedSyncRefresh)
-		syncTokenExpiry = coalesce(syncTokenExpiry, storedSyncExpiry)
-		ainstructPATExpiry = coalesce(ainstructPATExpiry, storedPatExpiry)
+	store, loadErr := loadTokenStore(homeDir, userID)
+	if loadErr != nil {
+		store = TokenStore{}
+	} else {
+		ainstructToken = coalesce(ainstructToken, store.Get(tokenKeyAinstruct))
+		context7Token = coalesce(context7Token, store.Get(tokenKeyContext7))
+		syncToken = coalesce(syncToken, store.Get(tokenKeySync))
+		syncRefreshToken = coalesce(syncRefreshToken, store.Get(tokenKeySyncRefresh))
+		syncTokenExpiry = coalesce(syncTokenExpiry, store.Get(tokenKeySyncExpiry))
+		ainstructPATExpiry = coalesce(ainstructPATExpiry, store.Get(tokenKeyPATExtiry))
 	}
 
 	if context7Token == "" && ainstructToken == "" && syncToken == "" {
 		return nil
 	}
 
-	return saveEncryptedTokens(homeDir, userID, context7Token, ainstructToken, syncToken, syncRefreshToken, syncTokenExpiry, ainstructPATExpiry)
+	store.Set(tokenKeyContext7, context7Token)
+	store.Set(tokenKeyAinstruct, ainstructToken)
+	store.Set(tokenKeySync, syncToken)
+	store.Set(tokenKeySyncRefresh, syncRefreshToken)
+	store.Set(tokenKeySyncExpiry, syncTokenExpiry)
+	store.Set(tokenKeyPATExtiry, ainstructPATExpiry)
+	return saveTokenStore(homeDir, userID, store)
 }
 
 // clearZellijSessions removes all zellij sessions to prevent stale

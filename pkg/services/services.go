@@ -6,6 +6,16 @@ type CopyConfig struct {
 	Dst  string
 }
 
+// UpdateCheck describes one independently versioned binary installed by a
+// service. Services that install more than one tool (e.g. --gitea installs tea
+// and gitea-mcp) list each binary here so updates can be detected per binary
+// while still running the service's Install commands as a single batch.
+type UpdateCheck struct {
+	Name    string // display name, e.g. "tea"
+	Current string // shell command printing the installed version
+	Latest  string // shell command printing the latest version
+}
+
 type Service struct {
 	Name                 string
 	DisplayName          string
@@ -17,6 +27,7 @@ type Service struct {
 	LatestVersion        string
 	InstallVersionCheck  string
 	InstallLatestVersion string
+	InstallUpdates       []UpdateCheck
 	EnvVars              map[string]string
 	Volumes              []string
 	RequiresSocket       string
@@ -78,6 +89,30 @@ var BuiltInServices = []Service{
 		InstallLatestVersion: "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/cli/cli/releases/latest | sed 's#.*/tag/v\\?##'",
 		Volumes:              []string{},
 		RequiresSocket:       "",
+	},
+	{
+		Name:        "gitea",
+		DisplayName: "Gitea CLI + MCP",
+		Flag:        "--gitea",
+		Description: "Install the tea CLI and the gitea-mcp server for Gitea interactions",
+		Install: []string{
+			`TEA_VERSION=$(curl -fsSL --connect-timeout 5 --max-time 20 https://gitea.com/api/v1/repos/gitea/tea/releases/latest | jq -r '.tag_name | ltrimstr("v")') && TEA_ARCH=$(case $(uname -m) in x86_64) echo amd64 ;; aarch64|arm64) echo arm64 ;; esac) && curl -fsSL --connect-timeout 10 --max-time 120 "https://dl.gitea.com/tea/${TEA_VERSION}/tea-${TEA_VERSION}-linux-${TEA_ARCH}.xz" -o /tmp/tea.xz && xz -dc /tmp/tea.xz > /usr/local/bin/.tea.tmp && chmod +x /usr/local/bin/.tea.tmp && mv /usr/local/bin/.tea.tmp /usr/local/bin/tea && rm -f /tmp/tea.xz`,
+			`MCP_TAG=$(curl -fsSL --connect-timeout 5 --max-time 20 https://gitea.com/api/v1/repos/gitea/gitea-mcp/releases/latest | jq -r '.tag_name') && MCP_ARCH=$(case $(uname -m) in x86_64) echo x86_64 ;; aarch64|arm64) echo arm64 ;; esac) && curl -fsSL --connect-timeout 10 --max-time 120 "https://gitea.com/gitea/gitea-mcp/releases/download/${MCP_TAG}/gitea-mcp_Linux_${MCP_ARCH}.tar.gz" -o /tmp/gitea-mcp.tar.gz && tar -xzf /tmp/gitea-mcp.tar.gz -C /tmp gitea-mcp && mv /tmp/gitea-mcp /usr/local/bin/gitea-mcp && chmod +x /usr/local/bin/gitea-mcp && rm -f /tmp/gitea-mcp.tar.gz`,
+		},
+		InstallUpdates: []UpdateCheck{
+			{
+				Name:    "tea",
+				Current: `command -v tea >/dev/null && tea --version 2>/dev/null | head -1 | sed -E 's/\x1b\[[0-9;]*m//g; s/^Version:[[:space:]]+//' | awk '{print $1}'`,
+				Latest:  `curl -fsSL --connect-timeout 5 --max-time 20 https://gitea.com/api/v1/repos/gitea/tea/releases/latest | jq -r '.tag_name | ltrimstr("v")'`,
+			},
+			{
+				Name:    "gitea-mcp",
+				Current: `command -v gitea-mcp >/dev/null && gitea-mcp -v 2>/dev/null | head -1`,
+				Latest:  `curl -fsSL --connect-timeout 5 --max-time 20 https://gitea.com/api/v1/repos/gitea/gitea-mcp/releases/latest | jq -r '.tag_name | ltrimstr("v")'`,
+			},
+		},
+		Volumes:        []string{},
+		RequiresSocket: "",
 	},
 	{
 		Name:        "uv",

@@ -108,16 +108,13 @@ func NewSyncer() *Syncer {
 
 	homeDir, _, _, userID := loadUserConfig()
 	if homeDir != "" && userID != "" {
-		encPath := filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")
-		if encData, err := os.ReadFile(encPath); err == nil {
-			if decrypted, err := decryptAES(encData, userID); err == nil {
-				var expiryStr string
-				_, _, accessToken, refreshToken, expiryStr, _, _ = parseTokenEnv(string(decrypted))
-				if expiryStr != "" {
-					expiry, _ = strconv.ParseInt(expiryStr, 10, 64)
-				}
-				utils.Log("[ainstruct-sync] Loaded tokens from encrypted storage\n")
+		if store, err := loadTokenStore(homeDir, userID); err == nil {
+			accessToken = store.Get(tokenKeySync)
+			refreshToken = store.Get(tokenKeySyncRefresh)
+			if expiryStr := store.Get(tokenKeySyncExpiry); expiryStr != "" {
+				expiry, _ = strconv.ParseInt(expiryStr, 10, 64)
 			}
+			utils.Log("[ainstruct-sync] Loaded tokens from encrypted storage\n")
 		}
 	}
 

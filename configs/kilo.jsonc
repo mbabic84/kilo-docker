@@ -32,6 +32,16 @@
       "type": "local",
       "command": ["gh", "mcp"],
       "enabled": false
+    },
+    "gitea": {
+      "type": "local",
+      "command": ["gitea-mcp", "-t", "stdio"],
+      "enabled": false,
+      "environment": {
+        "GITEA_HOST": "{env:KD_GITEA_HOST}",
+        "GITEA_ACCESS_TOKEN": "{env:KD_MCP_GITEA_TOKEN}",
+        "GITEA_INSECURE": "{env:KD_GITEA_INSECURE}"
+      }
     }
   },
   "instructions": [

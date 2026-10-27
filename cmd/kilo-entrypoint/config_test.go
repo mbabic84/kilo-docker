@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -99,5 +101,116 @@ func TestStripJSONCCommentsParsesRealisticConfig(t *testing.T) {
 	}
 	if v, ok := bash["curl *--output /dev/null*"]; !ok || v != "allow" {
 		t.Fatalf("entry after line comment was lost: %v", bash["curl *--output /dev/null*"])
+	}
+}
+
+func TestMCPEnabledStatesGiteaMatrix(t *testing.T) {
+	t.Setenv("PLAYWRIGHT_ENABLED", "")
+	t.Setenv("GITNEXUS_ENABLED", "")
+
+	tests := []struct {
+		name     string
+		services string
+		token    string
+		want     bool
+	}{
+		{"service and token", "gitea", "tok", true},
+		{"service with other services and token", "go,gitea", "tok", true},
+		{"service without token", "gitea", "", false},
+		{"token without service", "go", "tok", false},
+		{"similar service name does not match", "gitea-mcp", "tok", false},
+		{"empty", "", "", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			store := TokenStore{}
+			if tc.token != "" {
+				store.Set(tokenKeyGiteaToken, tc.token)
+			}
+			enabled := mcpEnabledStates(tc.services, store)
+			if got := enabled["gitea"]; got != tc.want {
+				t.Errorf("gitea enabled = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestMCPEnabledStatesStillUsesStoredMCPTokens(t *testing.T) {
+	t.Setenv("PLAYWRIGHT_ENABLED", "1")
+	t.Setenv("GITNEXUS_ENABLED", "")
+
+	store := TokenStore{}
+	store.Set(tokenKeyContext7, "ctx7")
+	store.Set(tokenKeyAinstruct, "ainstruct")
+
+	enabled := mcpEnabledStates("gh", store)
+
+	if !enabled["context7"] {
+		t.Error("context7 should be enabled when a token is stored")
+	}
+	if !enabled["ainstruct"] {
+		t.Error("ainstruct should be enabled when a token is stored")
+	}
+	if !enabled["github"] {
+		t.Error("github should be enabled when gh service is active")
+	}
+	if !enabled["playwright"] {
+		t.Error("playwright should follow PLAYWRIGHT_ENABLED")
+	}
+}
+
+func TestEnsureMCPEntryInsertsGiteaDefaults(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "kilo.jsonc")
+	if err := os.WriteFile(configPath, []byte(`{"mcp": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 2; i++ {
+		if err := ensureMCPEntry(configPath, "gitea", mcpServerDefaults["gitea"]); err != nil {
+			t.Fatalf("ensureMCPEntry() call %d error = %v", i+1, err)
+		}
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("config is not valid JSON: %v", err)
+	}
+	mcp, ok := cfg["mcp"].(map[string]any)
+	if !ok {
+		t.Fatal("mcp section missing")
+	}
+	entry, ok := mcp["gitea"].(map[string]any)
+	if !ok {
+		t.Fatal("gitea entry missing")
+	}
+	if entry["type"] != "local" {
+		t.Errorf("type = %v, want local", entry["type"])
+	}
+	command, ok := entry["command"].([]any)
+	if !ok || len(command) != 3 || command[0] != "gitea-mcp" || command[1] != "-t" || command[2] != "stdio" {
+		t.Errorf("command = %v, want [gitea-mcp -t stdio]", entry["command"])
+	}
+	if entry["enabled"] != false {
+		t.Errorf("enabled = %v, want false", entry["enabled"])
+	}
+	environment, ok := entry["environment"].(map[string]any)
+	if !ok {
+		t.Fatalf("environment = %v, want object", entry["environment"])
+	}
+	wantEnv := map[string]string{
+		"GITEA_HOST":         "{env:KD_GITEA_HOST}",
+		"GITEA_ACCESS_TOKEN": "{env:KD_MCP_GITEA_TOKEN}",
+		"GITEA_INSECURE":     "{env:KD_GITEA_INSECURE}",
+	}
+	for key, want := range wantEnv {
+		if environment[key] != want {
+			t.Errorf("environment[%s] = %v, want %q", key, environment[key], want)
+		}
 	}
 }

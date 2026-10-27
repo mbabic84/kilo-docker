@@ -99,7 +99,7 @@ func installServices() error {
 			continue
 		}
 
-		if svc.InstallVersionCheck != "" && svc.InstallLatestVersion != "" {
+		if len(svc.InstallUpdates) > 0 || (svc.InstallVersionCheck != "" && svc.InstallLatestVersion != "") {
 			if !shouldRunSystemInstall(svc) {
 				continue
 			}
@@ -141,6 +141,12 @@ func installServices() error {
 // shouldRunSystemInstall returns true if the service's install command should run based on
 // version comparison. It logs the outcome and prompts the user when an update is available.
 func shouldRunSystemInstall(svc *services.Service) bool {
+	if len(svc.InstallUpdates) > 0 {
+		return evaluateUpdateChecks(svc.InstallUpdates, func(cmd string) string {
+			return runVersionCheck(cmd, "/root")
+		}, promptYesNo)
+	}
+
 	currentVer := runVersionCheck(svc.InstallVersionCheck, "/root")
 	latestVer := runVersionCheck(svc.InstallLatestVersion, "/root")
 
@@ -163,6 +169,42 @@ func shouldRunSystemInstall(svc *services.Service) bool {
 		utils.Log("[init] Installing %s\n", svc.Name)
 	}
 	return true
+}
+
+// evaluateUpdateChecks runs each binary's version check and prompts per binary
+// when a newer release is available. It returns true when at least one binary
+// should be (re)installed: either the user accepted an update, or a version
+// could not be determined (missing binary or failed lookup), in which case
+// installing is the safe fallback. The caller runs the service's install
+// commands once, so accepting any update refreshes every bundled binary.
+func evaluateUpdateChecks(checks []services.UpdateCheck, runCheck func(string) string, prompt func(string) bool) bool {
+	installNeeded := false
+	for _, check := range checks {
+		currentVer := runCheck(check.Current)
+		latestVer := runCheck(check.Latest)
+
+		if currentVer != "" && latestVer != "" {
+			if compareVersions(currentVer, latestVer) >= 0 {
+				utils.Log("[init] Skipping %s: already at latest version (%s)\n", check.Name, currentVer)
+				continue
+			}
+			utils.Log("[init] Updating %s: %s -> %s\n", check.Name, currentVer, latestVer)
+			if prompt(fmt.Sprintf("Update %s: %s -> %s?", check.Name, currentVer, latestVer)) {
+				installNeeded = true
+			} else {
+				utils.Log("[init] Skipping %s update\n", check.Name)
+			}
+			continue
+		}
+
+		if currentVer == "" && latestVer != "" {
+			utils.Log("[init] Installing %s (latest: %s)\n", check.Name, latestVer)
+		} else {
+			utils.Log("[init] Installing %s\n", check.Name)
+		}
+		installNeeded = true
+	}
+	return installNeeded
 }
 
 // runVersionCheck executes a command and returns its trimmed output.
@@ -210,12 +252,23 @@ func compareVersions(v1, v2 string) int {
 	return 0
 }
 
-// promptYesNo prompts the user with a question and returns true if they answered yes.
+// promptYesNo prompts the user with a question and returns true if they
+// answered yes. Empty input defaults to yes (used only for service updates).
 func promptYesNo(question string) bool {
-	utils.Log("[kilo-docker] %s [y/N]: ", question, utils.WithOutput())
+	utils.Log("[kilo-docker] %s [Y/n]: ", question, utils.WithOutput())
 	var answer string
 	_, _ = fmt.Scanln(&answer)
-	return strings.ToLower(strings.TrimSpace(answer)) == "y"
+	return parseYesNoAnswer(answer)
+}
+
+// parseYesNoAnswer interprets a yes/no answer where an empty answer means yes.
+func parseYesNoAnswer(answer string) bool {
+	switch strings.ToLower(strings.TrimSpace(answer)) {
+	case "", "y", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
 // installUserServices runs UserInstall commands for services that require

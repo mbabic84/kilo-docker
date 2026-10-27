@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mbabic84/kilo-docker/pkg/services"
 )
 
 // stubInstallCmd replaces the real command runner with a no-op for tests,
@@ -230,5 +232,136 @@ func TestCopyServiceConfigsSkipsExisting(t *testing.T) {
 	data, _ := os.ReadFile(dstFile)
 	if string(data) != "existing config" {
 		t.Error("expected existing config to be preserved")
+	}
+}
+
+func TestEvaluateUpdateChecks(t *testing.T) {
+	checks := []services.UpdateCheck{
+		{Name: "tea", Current: "cur-tea", Latest: "lat-tea"},
+		{Name: "gitea-mcp", Current: "cur-mcp", Latest: "lat-mcp"},
+	}
+
+	tests := []struct {
+		name        string
+		versions    map[string]string
+		accept      func(string) bool
+		want        bool
+		wantPrompts int
+	}{
+		{
+			name: "both current",
+			versions: map[string]string{
+				"cur-tea": "0.16.0", "lat-tea": "0.16.0",
+				"cur-mcp": "1.11.0", "lat-mcp": "1.11.0",
+			},
+			want: false,
+		},
+		{
+			name: "one outdated accepted",
+			versions: map[string]string{
+				"cur-tea": "0.15.0", "lat-tea": "0.16.0",
+				"cur-mcp": "1.11.0", "lat-mcp": "1.11.0",
+			},
+			accept:      func(string) bool { return true },
+			want:        true,
+			wantPrompts: 1,
+		},
+		{
+			name: "one outdated declined",
+			versions: map[string]string{
+				"cur-tea": "0.15.0", "lat-tea": "0.16.0",
+				"cur-mcp": "1.11.0", "lat-mcp": "1.11.0",
+			},
+			accept:      func(string) bool { return false },
+			want:        false,
+			wantPrompts: 1,
+		},
+		{
+			name: "both outdated, second accepted",
+			versions: map[string]string{
+				"cur-tea": "0.15.0", "lat-tea": "0.16.0",
+				"cur-mcp": "1.10.0", "lat-mcp": "1.11.0",
+			},
+			accept:      func(question string) bool { return strings.Contains(question, "gitea-mcp") },
+			want:        true,
+			wantPrompts: 2,
+		},
+		{
+			name: "both outdated, all declined",
+			versions: map[string]string{
+				"cur-tea": "0.15.0", "lat-tea": "0.16.0",
+				"cur-mcp": "1.10.0", "lat-mcp": "1.11.0",
+			},
+			accept:      func(string) bool { return false },
+			want:        false,
+			wantPrompts: 2,
+		},
+		{
+			name: "missing binary falls back to install without prompting",
+			versions: map[string]string{
+				"cur-tea": "", "lat-tea": "0.16.0",
+				"cur-mcp": "1.11.0", "lat-mcp": "1.11.0",
+			},
+			accept: func(string) bool { return false },
+			want:   true,
+		},
+		{
+			name: "failed latest lookup falls back to install without prompting",
+			versions: map[string]string{
+				"cur-tea": "0.16.0", "lat-tea": "",
+				"cur-mcp": "1.11.0", "lat-mcp": "1.11.0",
+			},
+			accept: func(string) bool { return false },
+			want:   true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			prompts := 0
+			run := func(cmd string) string {
+				return tc.versions[cmd]
+			}
+			accept := tc.accept
+			if accept == nil {
+				accept = func(string) bool {
+					t.Fatal("prompt must not be shown when no update is available")
+					return false
+				}
+			}
+			got := evaluateUpdateChecks(checks, run, func(question string) bool {
+				prompts++
+				return accept(question)
+			})
+			if got != tc.want {
+				t.Errorf("evaluateUpdateChecks() = %v, want %v", got, tc.want)
+			}
+			if prompts != tc.wantPrompts {
+				t.Errorf("prompts = %d, want %d", prompts, tc.wantPrompts)
+			}
+		})
+	}
+}
+
+func TestParseYesNoAnswerDefaultsToYes(t *testing.T) {
+	tests := []struct {
+		answer string
+		want   bool
+	}{
+		{"", true},
+		{"   ", true},
+		{"y", true},
+		{"Y", true},
+		{"yes", true},
+		{"YES", true},
+		{"n", false},
+		{"no", false},
+		{"anything", false},
+	}
+
+	for _, tc := range tests {
+		if got := parseYesNoAnswer(tc.answer); got != tc.want {
+			t.Errorf("parseYesNoAnswer(%q) = %v, want %v", tc.answer, got, tc.want)
+		}
 	}
 }
