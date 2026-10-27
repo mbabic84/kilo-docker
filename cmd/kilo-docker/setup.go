@@ -291,6 +291,7 @@ Service flags:
   --docker          Mount Docker socket
   --go              Install Go
   --gh              Install GitHub CLI (gh-mcp extension)
+  --gitea           Install tea CLI and gitea-mcp server
   --uv              Install uv (Python package manager)
   --nvm             Install NVM (Node Version Manager)
   --build           Install build base dependencies

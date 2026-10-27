@@ -218,6 +218,11 @@ Interactive token management for MCP services.
 Prompts for and stores Context7, Ainstruct, and other MCP tokens
 in an encrypted file under KILO_HOME.
 
+When the gitea service (--gitea) is enabled, also prompts for the
+Gitea host, access token, and TLS verification setting. Values set via
+KD_GITEA_HOST, KD_MCP_GITEA_TOKEN, and KD_GITEA_INSECURE take
+precedence and skip their prompt.
+
 Options:
   -h, --help            Show this help message
 
@@ -450,18 +455,27 @@ func runPrintEnv() {
 		return
 	}
 
-	context7, ainstruct, _, _, _, patExpiry, err := loadEncryptedTokens(homeDir, userID)
+	store, err := loadTokenStore(homeDir, userID)
 	if err != nil {
 		return
 	}
 
-	fmt.Printf("export KD_MCP_CONTEXT7_TOKEN=%q\n", context7)
-	fmt.Printf("export KD_MCP_AINSTRUCT_TOKEN=%q\n", ainstruct)
-	if patExpiry != "" {
+	fmt.Printf("export KD_MCP_CONTEXT7_TOKEN=%q\n", store.Get(tokenKeyContext7))
+	fmt.Printf("export KD_MCP_AINSTRUCT_TOKEN=%q\n", store.Get(tokenKeyAinstruct))
+	if patExpiry := store.Get(tokenKeyPATExtiry); patExpiry != "" {
 		fmt.Printf("export KD_AINSTRUCT_PAT_EXPIRY=%q\n", patExpiry)
 	} else {
 		fmt.Printf("# KD_AINSTRUCT_PAT_EXPIRY not set\n")
 	}
+
+	// Gitea values are always exported, even when empty, so a stale value from
+	// a previous session cannot leak into the current one.
+	fmt.Printf("export KD_MCP_GITEA_TOKEN=%q\n", store.Get(tokenKeyGiteaToken))
+	fmt.Printf("export KD_GITEA_HOST=%q\n", store.Get(tokenKeyGiteaHost))
+	fmt.Printf("export KD_GITEA_INSECURE=%q\n", store.Get(tokenKeyGiteaInsecure))
+	// tea reads these native variables instead of the KD_* ones.
+	fmt.Printf("export GITEA_SERVER_URL=%q\n", store.Get(tokenKeyGiteaHost))
+	fmt.Printf("export GITEA_SERVER_TOKEN=%q\n", store.Get(tokenKeyGiteaToken))
 
 	customEnvs, err := loadCustomEnvs(homeDir, userID)
 	if err != nil {

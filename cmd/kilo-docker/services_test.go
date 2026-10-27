@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mbabic84/kilo-docker/pkg/services"
@@ -57,8 +58,8 @@ func TestIsServiceEnabledEmpty(t *testing.T) {
 }
 
 func TestBuiltInServicesCount(t *testing.T) {
-	if len(services.BuiltInServices) != 9 {
-		t.Errorf("expected 9 built-in services, got %d", len(services.BuiltInServices))
+	if len(services.BuiltInServices) != 10 {
+		t.Errorf("expected 10 built-in services, got %d", len(services.BuiltInServices))
 	}
 }
 
@@ -219,5 +220,53 @@ func TestDiagnosticsServiceHasRequiredFields(t *testing.T) {
 	}
 	if _, ok := svc.EnvVars["DIAGNOSTICS_ENABLED"]; !ok {
 		t.Error("expected DIAGNOSTICS_ENABLED in EnvVars")
+	}
+}
+
+func TestGiteaServiceHasRequiredFields(t *testing.T) {
+	svc := mustGetService(t, "gitea")
+
+	if svc.Name != "gitea" {
+		t.Errorf("expected Name 'gitea', got %q", svc.Name)
+	}
+	if svc.Flag != "--gitea" {
+		t.Errorf("expected Flag '--gitea', got %q", svc.Flag)
+	}
+	if len(svc.Install) != 2 {
+		t.Errorf("expected 2 Install commands for gitea (tea + gitea-mcp), got %d", len(svc.Install))
+	}
+	if len(svc.UserInstall) != 0 {
+		t.Errorf("expected 0 UserInstall commands for gitea, got %d", len(svc.UserInstall))
+	}
+	if len(svc.InstallUpdates) != 2 {
+		t.Fatalf("expected 2 InstallUpdates for gitea, got %d", len(svc.InstallUpdates))
+	}
+	if svc.InstallUpdates[0].Name != "tea" {
+		t.Errorf("expected first update check to be tea, got %q", svc.InstallUpdates[0].Name)
+	}
+	if svc.InstallUpdates[1].Name != "gitea-mcp" {
+		t.Errorf("expected second update check to be gitea-mcp, got %q", svc.InstallUpdates[1].Name)
+	}
+	for _, check := range svc.InstallUpdates {
+		if check.Current == "" || check.Latest == "" {
+			t.Errorf("update check %q must define Current and Latest", check.Name)
+		}
+		if !strings.Contains(check.Latest, "--max-time") {
+			t.Errorf("update check %q must bound its latest-version request", check.Name)
+		}
+	}
+	for _, cmd := range svc.Install {
+		if !strings.Contains(cmd, "--max-time") {
+			t.Errorf("gitea install command must bound its network requests: %s", cmd)
+		}
+	}
+	if svc.InstallVersionCheck != "" || svc.InstallLatestVersion != "" {
+		t.Error("gitea must use InstallUpdates instead of the legacy version-check pair")
+	}
+	if svc.RequiresSocket != "" {
+		t.Errorf("expected RequiresSocket to be empty for gitea, got %q", svc.RequiresSocket)
+	}
+	if len(svc.EnvVars) != 0 {
+		t.Errorf("expected no EnvVars for gitea, got %v", svc.EnvVars)
 	}
 }

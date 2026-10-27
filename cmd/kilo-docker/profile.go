@@ -19,6 +19,7 @@ type profileFlags struct {
 	Docker      bool `json:"docker,omitempty"`
 	UV          bool `json:"uv,omitempty"`
 	GH          bool `json:"gh,omitempty"`
+	Gitea       bool `json:"gitea,omitempty"`
 	NVM         bool `json:"nvm,omitempty"`
 	Build       bool `json:"build,omitempty"`
 	Rclone      bool `json:"rclone,omitempty"`
@@ -140,6 +141,9 @@ func mergeProfile(cfg *config, p Profile) {
 	}
 	if p.Flags.GH {
 		addServiceIfMissing(cfg, "gh")
+	}
+	if p.Flags.Gitea {
+		addServiceIfMissing(cfg, "gitea")
 	}
 	if p.Flags.NVM {
 		addServiceIfMissing(cfg, "nvm")
@@ -306,6 +310,38 @@ func handleProfile(cfg config) {
 	}
 }
 
+// profileFlagsFromConfig maps enabled services to their profile flags.
+func profileFlagsFromConfig(cfg config) profileFlags {
+	flags := profileFlags{
+		Picomamba: isServiceEnabled(cfg, "picomamba"),
+	}
+	for _, svc := range cfg.enabledServices {
+		switch svc {
+		case "go":
+			flags.Go = true
+		case "docker":
+			flags.Docker = true
+		case "uv":
+			flags.UV = true
+		case "gh":
+			flags.GH = true
+		case "gitea":
+			flags.Gitea = true
+		case "nvm":
+			flags.NVM = true
+		case "build":
+			flags.Build = true
+		case "rclone":
+			flags.Rclone = true
+		case "gitnexus":
+			flags.Gitnexus = true
+		case "diagnostics":
+			flags.Diagnostics = true
+		}
+	}
+	return flags
+}
+
 // runProfileSave captures the current config flags and saves them as a named
 // profile. The implicit kilo-shared network is filtered out.
 func runProfileSave(cfg config, name string) {
@@ -329,33 +365,8 @@ func runProfileSave(cfg config, name string) {
 	}
 
 	p := Profile{
-		Name: name,
-		Flags: profileFlags{
-			Picomamba: isServiceEnabled(cfg, "picomamba"),
-		},
-	}
-
-	for _, svc := range cfg.enabledServices {
-		switch svc {
-		case "go":
-			p.Flags.Go = true
-		case "docker":
-			p.Flags.Docker = true
-		case "uv":
-			p.Flags.UV = true
-		case "gh":
-			p.Flags.GH = true
-		case "nvm":
-			p.Flags.NVM = true
-		case "build":
-			p.Flags.Build = true
-		case "rclone":
-			p.Flags.Rclone = true
-		case "gitnexus":
-			p.Flags.Gitnexus = true
-		case "diagnostics":
-			p.Flags.Diagnostics = true
-		}
+		Name:  name,
+		Flags: profileFlagsFromConfig(cfg),
 	}
 
 	p.Networks = cfg.networks

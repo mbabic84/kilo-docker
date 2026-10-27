@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/mbabic84/kilo-docker/pkg/constants"
@@ -18,20 +17,13 @@ import (
 func checkRemoteHasConfig(homeDir, userID string) (bool, error) {
 	utils.Log("[userinit] checkRemote: Checking remote for kilo.jsonc (first time init)\n")
 
-	encPath := filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")
-	encData, err := os.ReadFile(encPath)
+	store, err := loadTokenStore(homeDir, userID)
 	if err != nil {
-		utils.LogWarn("[userinit] checkRemote: no encrypted tokens found: %v\n", err)
-		return false, fmt.Errorf("no encrypted tokens found: %w", err)
+		utils.LogWarn("[userinit] checkRemote: cannot load encrypted tokens: %v\n", err)
+		return false, fmt.Errorf("cannot load encrypted tokens: %w", err)
 	}
 
-	decrypted, err := decryptAES(encData, userID)
-	if err != nil {
-		utils.LogWarn("[userinit] checkRemote: failed to decrypt tokens: %v\n", err)
-		return false, fmt.Errorf("failed to decrypt tokens: %w", err)
-	}
-
-	_, _, syncToken, _, _, _, _ := parseTokenEnv(string(decrypted))
+	syncToken := store.Get(tokenKeySync)
 	if syncToken == "" {
 		utils.LogWarn("[userinit] checkRemote: no sync token available\n")
 		return false, fmt.Errorf("no sync token available")
@@ -142,20 +134,13 @@ func checkRemoteHasConfig(homeDir, userID string) (bool, error) {
 func deleteRemoteOpencode(homeDir, userID string) error {
 	utils.Log("[userinit] deleteRemote: Checking for old opencode.json in remote\n")
 
-	encPath := filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")
-	encData, err := os.ReadFile(encPath)
+	store, err := loadTokenStore(homeDir, userID)
 	if err != nil {
-		utils.LogWarn("[userinit] deleteRemote: no encrypted tokens: %v\n", err)
+		utils.LogWarn("[userinit] deleteRemote: cannot load encrypted tokens: %v\n", err)
 		return err
 	}
 
-	decrypted, err := decryptAES(encData, userID)
-	if err != nil {
-		utils.LogWarn("[userinit] deleteRemote: decrypt failed: %v\n", err)
-		return err
-	}
-
-	_, _, syncToken, _, _, _, _ := parseTokenEnv(string(decrypted))
+	syncToken := store.Get(tokenKeySync)
 	if syncToken == "" {
 		return fmt.Errorf("no sync token")
 	}

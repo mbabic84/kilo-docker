@@ -137,6 +137,7 @@ patches, etc.) inside the workspace rather than the system `/tmp`.
 | `--go` | Install Go (latest stable) for development |
 | `--build` | Install build essentials (gcc, g++, make) for compiling native extensions |
 | `--gh` | Install GitHub CLI and GitHub MCP server (via gh-mcp extension) for GitHub interactions from within Kilo |
+| `--gitea` | Install the tea CLI and the gitea-mcp server for Gitea interactions from within Kilo |
 | `--uv` | Install uv for fast Python package management |
 | `--nvm` | Install NVM (Node Version Manager) for managing Node.js versions |
 | `--rclone` | Install rclone, a universal CLI for S3 and 40+ cloud storage backends |
@@ -419,12 +420,30 @@ When attaching to a session, `kilo-docker` detects the container state: if runni
 | `playwright` | Browser automation (screenshots, navigation) | None (local sidecar) |
 | `gitnexus` | Codebase knowledge graph indexing and MCP-based code intelligence | None (local) |
 | `github` | GitHub repository, issue, and PR management | None (uses gh auth) |
+| `gitea` | Gitea repository, issue, and PR management | Personal access token via `mcp-tokens` |
 
 `context7` requires an API key passed via the `CONTEXT7_API_KEY` header. Use `kilo-entrypoint mcp-tokens` to manage MCP tokens interactively. Use `kilo-entrypoint custom-envs` to manage your own environment variables (see [Custom Environment Variables](#custom-environment-variables)).
 
 `playwright` is only available when using the `--playwright` flag. It runs as a separate container on a shared Docker network with no authentication required.
 
 `github` is only available when using the `--gh` flag. It runs as a local MCP server inside the Kilo container, reusing your existing `gh auth` session — no separate PAT or token needed.
+
+`gitea` is only available when using the `--gitea` flag. The flag installs both the `tea` CLI and the local `gitea-mcp` server. Run `kilo-entrypoint mcp-tokens` to configure:
+
+- **Host** — defaults to `https://gitea.com`; any `http`/`https` Gitea instance is accepted.
+- **Access token** — a Gitea personal access token.
+- **TLS verification** — disable only for self-signed certificates. This applies to the MCP server; `tea` still needs a one-time `tea login add --insecure` for the same instance.
+
+The values are stored encrypted as `KD_MCP_GITEA_TOKEN`, `KD_GITEA_HOST`, and `KD_GITEA_INSECURE`. The MCP entry is enabled only when `--gitea` is active **and** a token is stored; after changing tokens, the new enabled state takes effect on the next session start.
+
+`GITEA_SERVER_URL` and `GITEA_SERVER_TOKEN` are exported for `tea`, but tea only uses them as defaults for `tea login add` — it does not authenticate regular commands from the environment. Create its login once after configuring the token:
+
+```bash
+tea login add --name kilo
+tea login default kilo
+```
+
+`tea login add` picks up the exported URL and token automatically; add `--insecure` for a self-signed instance. tea stores its own copy of the token under `~/.config/tea` (mode `0600`).
 
 ## Custom Environment Variables
 

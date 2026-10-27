@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -320,11 +319,9 @@ func runLoginInteractive() (loginResult, error) {
 	_ = os.MkdirAll(homeDir, 0o700)
 
 	var storedAinstruct, storedPatExpiry string
-	encPath := filepath.Join(homeDir, ".local/share/kilo-docker/.tokens.env.enc")
-	if encData, err := os.ReadFile(encPath); err == nil {
-		if decrypted, decErr := decryptAES(encData, result.UserID); decErr == nil {
-			_, storedAinstruct, _, _, _, storedPatExpiry, _ = parseTokenEnv(string(decrypted))
-		}
+	if store, err := loadTokenStore(homeDir, result.UserID); err == nil {
+		storedAinstruct = store.Get(tokenKeyAinstruct)
+		storedPatExpiry = store.Get(tokenKeyPATExtiry)
 	}
 
 	ainstructPATLabel := buildAinstructPATLabel()
@@ -490,18 +487,18 @@ func loadUsableSyncTokens(homeDir, userID, apiBaseURL string) (storedTokenSet, b
 		return set, false
 	}
 
-	context7, ainstruct, syncToken, syncRefresh, syncExpiry, patExpiry, err := loadEncryptedTokens(homeDir, userID)
+	store, err := loadTokenStore(homeDir, userID)
 	if err != nil {
 		utils.Log("[login] Cannot load stored tokens: %v\n", err)
 		return set, false
 	}
 
-	set.context7 = context7
-	set.ainstruct = ainstruct
-	set.accessToken = syncToken
-	set.refreshToken = syncRefresh
-	set.syncExpiry, _ = strconv.ParseInt(strings.TrimSpace(syncExpiry), 10, 64)
-	set.patExpiry, _ = strconv.ParseInt(strings.TrimSpace(patExpiry), 10, 64)
+	set.context7 = store.Get(tokenKeyContext7)
+	set.ainstruct = store.Get(tokenKeyAinstruct)
+	set.accessToken = store.Get(tokenKeySync)
+	set.refreshToken = store.Get(tokenKeySyncRefresh)
+	set.syncExpiry, _ = strconv.ParseInt(strings.TrimSpace(store.Get(tokenKeySyncExpiry)), 10, 64)
+	set.patExpiry, _ = strconv.ParseInt(strings.TrimSpace(store.Get(tokenKeyPATExtiry)), 10, 64)
 
 	if set.accessToken == "" && set.refreshToken == "" {
 		utils.Log("[login] No stored sync tokens to reuse\n")
