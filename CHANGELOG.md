@@ -1,3 +1,9 @@
+## [3.93.0](https://github.com/mbabic84/kilo-docker/compare/v3.92.0...v3.93.0) (2026-10-27)
+
+### Features
+
+* add Gitea service with tea and gitea-mcp ([29e2086](https://github.com/mbabic84/kilo-docker/commit/29e20864387564c58e9f38309876adddbf47cd2a))
+
 ## [3.92.0](https://github.com/mbabic84/kilo-docker/compare/v3.91.0...v3.92.0) (2026-10-26)
 
 ### Features
