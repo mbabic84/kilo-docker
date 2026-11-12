@@ -1,3 +1,9 @@
+## [3.94.1](https://github.com/mbabic84/kilo-docker/compare/v3.94.0...v3.94.1) (2026-11-12)
+
+### Bug Fixes
+
+* apply updates reliably and prompt on stale session attach ([fdd8700](https://github.com/mbabic84/kilo-docker/commit/fdd8700a652ebca19dc3c6990ed3e45ff942896d))
+
 ## [3.94.0](https://github.com/mbabic84/kilo-docker/compare/v3.93.0...v3.94.0) (2026-11-05)
 
 ### Features
