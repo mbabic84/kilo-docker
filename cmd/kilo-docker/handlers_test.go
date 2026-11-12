@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -211,6 +213,80 @@ func TestInstallDevBinaryCreatesTargetDirectory(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Dir(target)); err != nil {
 		t.Fatalf("target directory was not created: %v", err)
+	}
+}
+
+func TestUpdateBinaryReplacesTarget(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("new-binary"))
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	target := filepath.Join(dir, "kilo-docker")
+	if err := os.WriteFile(target, []byte("old-binary"), 0o755); err != nil {
+		t.Fatalf("failed to write target: %v", err)
+	}
+
+	if err := updateBinary(srv.URL, target); err != nil {
+		t.Fatalf("updateBinary() error = %v", err)
+	}
+
+	content, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("failed to read target: %v", err)
+	}
+	if string(content) != "new-binary" {
+		t.Fatalf("target content = %q, want %q", content, "new-binary")
+	}
+
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("failed to stat target: %v", err)
+	}
+	if info.Mode()&0o111 == 0 {
+		t.Fatalf("target mode = %v, want executable permissions", info.Mode())
+	}
+
+	leftovers, err := filepath.Glob(filepath.Join(dir, ".kilo-docker-*"))
+	if err != nil {
+		t.Fatalf("failed to glob temp files: %v", err)
+	}
+	if len(leftovers) != 0 {
+		t.Fatalf("temp files left behind: %v", leftovers)
+	}
+}
+
+func TestUpdateBinaryDownloadFailureKeepsTarget(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	target := filepath.Join(dir, "kilo-docker")
+	if err := os.WriteFile(target, []byte("old-binary"), 0o755); err != nil {
+		t.Fatalf("failed to write target: %v", err)
+	}
+
+	if err := updateBinary(srv.URL, target); err == nil {
+		t.Fatal("updateBinary() expected error for failed download, got nil")
+	}
+
+	content, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("failed to read target: %v", err)
+	}
+	if string(content) != "old-binary" {
+		t.Fatalf("target content = %q, want %q", content, "old-binary")
+	}
+
+	leftovers, err := filepath.Glob(filepath.Join(dir, ".kilo-docker-*"))
+	if err != nil {
+		t.Fatalf("failed to glob temp files: %v", err)
+	}
+	if len(leftovers) != 0 {
+		t.Fatalf("temp files left behind: %v", leftovers)
 	}
 }
 

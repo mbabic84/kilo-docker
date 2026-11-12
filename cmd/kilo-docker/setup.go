@@ -124,6 +124,9 @@ func printCommandHelp(command string) {
 
 List sessions, attach to one, stop, or clean up sessions.
 
+When attaching to a session created by an older kilo-docker version, you are
+prompted to recreate it so it picks up the current image.
+
 Commands:
   (no command)          List all sessions and attach interactively
   cleanup               Remove sessions (supports --legacy, --needs-update)

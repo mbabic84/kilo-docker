@@ -166,14 +166,7 @@ func handleSessions(cfg config) {
 			os.Exit(1)
 		}
 
-		var targetSession session
-		for _, s := range sessions {
-			if s.Name == containerName {
-				targetSession = s
-				break
-			}
-		}
-
+		targetSession := findSession(sessions, containerName)
 		if targetSession.Name == "" {
 			fmt.Fprintf(os.Stderr, "Error: session '%s' not found\n", containerName)
 			os.Exit(1)
@@ -185,37 +178,7 @@ func handleSessions(cfg config) {
 			os.Exit(1)
 		}
 
-		// Parse stored args back into a config.
-		storedArgs := targetSession.Args
-		parsedArgs := strings.Fields(storedArgs)
-		utils.Log("[kilo-docker] Recreating with stored args: %q, parsed: %v\n", storedArgs, parsedArgs)
-
-		newCfg := parseArgs(parsedArgs)
-		utils.Log("[kilo-docker] Parsed config: yes=%v, services=%v\n", newCfg.yes, newCfg.enabledServices)
-		newCfg.command = "" // ensure runContainer creates a new container
-		utils.Log("[kilo-docker] Recreate config after normalization: yes=%v, serialized=%q\n", newCfg.yes, serializeArgs(newCfg))
-
-		// Merge any flags the user passed on the command line as overrides
-		newCfg = mergeOverrides(newCfg, cfg)
-
-		// Only chdir to stored workspace if user didn't override --workspace
-		if cfg.workspace == "" && targetSession.Workspace != "" {
-			originalDir, _ := os.Getwd()
-			if err := os.Chdir(targetSession.Workspace); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: cannot change to workspace '%s': %v\n", targetSession.Workspace, err)
-				fmt.Fprintf(os.Stderr, "Current directory: %s\n", originalDir)
-				os.Exit(1)
-			}
-			utils.Log("[kilo-docker] Recreating session in workspace: %s\n", targetSession.Workspace, utils.WithOutput())
-		}
-
-		// Remove the old container (volume persists)
-		utils.Log("[kilo-docker] Removing old container '%s'...\n", containerName, utils.WithOutput())
-		_, _ = dockerRun("rm", "-f", containerName)
-
-		// Run with the original flags — this creates a fresh container
-		// attached to the same volume (user data preserved).
-		runContainer(newCfg)
+		recreateSession(targetSession, cfg)
 		return
 	}
 
@@ -297,13 +260,7 @@ func handleSessions(cfg config) {
 		utils.Log("[kilo-docker] Session '%s' uses an outdated volume (%s).\n", containerToAttach, oldVolume, utils.WithOutput())
 		utils.Log("[kilo-docker] Per-user volumes are now used for data isolation between users.\n", utils.WithOutput())
 		if cfg.yes || promptConfirm("Recreate session with current per-user volume? [y/N]: ", cfg.yes) {
-			var targetSession session
-			for _, s := range sessions {
-				if s.Name == containerToAttach {
-					targetSession = s
-					break
-				}
-			}
+			targetSession := findSession(sessions, containerToAttach)
 
 			if targetSession.Workspace != "" {
 				if err := os.Chdir(targetSession.Workspace); err != nil {
@@ -327,6 +284,23 @@ func handleSessions(cfg config) {
 			}
 
 			runContainer(newCfg)
+			return
+		}
+	}
+
+	// Offer to recreate sessions created by an older kilo-docker so they pick
+	// up the current image. Legacy-volume sessions are handled above (their
+	// recreation also applies the update), and --once sessions have no volume
+	// to preserve.
+	targetSession := findSession(sessions, containerToAttach)
+	if targetSession.NeedsUpdate && !targetSession.UsesLegacyVolume && !strings.Contains(targetSession.Args, "--once") {
+		if targetSession.ImageVersion == "" {
+			utils.Log("[kilo-docker] Session '%s' was created with an unknown kilo-docker version (current: %s).\n", containerToAttach, version, utils.WithOutput())
+		} else {
+			utils.Log("[kilo-docker] Session '%s' was created with kilo-docker %s (current: %s).\n", containerToAttach, targetSession.ImageVersion, version, utils.WithOutput())
+		}
+		if cfg.yes || promptConfirm("Recreate session to apply the update? [y/N]: ", cfg.yes) {
+			recreateSession(targetSession, cfg)
 			return
 		}
 	}
@@ -357,4 +331,50 @@ func handleSessions(cfg config) {
 		fmt.Fprintf(os.Stderr, "Error: Container '%s' is in state '%s'.\n", containerToAttach, state)
 		os.Exit(1)
 	}
+}
+
+// findSession returns the session with the given container name, or a zero
+// value when no session matches.
+func findSession(sessions []session, name string) session {
+	for _, s := range sessions {
+		if s.Name == name {
+			return s
+		}
+	}
+	return session{}
+}
+
+// recreateSession removes the session's container and starts a fresh one from
+// its stored arguments. The persistent volume and its data are preserved.
+func recreateSession(targetSession session, cfg config) {
+	storedArgs := targetSession.Args
+	parsedArgs := strings.Fields(storedArgs)
+	utils.Log("[kilo-docker] Recreating with stored args: %q, parsed: %v\n", storedArgs, parsedArgs)
+
+	newCfg := parseArgs(parsedArgs)
+	utils.Log("[kilo-docker] Parsed config: yes=%v, services=%v\n", newCfg.yes, newCfg.enabledServices)
+	newCfg.command = "" // ensure runContainer creates a new container
+	utils.Log("[kilo-docker] Recreate config after normalization: yes=%v, serialized=%q\n", newCfg.yes, serializeArgs(newCfg))
+
+	// Merge any flags the user passed on the command line as overrides.
+	newCfg = mergeOverrides(newCfg, cfg)
+
+	// Only chdir to the stored workspace if the user didn't override --workspace.
+	if cfg.workspace == "" && targetSession.Workspace != "" {
+		originalDir, _ := os.Getwd()
+		if err := os.Chdir(targetSession.Workspace); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: cannot change to workspace '%s': %v\n", targetSession.Workspace, err)
+			fmt.Fprintf(os.Stderr, "Current directory: %s\n", originalDir)
+			os.Exit(1)
+		}
+		utils.Log("[kilo-docker] Recreating session in workspace: %s\n", targetSession.Workspace, utils.WithOutput())
+	}
+
+	// Remove the old container (the volume persists).
+	utils.Log("[kilo-docker] Removing old container '%s'...\n", targetSession.Name, utils.WithOutput())
+	_, _ = dockerRun("rm", "-f", targetSession.Name)
+
+	// Run with the original flags — this creates a fresh container attached to
+	// the same volume (user data preserved).
+	runContainer(newCfg)
 }

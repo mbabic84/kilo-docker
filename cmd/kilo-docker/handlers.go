@@ -33,6 +33,30 @@ func downloadFile(url, dest string) error {
 	return err
 }
 
+// updateBinary downloads url and atomically replaces target. The temporary
+// file is created in the target directory so os.Rename stays on the same
+// filesystem; using os.TempDir() breaks when /tmp is a separate mount (EXDEV).
+func updateBinary(url, target string) error {
+	tempFile, err := os.CreateTemp(filepath.Dir(target), ".kilo-docker-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tempPath := tempFile.Name()
+	_ = tempFile.Close()
+	defer func() { _ = os.Remove(tempPath) }()
+
+	if err := downloadFile(url, tempPath); err != nil {
+		return fmt.Errorf("failed to download update: %w", err)
+	}
+	if err := os.Chmod(tempPath, 0o755); err != nil {
+		return fmt.Errorf("failed to set permissions: %w", err)
+	}
+	if err := os.Rename(tempPath, target); err != nil {
+		return fmt.Errorf("failed to replace binary: %w", err)
+	}
+	return nil
+}
+
 // latestVersions holds the latest available versions from the remote.
 type latestVersions struct {
 	kiloDockerVersion string
@@ -138,31 +162,15 @@ func handleUpdate(cfg config) {
 
 		utils.Log("[kilo-docker] \nUpdating kilo-docker binary...\n", utils.WithOutput())
 
-		tempFile, err := os.CreateTemp("", "kilo-docker-*")
-		if err != nil {
-			utils.LogError("[kilo-docker] Error: failed to create temp file: %v\n", err)
-		} else {
-			tempPath := tempFile.Name()
-			_ = tempFile.Close()
-
-			if err := downloadFile(downloadURL, tempPath); err != nil {
-				_ = os.Remove(tempPath)
-				utils.LogError("[kilo-docker] Error: Failed to download update: %v\n", err)
-			} else {
-				if err := os.Chmod(tempPath, 0o755); err != nil {
-					_ = os.Remove(tempPath)
-					utils.LogError("[kilo-docker] Error: failed to set permissions: %v\n", err)
-				} else if err := os.Rename(tempPath, target); err != nil {
-					_ = os.Remove(tempPath)
-					utils.LogError("[kilo-docker] Error: failed to replace binary: %v\n", err)
-				} else {
-					utils.Log("[kilo-docker] Binary updated: %s\n", target, utils.WithOutput())
-					utils.Log("[kilo-docker] Updating shell completions...\n", utils.WithOutput())
-					if msg := installCompletions(); msg != "" {
-						utils.Log("[kilo-docker] %s\n", msg, utils.WithOutput())
-					}
-				}
-			}
+		if err := updateBinary(downloadURL, target); err != nil {
+			utils.LogError("[kilo-docker] Failed to update binary: %v\n", err, utils.WithOutput())
+			utils.LogError("[kilo-docker] Still running %s. Fix the error above and retry.\n", version, utils.WithOutput())
+			os.Exit(1)
+		}
+		utils.Log("[kilo-docker] Binary updated: %s\n", target, utils.WithOutput())
+		utils.Log("[kilo-docker] Updating shell completions...\n", utils.WithOutput())
+		if msg := installCompletions(); msg != "" {
+			utils.Log("[kilo-docker] %s\n", msg, utils.WithOutput())
 		}
 	}
 
