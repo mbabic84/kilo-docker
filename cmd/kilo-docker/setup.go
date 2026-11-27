@@ -293,7 +293,7 @@ can be reused later with --profile <name>.
 Service flags:
   --docker          Mount Docker socket
   --go              Install Go
-  --gh              Install GitHub CLI (gh-mcp extension)
+  --gh              Install GitHub CLI, gh-mcp, and gh-stack
   --gitea           Install tea CLI and gitea-mcp server
   --uv              Install uv (Python package manager)
   --nvm             Install NVM (Node Version Manager)
