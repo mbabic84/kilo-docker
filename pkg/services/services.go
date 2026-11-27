@@ -17,12 +17,20 @@ type UpdateCheck struct {
 }
 
 type Service struct {
-	Name                 string
-	DisplayName          string
-	Flag                 string
-	Description          string
-	Install              []string
-	UserInstall          []string
+	Name        string
+	DisplayName string
+	Flag        string
+	Description string
+	Install     []string
+	UserInstall []string
+	// UserInstallUpdates describes independently versioned tools installed by
+	// UserInstall. When set and aligned one-to-one with UserInstall, each
+	// command runs only when its corresponding tool needs installing or
+	// updating, so declining one update does not refresh the others. If the
+	// counts differ, all UserInstall commands run as a batch when any tool
+	// needs attention. Services with a single user tool can keep using
+	// VersionCheck/LatestVersion instead.
+	UserInstallUpdates   []UpdateCheck
 	VersionCheck         string
 	LatestVersion        string
 	InstallVersionCheck  string

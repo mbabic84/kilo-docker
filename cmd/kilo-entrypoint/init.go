@@ -141,32 +141,41 @@ func installServices() error {
 // shouldRunSystemInstall returns true if the service's install command should run based on
 // version comparison. It logs the outcome and prompts the user when an update is available.
 func shouldRunSystemInstall(svc *services.Service) bool {
+	runCheck := func(cmd string) string { return runVersionCheck(cmd, "/root") }
 	if len(svc.InstallUpdates) > 0 {
-		return evaluateUpdateChecks(svc.InstallUpdates, func(cmd string) string {
-			return runVersionCheck(cmd, "/root")
-		}, promptYesNo)
+		return evaluateUpdateChecks(svc.InstallUpdates, runCheck, promptYesNo)
 	}
+	return checkUpdate(services.UpdateCheck{
+		Name:    svc.Name,
+		Current: svc.InstallVersionCheck,
+		Latest:  svc.InstallLatestVersion,
+	}, runCheck, promptYesNo)
+}
 
-	currentVer := runVersionCheck(svc.InstallVersionCheck, "/root")
-	latestVer := runVersionCheck(svc.InstallLatestVersion, "/root")
+// checkUpdate evaluates one independently versioned tool and reports whether
+// its install command should run. It logs the per-tool outcome and, when a
+// newer release is available, asks the prompt function for consent.
+func checkUpdate(check services.UpdateCheck, runCheck func(string) string, prompt func(string) bool) bool {
+	currentVer := runCheck(check.Current)
+	latestVer := runCheck(check.Latest)
 
 	if currentVer != "" && latestVer != "" {
 		if compareVersions(currentVer, latestVer) >= 0 {
-			utils.Log("[init] Skipping %s: already at latest version (%s)\n", svc.Name, currentVer)
+			utils.Log("[init] Skipping %s: already at latest version (%s)\n", check.Name, currentVer)
 			return false
 		}
-		utils.Log("[init] Updating %s: %s -> %s\n", svc.Name, currentVer, latestVer)
-		if !promptYesNo(fmt.Sprintf("Update %s?", svc.Name)) {
-			utils.Log("[init] Skipping %s update\n", svc.Name)
-			return false
+		utils.Log("[init] Updating %s: %s -> %s\n", check.Name, currentVer, latestVer)
+		if prompt(fmt.Sprintf("Update %s: %s -> %s?", check.Name, currentVer, latestVer)) {
+			return true
 		}
-		return true
+		utils.Log("[init] Skipping %s update\n", check.Name)
+		return false
 	}
 
 	if currentVer == "" && latestVer != "" {
-		utils.Log("[init] Installing %s (latest: %s)\n", svc.Name, latestVer)
+		utils.Log("[init] Installing %s (latest: %s)\n", check.Name, latestVer)
 	} else {
-		utils.Log("[init] Installing %s\n", svc.Name)
+		utils.Log("[init] Installing %s\n", check.Name)
 	}
 	return true
 }
@@ -180,29 +189,9 @@ func shouldRunSystemInstall(svc *services.Service) bool {
 func evaluateUpdateChecks(checks []services.UpdateCheck, runCheck func(string) string, prompt func(string) bool) bool {
 	installNeeded := false
 	for _, check := range checks {
-		currentVer := runCheck(check.Current)
-		latestVer := runCheck(check.Latest)
-
-		if currentVer != "" && latestVer != "" {
-			if compareVersions(currentVer, latestVer) >= 0 {
-				utils.Log("[init] Skipping %s: already at latest version (%s)\n", check.Name, currentVer)
-				continue
-			}
-			utils.Log("[init] Updating %s: %s -> %s\n", check.Name, currentVer, latestVer)
-			if prompt(fmt.Sprintf("Update %s: %s -> %s?", check.Name, currentVer, latestVer)) {
-				installNeeded = true
-			} else {
-				utils.Log("[init] Skipping %s update\n", check.Name)
-			}
-			continue
+		if checkUpdate(check, runCheck, prompt) {
+			installNeeded = true
 		}
-
-		if currentVer == "" && latestVer != "" {
-			utils.Log("[init] Installing %s (latest: %s)\n", check.Name, latestVer)
-		} else {
-			utils.Log("[init] Installing %s\n", check.Name)
-		}
-		installNeeded = true
 	}
 	return installNeeded
 }
@@ -299,33 +288,17 @@ func installUserServices(homeDir string) error {
 			continue
 		}
 
-		for _, installCmd := range svc.UserInstall {
+		installCmds := selectUserInstallCommands(svc, func(cmd string) string {
+			return runVersionCheck(cmd, homeDir)
+		}, promptYesNo)
+		if len(installCmds) == 0 {
+			continue
+		}
+
+		displayName := svc.DisplayNameOrName()
+		for _, installCmd := range installCmds {
 			if installCmd == "" {
 				continue
-			}
-
-			currentVer := runVersionCheck(svc.VersionCheck, homeDir)
-			latestVer := runVersionCheck(svc.LatestVersion, homeDir)
-
-			displayName := svc.DisplayNameOrName()
-
-			if currentVer != "" && latestVer != "" {
-				if compareVersions(currentVer, latestVer) < 0 {
-					utils.Log("[init] Updating %s: %s -> %s\n", displayName, currentVer, latestVer)
-					if !promptYesNo(fmt.Sprintf("Update %s?", displayName)) {
-						utils.Log("[init] Skipping %s update\n", displayName)
-						continue
-					}
-				} else {
-					utils.Log("[init] Skipping %s: already at latest version (%s)\n", displayName, currentVer)
-					continue
-				}
-			} else {
-				if currentVer == "" && latestVer != "" {
-					utils.Log("[init] Installing %s (current: none, latest: %s)\n", displayName, latestVer)
-				} else {
-					utils.Log("[init] Installing %s\n", displayName)
-				}
 			}
 
 			c := exec.Command("sh", "-c", installCmd)
@@ -340,6 +313,45 @@ func installUserServices(homeDir string) error {
 		}
 	}
 	return nil
+}
+
+// selectUserInstallCommands returns the subset of a service's UserInstall
+// commands that should run. A service with a single user tool uses the legacy
+// VersionCheck/LatestVersion pair to decide whether every command runs. When
+// UserInstallUpdates is set and aligned one-to-one with UserInstall, each
+// command runs only if its tool needs installing or updating, so declining one
+// tool's update does not refresh the others. If the counts differ the checks
+// cannot be mapped to individual commands, so every command runs as a batch
+// when any tool needs attention.
+func selectUserInstallCommands(svc *services.Service, runCheck func(string) string, prompt func(string) bool) []string {
+	if len(svc.UserInstallUpdates) == 0 {
+		if checkUpdate(services.UpdateCheck{
+			Name:    svc.DisplayNameOrName(),
+			Current: svc.VersionCheck,
+			Latest:  svc.LatestVersion,
+		}, runCheck, prompt) {
+			return svc.UserInstall
+		}
+		return nil
+	}
+
+	if len(svc.UserInstallUpdates) != len(svc.UserInstall) {
+		if evaluateUpdateChecks(svc.UserInstallUpdates, runCheck, prompt) {
+			return svc.UserInstall
+		}
+		return nil
+	}
+
+	var cmds []string
+	for i, check := range svc.UserInstallUpdates {
+		if svc.UserInstall[i] == "" {
+			continue
+		}
+		if checkUpdate(check, runCheck, prompt) {
+			cmds = append(cmds, svc.UserInstall[i])
+		}
+	}
+	return cmds
 }
 
 // copyServiceConfigs copies configured files from the container filesystem
