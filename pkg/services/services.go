@@ -2,8 +2,8 @@
 package services
 
 type CopyConfig struct {
-	Src  string
-	Dst  string
+	Src string
+	Dst string
 }
 
 // UpdateCheck describes one independently versioned binary installed by a
@@ -134,7 +134,7 @@ var BuiltInServices = []Service{
 		Flag:        "--build",
 		Description: "Install build base dependencies (gcc, g++, make) for compiling native extensions",
 		Install: []string{
-		"command -v gcc >/dev/null || apt-get update && apt-get install -y --no-install-recommends build-essential",
+			"command -v gcc >/dev/null || apt-get update && apt-get install -y --no-install-recommends build-essential",
 		},
 		EnvVars: map[string]string{
 			"BUILD_ENABLED": "1",
@@ -149,9 +149,9 @@ var BuiltInServices = []Service{
 		UserInstall: []string{
 			"curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash",
 		},
-		VersionCheck:  "[ -f \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\" && nvm --version 2>/dev/null || echo \"\"",
-		LatestVersion: "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/nvm-sh/nvm/releases/latest | sed 's#.*/tag/v\\?##'",
-		EnvVars: map[string]string{},
+		VersionCheck:   "[ -f \"$HOME/.nvm/nvm.sh\" ] && . \"$HOME/.nvm/nvm.sh\" && nvm --version 2>/dev/null || echo \"\"",
+		LatestVersion:  "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/nvm-sh/nvm/releases/latest | sed 's#.*/tag/v\\?##'",
+		EnvVars:        map[string]string{},
 		Volumes:        []string{},
 		RequiresSocket: "",
 	},
