@@ -343,6 +343,81 @@ func TestEvaluateUpdateChecks(t *testing.T) {
 	}
 }
 
+func TestSelectUserInstallCommandsSkipsUpToDateTools(t *testing.T) {
+	svc := &services.Service{
+		Name:        "test",
+		UserInstall: []string{"install-tool"},
+		UserInstallUpdates: []services.UpdateCheck{
+			{Name: "tool", Current: "cur", Latest: "lat"},
+		},
+	}
+
+	run := func(cmd string) string {
+		if cmd == "cur" || cmd == "lat" {
+			return "1.2.3"
+		}
+		return ""
+	}
+
+	if got := selectUserInstallCommands(svc, run, func(string) bool { return true }); len(got) != 0 {
+		t.Errorf("expected up-to-date UserInstallUpdates to skip installation, got %v", got)
+	}
+}
+
+func TestSelectUserInstallCommandsInstallsMissingTool(t *testing.T) {
+	svc := &services.Service{
+		Name:        "test",
+		UserInstall: []string{"install-tool"},
+		UserInstallUpdates: []services.UpdateCheck{
+			{Name: "tool", Current: "cur", Latest: "lat"},
+		},
+	}
+
+	run := func(cmd string) string {
+		if cmd == "lat" {
+			return "1.2.3"
+		}
+		return ""
+	}
+
+	got := selectUserInstallCommands(svc, run, func(string) bool {
+		t.Fatal("prompt must not be shown when a tool is missing")
+		return false
+	})
+	if len(got) != 1 || got[0] != "install-tool" {
+		t.Errorf("expected a missing UserInstallUpdates tool to trigger installation, got %v", got)
+	}
+}
+
+func TestSelectUserInstallCommandsHonorsPerToolConsent(t *testing.T) {
+	svc := &services.Service{
+		Name:        "test",
+		UserInstall: []string{"install-a", "install-b"},
+		UserInstallUpdates: []services.UpdateCheck{
+			{Name: "tool-a", Current: "cur-a", Latest: "lat-a"},
+			{Name: "tool-b", Current: "cur-b", Latest: "lat-b"},
+		},
+	}
+
+	run := func(cmd string) string {
+		switch cmd {
+		case "cur-a", "cur-b":
+			return "1.0.0"
+		case "lat-a", "lat-b":
+			return "2.0.0"
+		default:
+			return ""
+		}
+	}
+
+	prompt := func(question string) bool { return strings.Contains(question, "tool-a") }
+
+	got := selectUserInstallCommands(svc, run, prompt)
+	if len(got) != 1 || got[0] != "install-a" {
+		t.Errorf("expected only the accepted tool's command to run, got %v", got)
+	}
+}
+
 func TestParseYesNoAnswerDefaultsToYes(t *testing.T) {
 	tests := []struct {
 		answer string
