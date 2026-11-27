@@ -82,17 +82,28 @@ var BuiltInServices = []Service{
 	},
 	{
 		Name:        "gh",
-		DisplayName: "gh-mcp extension",
+		DisplayName: "GitHub CLI + MCP",
 		Flag:        "--gh",
-		Description: "Install GitHub CLI for interacting with GitHub",
+		Description: "Install GitHub CLI, the gh-mcp MCP server, and the gh-stack extension for stacked pull requests",
 		Install: []string{
 			"(GH_VERSION=$(curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/cli/cli/releases/latest | sed 's#.*/tag/v\\?##') && GH_ARCH=$(case $(uname -m) in x86_64) echo 'amd64' ;; aarch64|arm64) echo 'arm64' ;; esac) && curl -fsSL \"https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz\" -o /tmp/gh.tar.gz && tar xzf /tmp/gh.tar.gz -C /tmp && mv /tmp/gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh && chmod +x /usr/local/bin/gh && rm -rf /tmp/gh*)",
 		},
 		UserInstall: []string{
 			"gh extension remove shuymn/gh-mcp 2>/dev/null; gh extension install shuymn/gh-mcp",
+			"gh extension install --force github/gh-stack",
 		},
-		VersionCheck:         "gh extension list 2>/dev/null | grep 'shuymn/gh-mcp' | awk '{print $NF}' | sed 's/^v//'",
-		LatestVersion:        "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/shuymn/gh-mcp/releases/latest | sed 's#.*/tag/v\\?##'",
+		UserInstallUpdates: []UpdateCheck{
+			{
+				Name:    "gh-mcp",
+				Current: "gh extension list 2>/dev/null | grep 'shuymn/gh-mcp' | awk '{print $NF}' | sed 's/^v//'",
+				Latest:  "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/shuymn/gh-mcp/releases/latest | sed 's#.*/tag/v\\?##'",
+			},
+			{
+				Name:    "gh-stack",
+				Current: "gh extension list 2>/dev/null | grep 'github/gh-stack' | awk '{print $NF}' | sed 's/^v//'",
+				Latest:  "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/github/gh-stack/releases/latest | sed 's#.*/tag/v\\?##'",
+			},
+		},
 		InstallVersionCheck:  "command -v gh >/dev/null && gh --version 2>/dev/null | head -1 | awk '{print $3}'",
 		InstallLatestVersion: "curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/cli/cli/releases/latest | sed 's#.*/tag/v\\?##'",
 		Volumes:              []string{},

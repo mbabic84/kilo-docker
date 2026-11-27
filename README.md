@@ -136,13 +136,35 @@ patches, etc.) inside the workspace rather than the system `/tmp`.
 | `--docker` | Mount Docker socket for container management from within Kilo |
 | `--go` | Install Go (latest stable) for development |
 | `--build` | Install build essentials (gcc, g++, make) for compiling native extensions |
-| `--gh` | Install GitHub CLI and GitHub MCP server (via gh-mcp extension) for GitHub interactions from within Kilo |
+| `--gh` | Install GitHub CLI, the GitHub MCP server (via gh-mcp), and the gh-stack extension for stacked pull requests |
 | `--gitea` | Install the tea CLI and the gitea-mcp server for Gitea interactions from within Kilo |
 | `--uv` | Install uv for fast Python package management |
 | `--nvm` | Install NVM (Node Version Manager) for managing Node.js versions |
 | `--rclone` | Install rclone, a universal CLI for S3 and 40+ cloud storage backends |
 | `--gitnexus` | Install GitNexus for codebase knowledge graph indexing and MCP-based code intelligence |
 | `--diagnostics` | Install diagnostic tools (ps, top, ss, lsof, netstat, nc, ping, pstree) plus gitleaks for pre-commit secret detection |
+
+#### Stacked pull requests
+
+`--gh` also installs GitHub's official [`gh-stack`](https://github.com/github/gh-stack)
+extension, so stacked PRs can be created and managed from inside the container
+after authenticating the CLI with `gh auth login`:
+
+```bash
+gh stack init              # start a stack (creates and checks out the first branch)
+gh stack add api-routes    # add another layer and check it out
+gh stack submit            # push all branches and open the stack of PRs
+gh stack sync              # rebase, push, and sync PR state with GitHub
+gh stack view              # inspect the current stack
+```
+
+The extension tracks stack metadata in `.git/gh-stack`; nothing stack-related is
+committed to the repository. To give Kilo the matching `gh-stack` agent skill,
+install it into the user skills directory after `gh auth login`:
+
+```bash
+gh skill install github/gh-stack gh-stack --dir "$HOME/.config/kilo/skills"
+```
 
 ### Config Profiles
 

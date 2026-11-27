@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mbabic84/kilo-docker/pkg/services"
@@ -57,11 +58,40 @@ func TestGhServiceHasSystemVersionCheck(t *testing.T) {
 func TestGhServiceDisplayName(t *testing.T) {
 	svc := mustGetService(t, "gh")
 
-	if svc.DisplayName != "gh-mcp extension" {
-		t.Errorf("expected DisplayName 'gh-mcp extension', got %q", svc.DisplayName)
+	if svc.DisplayName != "GitHub CLI + MCP" {
+		t.Errorf("expected DisplayName 'GitHub CLI + MCP', got %q", svc.DisplayName)
 	}
-	if got := svc.DisplayNameOrName(); got != "gh-mcp extension" {
-		t.Errorf("expected DisplayNameOrName() 'gh-mcp extension', got %q", got)
+	if got := svc.DisplayNameOrName(); got != "GitHub CLI + MCP" {
+		t.Errorf("expected DisplayNameOrName() 'GitHub CLI + MCP', got %q", got)
+	}
+}
+
+func TestGhServiceInstallsStackExtension(t *testing.T) {
+	svc := mustGetService(t, "gh")
+
+	if len(svc.UserInstall) != 2 {
+		t.Fatalf("expected 2 UserInstall commands for gh (gh-mcp + gh-stack), got %d", len(svc.UserInstall))
+	}
+	if !strings.Contains(svc.UserInstall[1], "github/gh-stack") {
+		t.Errorf("expected gh-stack install command, got %q", svc.UserInstall[1])
+	}
+	if svc.VersionCheck != "" || svc.LatestVersion != "" {
+		t.Error("gh must use UserInstallUpdates instead of the legacy version-check pair")
+	}
+
+	if len(svc.UserInstallUpdates) != 2 {
+		t.Fatalf("expected 2 UserInstallUpdates for gh, got %d", len(svc.UserInstallUpdates))
+	}
+	if svc.UserInstallUpdates[0].Name != "gh-mcp" {
+		t.Errorf("expected first update check to be gh-mcp, got %q", svc.UserInstallUpdates[0].Name)
+	}
+	if svc.UserInstallUpdates[1].Name != "gh-stack" {
+		t.Errorf("expected second update check to be gh-stack, got %q", svc.UserInstallUpdates[1].Name)
+	}
+	for _, check := range svc.UserInstallUpdates {
+		if check.Current == "" || check.Latest == "" {
+			t.Errorf("update check %q must define Current and Latest", check.Name)
+		}
 	}
 }
 
