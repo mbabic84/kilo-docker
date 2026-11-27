@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ── Builder: compile kilo-entrypoint ──
-FROM golang:1.26-bookworm AS go-builder
+FROM golang:1.27-trixie@sha256:430985542100b871e108ccc00e8dcc5eef08ca14ee5825e98ebf563d8ffec4ee AS go-builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
@@ -9,7 +9,7 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/kilo-entrypoint ./cmd/kilo-entrypoint
 
 # ── Builder: download Kilo binary ──
-FROM debian:bookworm-slim AS builder
+FROM debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0 AS builder
 
 ARG KILO_VERSION=7.8.32
 
@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl tar ca-cer
     && chmod +x /tmp/kilo
 
 # ── Runtime: Debian with tools ──
-FROM debian:bookworm-slim
+FROM debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0
 
 ARG AINSTRUCT_BASE_URL=https://ainstruct-dev.kralicinora.cz
 
