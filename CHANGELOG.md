@@ -1,3 +1,9 @@
+## [3.96.0](https://github.com/mbabic84/kilo-docker/compare/v3.95.0...v3.96.0) (2026-11-27)
+
+### Features
+
+* install gh-stack extension with --gh ([eef6048](https://github.com/mbabic84/kilo-docker/commit/eef60484c18e0fae3c796328c5ecc1e0c3b461fe))
+
 ## [3.95.0](https://github.com/mbabic84/kilo-docker/compare/v3.94.1...v3.95.0) (2026-11-23)
 
 ### Features
