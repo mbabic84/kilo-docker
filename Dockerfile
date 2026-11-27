@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/kilo-entrypoint ./cmd/kilo-e
 # ── Builder: download Kilo binary ──
 FROM debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0 AS builder
 
-ARG KILO_VERSION=7.8.32
+ARG KILO_VERSION=7.8.40
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl tar ca-certificates \
      && rm -rf /var/lib/apt/lists/* \
